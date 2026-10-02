@@ -108,3 +108,54 @@ def test_mismatched_total_is_flagged():
     text = fixture_text().replace('Final amount in Euro\n514.61', 'Final amount in Euro\n520.00')
     result = sonett.parse_invoice(text, 'synthetic')
     assert any('does not reach' in w for w in result['Parse_Warnings'])
+
+
+# --- S26-0824-2606: the RRP column is filled in ---------------------------------------
+
+RRP_FIXTURE = '2026-08-24_S26-0824-2606.txt'
+
+
+def rrp_text():
+    with open(os.path.join(FIXTURE_DIR, RRP_FIXTURE), encoding='utf-8') as fh:
+        return fh.read()
+
+
+@pytest.fixture(scope='module')
+def rrp_invoice():
+    """No. S26-0824-2606, 2026-08-24. 21 item lines, each ending unit / total / RRP."""
+    return sonett.parse_invoice(rrp_text(), RRP_FIXTURE)
+
+
+def test_rrp_invoice_header(rrp_invoice):
+    assert rrp_invoice['Invoice Number'] == 'S26-0824-2606'
+    assert rrp_invoice['Invoice Date'] == '24/08/2026'
+
+
+def test_rrp_invoice_amounts(rrp_invoice):
+    assert rrp_invoice['VAT 23%'] == '739.60'
+    assert rrp_invoice['Total_VAT'] == 170.11
+    assert rrp_invoice['Total'] == '909.71'
+
+
+def test_rrp_column_is_not_summed_as_the_line_total(rrp_invoice):
+    # Taking the last figure on each row sums the RRPs and reports €597.20 of lines
+    # against the stated €739.60 net
+    assert 'Parse_Warnings' not in rrp_invoice
+
+
+def test_line_total_is_found_by_quantity_times_unit_price():
+    # "2 Laundry Liquid Lavender 30-95C 20 l 65.05 130.10 120.00"
+    assert sonett._line_total(2, [65.05, 130.10, 120.00]) == 130.10
+    # A money-shaped figure in the description ahead of the unit price
+    assert sonett._line_total(4, [0.30, 4.31, 17.24]) == 17.24
+    assert sonett._line_total(6, [7.56, 45.36]) == 45.36
+
+
+def test_line_that_fits_no_figure_is_flagged():
+    text = rrp_text().replace(
+        '6 Decalcifier 1 l 3.23 19.38 5.95', '6 Decalcifier 1 l 3.23 17.00 5.95'
+    )
+    result = sonett.parse_invoice(text, 'synthetic')
+    assert any('Decalcifier' in w for w in result['Parse_Warnings'])
+    # and the line sum no longer reconciles with the stated net
+    assert any('Line items total' in w for w in result['Parse_Warnings'])

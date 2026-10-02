@@ -284,6 +284,55 @@ class ShopDeliveryTest extends TestCase
             ->assertOk();
     }
 
+    /**
+     * Weights are typed with decimals and added on PHP floats, which leaves a
+     * tail (1.94 + 3.74 = 5.680000000000001). Stored totals are rounded to 3 dp.
+     */
+    public function test_weights_accumulate_without_a_floating_point_tail(): void
+    {
+        $user = $this->employee();
+
+        foreach (['1.94', '3.74', '0.111'] as $quantity) {
+            $response = $this->actingAs($user)
+                ->postJson(route('delivery-legacy.scan-increment'), [
+                    'delID' => 'd-1',
+                    'supplierID' => '999',
+                    'barcode' => '5000000000024',
+                    'quantity' => $quantity,
+                ])
+                ->assertOk();
+        }
+
+        $this->assertSame(11.791, (float) $response->json('newQuantity'));
+
+        $rows = DB::connection('pos')->table('deliveriesScanItems')
+            ->where('delID', 'd-1')
+            ->where('barcode', '5000000000024')
+            ->pluck('quantity');
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(11.791, (float) $rows->first());
+    }
+
+    public function test_a_corrected_quantity_is_rounded_to_three_decimals(): void
+    {
+        $this->actingAs($this->employee())
+            ->patchJson(route('delivery-legacy.update-quantity'), [
+                'delID' => 'd-1',
+                'supplierID' => '999',
+                'barcode' => '5000000000024',
+                'quantity' => '2.34567',
+            ])
+            ->assertOk();
+
+        $stored = DB::connection('pos')->table('deliveriesScanItems')
+            ->where('delID', 'd-1')
+            ->where('barcode', '5000000000024')
+            ->value('quantity');
+
+        $this->assertSame(2.346, (float) $stored);
+    }
+
     public function test_product_photo_route_serves_a_thumbnail(): void
     {
         $user = $this->employee();
@@ -473,6 +522,96 @@ class ShopDeliveryTest extends TestCase
         $response->assertSee('bump(-1)', false);
     }
 
+    public function test_quantities_on_the_delivery_screens_are_formatted(): void
+    {
+        $employee = $this->employee();
+
+        $this->actingAs($employee)
+            ->get($this->scanUrl())
+            ->assertOk()
+            ->assertSee('stockText(row.scanned)', false)
+            ->assertSee('stockText(pending.scannedSoFar)', false);
+
+        $this->actingAs($employee)
+            ->get($this->summaryUrl())
+            ->assertOk()
+            ->assertSee('quantityText(unitsToAdd)', false);
+    }
+
+    public function test_the_scan_prompt_offers_a_typed_quantity(): void
+    {
+        $response = $this->actingAs($this->employee())
+            ->get($this->scanUrl())
+            ->assertOk();
+
+        $response->assertSee('typeQuantity()', false);
+        $response->assertSee('inputmode="decimal"', false);
+        $response->assertSee('qtyValue === null', false);
+    }
+
+    public function test_the_correction_card_offers_a_typed_quantity(): void
+    {
+        $response = $this->actingAs($this->employee())
+            ->get($this->scanUrl())
+            ->assertOk();
+
+        $response->assertSee('typeCorrection()', false);
+        $response->assertSee('setCorrection()', false);
+    }
+
+    public function test_scan_screen_offers_find_by_name(): void
+    {
+        $response = $this->actingAs($this->userWith('employee', ['deliveries.process', 'products.view']))
+            ->get($this->scanUrl())
+            ->assertOk();
+
+        $response->assertSee('No barcode? Find by name');
+        $response->assertSee('openManual()', false);
+        $response->assertSee('data-search-url="'.e(route('api.products.search')).'"', false);
+    }
+
+    public function test_find_by_name_is_hidden_without_products_view(): void
+    {
+        $this->actingAs($this->employee())
+            ->get($this->scanUrl())
+            ->assertOk()
+            ->assertDontSee('openManual()', false);
+    }
+
+    public function test_find_by_name_is_hidden_on_a_completed_session(): void
+    {
+        DB::connection('pos')->table('deliveriesScan')->where('ID', 'd-1')->update(['status' => 1]);
+
+        $this->actingAs($this->userWith('employee', ['deliveries.process', 'products.view']))
+            ->get($this->scanUrl())
+            ->assertOk()
+            ->assertDontSee('openManual()', false);
+    }
+
+    /** The request a product picked by name makes: its code, with a typed weight. */
+    public function test_a_product_picked_by_name_is_recorded_by_its_code_with_a_weight(): void
+    {
+        $user = $this->employee();
+
+        $this->actingAs($user)
+            ->postJson(route('delivery-legacy.scan-increment'), [
+                'delID' => 'd-1',
+                'supplierID' => '999',
+                'barcode' => '5000000000024',
+                'quantity' => 4.35,
+            ])
+            ->assertOk()
+            ->assertJsonPath('newQuantity', 10.35);
+
+        $row = collect($this->actingAs($user)
+            ->getJson(route('delivery-legacy.items', ['delID' => 'd-1', 'supplierID' => '999']))
+            ->assertOk()
+            ->json('rows'))
+            ->firstWhere('barcode', '5000000000024');
+
+        $this->assertEquals(10.35, $row['scanned']);
+    }
+
     public function test_lookup_with_zero_quantity_records_nothing(): void
     {
         $employee = $this->employee();
@@ -591,6 +730,85 @@ class ShopDeliveryTest extends TestCase
         $this->assertEquals($afterFirst['p1'], $this->stockOf('p1'), 'Stock must not move on a second completion.');
         $this->assertEquals($afterFirst['p2'], $this->stockOf('p2'), 'Stock must not move on a second completion.');
         $this->assertSame(1, (int) DB::connection('pos')->table('deliveriesScan')->where('ID', 'd-1')->value('status'));
+    }
+
+    /**
+     * A product with no STOCKCURRENT row at all, delivered 2.5 on d-1. Seeded
+     * per test rather than in the trait so no other test's figures move.
+     */
+    private function seedProductWithoutStockRecord(): void
+    {
+        $pos = DB::connection('pos');
+
+        $pos->table('PRODUCTS')->insert([
+            'ID' => 'p3', 'NAME' => 'Mature cheddar', 'CODE' => '5000000000031', 'CATEGORY' => 'c1',
+            'TAXCAT' => '001', 'PRICEBUY' => 15, 'PRICESELL' => 28.5,
+        ]);
+        $pos->table('deliveriesScanItems')->insert([
+            'ID' => 'i4', 'delID' => 'd-1', 'barcode' => '5000000000031', 'quantity' => 2.5, 'dateScan' => now(),
+        ]);
+    }
+
+    private function stockRowsOf(string $productId)
+    {
+        return DB::connection('pos')->table('STOCKCURRENT')->where('PRODUCT', $productId)->get();
+    }
+
+    public function test_completion_creates_a_stock_record_for_a_product_without_one(): void
+    {
+        $this->seedProductWithoutStockRecord();
+        $this->assertCount(0, $this->stockRowsOf('p3'));
+
+        $this->actingAs($this->employee())
+            ->post(route('delivery-legacy.complete'), [
+                'delID' => 'd-1', 'supplierID' => '999', 'return' => 'shop',
+            ])
+            ->assertRedirect(route('shop.deliveries'));
+
+        $rows = $this->stockRowsOf('p3');
+        $this->assertCount(1, $rows);
+        $this->assertEquals(2.5, $rows->first()->UNITS);
+        $this->assertSame('0', $rows->first()->LOCATION);
+
+        $this->assertEquals(15, $this->stockOf('p1'));
+    }
+
+    public function test_undo_takes_a_created_stock_record_back_to_zero(): void
+    {
+        $this->seedProductWithoutStockRecord();
+        $user = $this->userWith('employee', ['deliveries.process', 'deliveries.manage']);
+
+        $this->actingAs($user)
+            ->post(route('delivery-legacy.complete'), [
+                'delID' => 'd-1', 'supplierID' => '999', 'return' => 'shop',
+            ])
+            ->assertRedirect(route('shop.deliveries'));
+
+        $this->actingAs($user)
+            ->post(route('delivery-legacy.undo-complete'), ['delID' => 'd-1', 'supplierID' => '999'])
+            ->assertRedirect();
+
+        $rows = $this->stockRowsOf('p3');
+        $this->assertCount(1, $rows, 'Undo returns a created record to 0; it does not delete it.');
+        $this->assertEquals(0, $rows->first()->UNITS);
+        $this->assertSame(0, (int) DB::connection('pos')->table('deliveriesScan')->where('ID', 'd-1')->value('status'));
+    }
+
+    public function test_completing_twice_does_not_create_or_add_twice(): void
+    {
+        $this->seedProductWithoutStockRecord();
+        $employee = $this->employee();
+
+        foreach ([1, 2] as $attempt) {
+            $this->actingAs($employee)
+                ->post(route('delivery-legacy.complete'), [
+                    'delID' => 'd-1', 'supplierID' => '999', 'return' => 'shop',
+                ]);
+        }
+
+        $rows = $this->stockRowsOf('p3');
+        $this->assertCount(1, $rows);
+        $this->assertEquals(2.5, $rows->first()->UNITS);
     }
 
     /**

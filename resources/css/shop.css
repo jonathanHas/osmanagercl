@@ -600,4 +600,38 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-choice__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 /* The design's delivery item row is a two-column grid; a picture needs a third. */
 .shop-item--pic { grid-template-columns: auto minmax(0, 1fr) auto; }
+/* Procedures (SOPs) read from BookStack (resources/views/shop/help.blade.php).
+   The HTML is BookStack's, sanitised, so it is styled by element, not by class;
+   .callout is BookStack's own callout box. */
+.shop-sop { display: flex; flex-direction: column; gap: var(--shop-space-3); padding: var(--shop-space-5); background: var(--shop-surface); border-radius: var(--shop-radius-lg); box-shadow: var(--shop-shadow-sm); font-size: var(--shop-fs-md); line-height: var(--shop-lh); color: var(--shop-ink); min-width: 0; overflow-wrap: anywhere; }
+.shop-sop > * { margin: 0; }
+.shop-sop h1, .shop-sop h2, .shop-sop h3, .shop-sop h4 { font-weight: var(--shop-fw-heavy); line-height: var(--shop-lh-tight); margin-top: var(--shop-space-3); }
+.shop-sop > :first-child { margin-top: 0; }
+.shop-sop h1 { font-size: var(--shop-fs-xl); }
+.shop-sop h2 { font-size: var(--shop-fs-lg); }
+.shop-sop h3 { font-size: var(--shop-fs-md); }
+.shop-sop h4 { font-size: var(--shop-fs-sm); text-transform: uppercase; letter-spacing: 0.04em; color: var(--shop-ink-2); }
+.shop-sop ul, .shop-sop ol { display: flex; flex-direction: column; gap: var(--shop-space-2); padding-left: var(--shop-space-5); }
+.shop-sop ul { list-style: disc; }
+.shop-sop ol { list-style: decimal; }
+.shop-sop li > ul, .shop-sop li > ol { margin-top: var(--shop-space-2); }
+.shop-sop blockquote { padding: var(--shop-space-2) var(--shop-space-4); border-left: 4px solid var(--shop-line-strong); color: var(--shop-ink-2); }
+.shop-sop hr { border: 0; border-top: 1px solid var(--shop-line); }
+.shop-sop code { padding: 1px 6px; border-radius: 6px; background: var(--shop-surface-2); font-size: 0.9em; }
+.shop-sop pre { padding: var(--shop-space-3) var(--shop-space-4); border-radius: var(--shop-radius-sm); background: var(--shop-surface-2); overflow-x: auto; font-size: var(--shop-fs-sm); }
+.shop-sop pre code { padding: 0; background: none; }
+.shop-sop img, .shop-sop video { max-width: 100%; height: auto; border-radius: var(--shop-radius-sm); }
+.shop-sop table { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--shop-fs-sm); }
+.shop-sop th, .shop-sop td { padding: var(--shop-space-2) var(--shop-space-3); border: 1px solid var(--shop-line); text-align: left; vertical-align: top; }
+.shop-sop th { background: var(--shop-surface-2); font-weight: var(--shop-fw-bold); }
+.shop-sop a { color: var(--shop-accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.shop-sop .callout { padding: var(--shop-space-3) var(--shop-space-4); border-left: 4px solid var(--shop-muted); border-radius: var(--shop-radius-sm); background: var(--shop-muted-soft); color: var(--shop-muted-ink); }
+.shop-sop .callout.info { border-left-color: var(--shop-sage); background: var(--shop-sage-soft); color: var(--shop-sage-ink); }
+.shop-sop .callout.success { border-left-color: var(--shop-ok); background: var(--shop-ok-soft); color: var(--shop-ok-ink); }
+.shop-sop .callout.warning { border-left-color: var(--shop-warn); background: var(--shop-warn-soft); color: var(--shop-warn-ink); }
+.shop-sop .callout.danger { border-left-color: var(--shop-bad); background: var(--shop-bad-soft); color: var(--shop-bad-ink); }
+/* The delivery prompt's quantity is a button (tap to type a weight). The reset
+   already strips the border and inherits font and colour; a grid cell button
+   still sizes to its content, so stretch it like the <output> it replaces. */
+.shop button.shop-stepper__value { width: 100%; }
 /* === APP ADDITIONS END === */

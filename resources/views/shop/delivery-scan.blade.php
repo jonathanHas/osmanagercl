@@ -14,6 +14,7 @@
           data-update-url="{{ route('delivery-legacy.update-quantity') }}"
           data-del-id="{{ $session['id'] }}"
           data-supplier-id="{{ $session['supplierId'] }}"
+          data-search-url="{{ route('api.products.search') }}"
           @scan="onScan($event.detail.code)"
           @scan-empty="pending && commit()">
         <div class="shop-split">
@@ -36,7 +37,7 @@
                     <div class="shop-facts shop-facts--2">
                         <div class="shop-fact">
                             <span class="shop-label">Scanned so far</span>
-                            <span class="shop-fact__value" x-text="pending?.scannedSoFar"></span>
+                            <span class="shop-fact__value" x-text="pending ? stockText(pending.scannedSoFar) : ''"></span>
                         </div>
                         <div class="shop-fact">
                             <span class="shop-label">Invoice</span>
@@ -52,16 +53,29 @@
                         </div>
                     </div>
 
-                    <div class="shop-stack shop-stack--tight">
+                    <div class="shop-stack shop-stack--tight" x-show="pending?.typed == null">
                         <span class="shop-label">Quantity to add</span>
                         <div class="shop-stepper">
                             <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One fewer" @click="bump(-1)"><x-shop.icon name="minus" size="lg" /></button>
-                            <output class="shop-stepper__value" x-text="pending?.qty"></output>
+                            {{-- Tap the number to type it: a weight, or a count too big to
+                                 step to. A case count stays on the stepper. --}}
+                            <output class="shop-stepper__value" x-show="pending?.scanType === 'case'" x-text="pending?.qty"></output>
+                            <button class="shop-stepper__value" type="button" aria-label="Type the quantity" x-show="pending?.scanType !== 'case'" x-on:click="typeQuantity()" x-text="pending?.qty"></button>
                             <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One more" @click="bump(1)"><x-shop.icon name="plus" size="lg" /></button>
                         </div>
                     </div>
 
-                    <button class="shop-btn shop-btn--primary shop-btn--lg shop-btn--block" type="button" :disabled="busy" @click="commit()">
+                    {{-- x-show with a null-safe getter/setter, not x-model="pending.typed"
+                         (throws while pending is null) and not x-if: commit() empties
+                         pending, and a handler on an element x-if has removed loses
+                         $root for the rest of its run (the list reset then fails). --}}
+                    <div class="shop-field" x-show="pending?.typed != null" x-cloak>
+                        <label class="shop-field__label" for="delivery-qty">Quantity or weight</label>
+                        <input class="shop-input" id="delivery-qty" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done"
+                               x-ref="qty" x-model="typedQty" x-on:keydown.enter.prevent="commit()">
+                    </div>
+
+                    <button class="shop-btn shop-btn--primary shop-btn--lg shop-btn--block" type="button" :disabled="busy || qtyValue === null" @click="commit()">
                         <x-shop.icon name="check" />
                         <span x-text="addLabel"></span>
                     </button>
@@ -74,6 +88,52 @@
                     </section>
                 @else
                     <x-shop.scan-input inline placeholder="Scan item" hint="Ready — scan the next item" />
+
+                    @if ($canSearch)
+                        {{-- Items without a barcode (the weekly cheese): pick by name,
+                             then type the amount. In flow, not a popup (README rule 6). --}}
+                        <button class="shop-btn shop-btn--ghost" type="button" x-show="! manual" x-on:click="openManual()">
+                            <x-shop.icon name="search" size="sm" />No barcode? Find by name
+                        </button>
+
+                        <section class="shop-card" x-show="manual && ! pending" x-cloak x-ref="manual">
+                            <div class="shop-between">
+                                <h2 class="shop-subtitle">Find by name</h2>
+                                <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Close" x-on:click="closeManual()">
+                                    <x-shop.icon name="x" />
+                                </button>
+                            </div>
+
+                            <div class="shop-search">
+                                <x-shop.icon name="search" />
+                                <input class="shop-input" type="search" x-model="query" x-ref="filter" autocomplete="off" enterkeyhint="search"
+                                       x-on:input.debounce.250ms="filterManual()" x-on:keydown.enter.prevent="pickFirst()"
+                                       :placeholder="everywhere ? 'Search all products' : {{ Js::from('Filter '.($session['supplier'] ?? 'supplier').' products') }}">
+                            </div>
+
+                            <div class="shop-list" x-show="results.length" x-cloak>
+                                <template x-for="p in results" :key="p.id">
+                                    <button class="shop-row" type="button" x-on:click="pickResult(p)">
+                                        <x-shop.product-thumb />
+                                        <div class="shop-row__main">
+                                            <span class="shop-row__title" x-text="p.name"></span>
+                                            <span class="shop-row__meta shop-code" x-text="p.code + (p.stock_units !== null ? ' · Stock ' + stockText(p.stock_units) : '')"></span>
+                                        </div>
+                                        <span class="shop-pill shop-pill--muted" x-show="! p.is_stocked">Not stocked</span>
+                                    </button>
+                                </template>
+                            </div>
+
+                            <p class="shop-meta" x-show="total > results.length" x-cloak>
+                                Showing the first <span x-text="results.length"></span>, type to narrow
+                            </p>
+                            <p class="shop-meta" x-show="! searching && query.trim() !== '' && ! results.length" x-cloak>No products match</p>
+
+                            <button class="shop-btn shop-btn--ghost" type="button" x-show="query.trim() !== '' && ! everywhere" x-cloak x-on:click="searchEverywhere()">
+                                <x-shop.icon name="search" size="sm" />Search all products
+                            </button>
+                        </section>
+                    @endif
                 @endif
 
                 <p class="shop-notice" x-show="! hasInvoice" x-cloak>
@@ -112,11 +172,19 @@
                         </div>
                     </div>
 
-                    <div class="shop-stepper">
+                    <div class="shop-stepper" x-show="editTyped === null">
                         <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One fewer" :disabled="busy" @click="adjust(editingRow, -1)"><x-shop.icon name="minus" size="lg" /></button>
-                        <output class="shop-stepper__value" x-text="editingRow?.scanned ?? 0"></output>
+                        <button class="shop-stepper__value" type="button" aria-label="Type the quantity" x-on:click="typeCorrection()" x-text="stockText(editingRow?.scanned)"></button>
                         <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One more" :disabled="busy" @click="adjust(editingRow, 1)"><x-shop.icon name="plus" size="lg" /></button>
                     </div>
+
+                    <div class="shop-field" x-show="editTyped !== null" x-cloak>
+                        <label class="shop-field__label" for="delivery-edit-qty">Quantity or weight</label>
+                        <input class="shop-input" id="delivery-edit-qty" type="text" inputmode="decimal" autocomplete="off" enterkeyhint="done"
+                               x-ref="editQty" x-model="editTyped" x-on:keydown.enter.prevent="setCorrection()">
+                    </div>
+                    <button class="shop-btn shop-btn--primary shop-btn--block" type="button" x-show="editTyped !== null" x-cloak
+                            :disabled="busy" x-on:click="setCorrection()">Set</button>
 
                     <button class="shop-btn shop-btn--primary shop-btn--block" type="button" @click="editing = null">Done</button>
                 </section>
@@ -163,7 +231,7 @@
                             </span>
                             <span class="shop-row__aside">
                                 <span class="shop-row__qty">
-                                    <span x-text="row.scanned ?? 0"></span><small x-show="hasInvoice" x-text="expectedLabel(row)"></small>
+                                    <span x-text="stockText(row.scanned)"></span><small x-show="hasInvoice" x-text="expectedLabel(row)"></small>
                                 </span>
                                 <span class="shop-pill" x-show="pill(row)" x-cloak :class="pill(row)?.tone" x-text="pill(row)?.text"></span>
                             </span>

@@ -4,22 +4,21 @@ Gift-voucher work runs here, separate from the Shop mode cycles in `docs/planImp
 Same protocol, same file roles: see [`planimp.md`](./planimp.md) (a copy of
 `docs/planImp/planimp.md` with paths pointing here).
 
-## Where things stand (2026-09-29)
+## Where things stand (2026-09-30)
 
 | | |
 |---|---|
-| Current cycle | Vouchers cycle 4 — admin changeover tools: make for sale, bulk deactivate / reactivate, delete, restore, and the command that retires the three fixed voucher products |
-| `plan.md` | `Status: READY`, Revision 2 (Planner: Fable 5.1) |
-| `implemented.md` | not started |
+| Current cycle | none: `plan.md` and `implemented.md` are empty. The next task starts fresh |
+| Cycle 4 | Admin changeover tools (make for sale, bulk deactivate / reactivate, delete, restore, retire command): ACCEPTED 2026-09-30, committed (9f796b28). `archive/2026-09-30-cycle-4-admin-tools/` |
 | Cycle 3 | Selling a voucher at the till activates it: ACCEPTED 2026-09-29, committed (65477718), deployed and working on the live till. `archive/2026-09-29-cycle-3-sale-activates/` |
 | Cycle 2 | Activity screen `/vouchers/activity`: ACCEPTED 2026-09-29, committed (88447f40), deployed. `archive/2026-09-29-cycle-2-activity-screen/` |
 | Cycle 1 | Till-driven redemption (called cycle 28 at the time): ACCEPTED, committed (421df081), deployed. `archive/2026-09-27-cycle-28-till-voucher-redemption/` |
 | Production | Scheduler runs every minute from `/etc/cron.d/osmanager` as `www-data`. `crontab -l` shows nothing, by design |
 
 Open items for the owner:
-1. After cycle 4 is deployed: the "Changeover on production" checklist in `docs/features/voucher-management.md` (make the 36 unsold labels for sale, delete the test vouchers, retire the three fixed products, restart the tills).
-2. Identify the one hand-activated voucher that was really sold, before running the changeover. A fixed voucher product was sold on 2026-09-29 at 14:14.
-3. Scan one printed GV label with the real scanner at the real till (finding 1 in [`findings/2026-09-28-till-testing.md`](./findings/2026-09-28-till-testing.md)), if not already done during the production test.
+1. Browser check of cycle 4 as an admin on dev (archived plan, Verification 7), then deploy.
+2. **The production changeover**, in the order given in `docs/features/voucher-management.md` under "Changeover on production": identify the one sold voucher (a fixed voucher product was sold 2026-09-29 14:14); make the other 36 for sale; delete the five test vouchers; retire the three fixed products; restart the tills; check `/vouchers/activity`.
+3. Scan one printed GV label with the real scanner at the real till (finding 1 in [`findings/2026-09-28-till-testing.md`](./findings/2026-09-28-till-testing.md)), if not already done. The parked backfill finding is settled by the changeover; move both findings into the cycle 4 archive folder once the changeover is done.
 
 ## Kickoff prompts
 

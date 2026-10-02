@@ -9,6 +9,7 @@
  */
 import mix from './mix.js';
 import productImages from './product-images.js';
+import { quantityText } from './quantity.js';
 
 export default () => mix(productImages(), {
     session: null,
@@ -121,12 +122,17 @@ export default () => mix(productImages(), {
         return !! this.session && ! this.session.completed && this.totals.scanned > 0;
     },
 
+    /** A quantity without floating-point tails (see quantity.js). */
+    quantityText(value) {
+        return quantityText(value);
+    },
+
     label(row) {
         switch (row.status) {
             case 'short':
-                return `Short ${row.expected - row.scanned}`;
+                return `Short ${quantityText(row.expected - row.scanned)}`;
             case 'over':
-                return `Over ${row.scanned - row.expected}`;
+                return `Over ${quantityText(row.scanned - row.expected)}`;
             case 'unexpected':
                 return 'Unexpected';
             default:
@@ -147,7 +153,9 @@ export default () => mix(productImages(), {
     },
 
     meta(row) {
-        return `Expected ${row.expected ?? '—'} · scanned ${row.scanned ?? 0}`;
+        const expected = row.expected === null || row.expected === undefined ? '—' : quantityText(row.expected);
+
+        return `Expected ${expected} · scanned ${quantityText(row.scanned)}`;
     },
 
     askToComplete() {

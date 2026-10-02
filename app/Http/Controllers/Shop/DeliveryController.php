@@ -65,7 +65,12 @@ class DeliveryController extends Controller
 
     public function scan(Request $request): View
     {
-        return view('shop.delivery-scan', ['session' => $this->session($request)]);
+        return view('shop.delivery-scan', [
+            'session' => $this->session($request),
+            // "No barcode? Find by name" searches products, which needs its own
+            // permission on top of deliveries.process.
+            'canSearch' => $request->user()->hasPermission('products.view'),
+        ]);
     }
 
     public function summary(Request $request): View

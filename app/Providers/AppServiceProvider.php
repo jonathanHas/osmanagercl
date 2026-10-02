@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\InvoiceAttachment;
 use App\Models\Product;
 use App\Observers\ProductObserver;
+use App\Services\BookStack\ScreenHelp;
 use App\Services\Shop\ShopDeviceService;
 use App\Support\UiMode;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
@@ -20,6 +21,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(UiMode::class);
         $this->app->scoped(ShopDeviceService::class);
+        // Memoises the BookStack screen index for one request (help buttons).
+        $this->app->scoped(ScreenHelp::class);
     }
 
     /**

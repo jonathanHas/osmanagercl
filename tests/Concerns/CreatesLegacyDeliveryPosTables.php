@@ -68,6 +68,9 @@ trait CreatesLegacyDeliveryPosTables
         $pos->create('STOCKCURRENT', function (Blueprint $table) {
             $table->string('PRODUCT');
             $table->decimal('UNITS', 10, 2)->default(0);
+            // Part of the POS key; completion sets them when it creates a row.
+            $table->string('LOCATION')->nullable();
+            $table->string('ATTRIBUTESETINSTANCE_ID')->nullable();
         });
         $pos->create('suppliers', function (Blueprint $table) {
             $table->string('SupplierID')->primary();

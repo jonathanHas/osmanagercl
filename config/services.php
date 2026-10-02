@@ -53,4 +53,14 @@ return [
         'timeout' => env('ZEBRA_PRINTER_TIMEOUT', 15),
     ],
 
+    'bookstack' => [
+        // Blank switches the whole procedures feature off (no button, no HTTP).
+        'url' => env('BOOKSTACK_URL'),
+        'token_id' => env('BOOKSTACK_TOKEN_ID'),
+        'token_secret' => env('BOOKSTACK_TOKEN_SECRET'),
+        'timeout' => env('BOOKSTACK_TIMEOUT', 3),
+        // Name of the BookStack page tag whose value is a screen's route name.
+        'screen_tag' => env('BOOKSTACK_SCREEN_TAG', 'screen'),
+    ],
+
 ];

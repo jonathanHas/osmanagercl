@@ -13,6 +13,7 @@ This document provides a comprehensive overview of all features in the OSManager
 - [Financial Systems](#financial-systems)
 - [Analytics & Reporting](#analytics--reporting)
 - [POS Integration](#pos-integration)
+- [Staff Procedures](#staff-procedures)
 - [User Management](#user-management)
 - [AI & Automation](#ai--automation)
 
@@ -947,6 +948,20 @@ Real-time coffee order tracking system for baristas with optimized performance.
 - **No Queue Dependencies**: Direct polling eliminates queue worker requirements
 
 📖 [KDS Documentation](./features/kds-coffee-system.md)
+
+---
+
+## Staff Procedures
+
+### Procedures (SOPs) from BookStack (NEW! 2026-09-30)
+A "How to do this" button on each screen opens the written procedure for it, read from BookStack and shown inside our own layouts (Shop mode or office).
+- **Written in BookStack**: owner and managers author SOPs there; the app only reads them through the API (GET only)
+- **Linked by tag**: a BookStack page tag `screen` = the route name links it to a screen; the empty help page tells managers the value
+- **Shop + Office**: topbar icon button in Shop mode, a sidebar row in the office layout; managers also get a "Procedures (BookStack)" sidebar link
+- **Safe by default**: only tagged pages are served, HTML sanitised, images through a proxy (no SVG), token never leaves the server
+- **Resilient**: 5-minute index cache with a last-good fallback, 10-minute page cache, manager Refresh; blank `BOOKSTACK_URL` switches it off
+
+📖 [Staff Procedures Documentation](./features/sops-bookstack.md)
 
 ---
 

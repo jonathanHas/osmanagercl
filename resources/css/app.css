@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Procedures (SOPs) read from BookStack, office layout (resources/views/help/show.blade.php).
+   Mirrors .shop-sop in resources/css/shop.css. The HTML is BookStack's, sanitised,
+   so it is styled by element; .callout is BookStack's own callout box. */
+.sop-body { @apply text-base leading-relaxed text-gray-900 break-words; }
+.sop-body > * + * { @apply mt-4; }
+.sop-body h1, .sop-body h2, .sop-body h3, .sop-body h4 { @apply font-bold leading-tight mt-6; }
+.sop-body > :first-child { @apply mt-0; }
+.sop-body h1 { @apply text-2xl; }
+.sop-body h2 { @apply text-xl; }
+.sop-body h3 { @apply text-lg; }
+.sop-body h4 { @apply text-sm uppercase tracking-wide text-gray-600; }
+.sop-body ul { @apply list-disc pl-6 space-y-2; }
+.sop-body ol { @apply list-decimal pl-6 space-y-2; }
+.sop-body li > ul, .sop-body li > ol { @apply mt-2; }
+.sop-body blockquote { @apply border-l-4 border-gray-300 pl-4 py-1 text-gray-600; }
+.sop-body hr { @apply border-0 border-t border-gray-200; }
+.sop-body code { @apply px-1.5 py-0.5 rounded bg-gray-100 text-sm; }
+.sop-body pre { @apply p-4 rounded bg-gray-100 overflow-x-auto text-sm; }
+.sop-body pre code { @apply p-0 bg-transparent; }
+.sop-body img, .sop-body video { max-width: 100%; height: auto; @apply rounded; }
+.sop-body table { @apply block overflow-x-auto border-collapse text-sm; }
+.sop-body th, .sop-body td { @apply px-3 py-2 border border-gray-200 text-left align-top; }
+.sop-body th { @apply bg-gray-50 font-semibold; }
+.sop-body a { @apply text-indigo-600 underline underline-offset-2 hover:text-indigo-800; }
+.sop-body .callout { @apply px-4 py-3 border-l-4 rounded border-gray-400 bg-gray-50 text-gray-800; }
+.sop-body .callout.info { @apply border-blue-400 bg-blue-50 text-blue-900; }
+.sop-body .callout.success { @apply border-green-500 bg-green-50 text-green-900; }
+.sop-body .callout.warning { @apply border-yellow-500 bg-yellow-50 text-yellow-900; }
+.sop-body .callout.danger { @apply border-red-500 bg-red-50 text-red-900; }

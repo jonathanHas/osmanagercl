@@ -6,6 +6,7 @@ use App\Models\Delivery;
 use App\Models\DeliveryLabelPrint;
 use App\Models\DeliveryScanItem;
 use App\Models\ProductTranslation;
+use App\Models\StockCurrent;
 use App\Models\ZebraLabel;
 use App\Services\CustomerRequestService;
 use App\Services\IihfGoodsReturnPdfService;
@@ -1285,7 +1286,7 @@ class DeliveryLegacyController extends Controller
 
         $delID = $validated['delID'];
         $barcode = $validated['barcode'];
-        $quantity = $validated['quantity'];
+        $quantity = round((float) $validated['quantity'], 3);
         $supplierID = $validated['supplierID'];
 
         // Delete existing scan records for this barcode+delID and insert consolidated record
@@ -1394,7 +1395,9 @@ class DeliveryLegacyController extends Controller
             ->where('barcode', $resolvedBarcode)
             ->sum('quantity');
 
-        $newQuantity = $currentTotal + $effectiveIncrement;
+        // Rounded to 3 dp: typed weights add up on floats and would otherwise
+        // store a tail (1.94 + 3.74 can come out as 5.680000000000001).
+        $newQuantity = round($currentTotal + $effectiveIncrement, 3);
 
         // Only write to DB if actually incrementing (quantity > 0)
         if ($effectiveIncrement > 0) {
@@ -1604,43 +1607,21 @@ class DeliveryLegacyController extends Controller
         // Get extra items (scanned but NOT on invoice)
         $extraItems = $this->getScannedNotOnInvoice($delID, $supplierID);
 
-        // Track update results
+        // Track update results. productsSkipped stays for the office view, which
+        // reports it; it now only counts a stock record that could not be created.
         $updateResults = [
             'productsUpdated' => 0,
+            'productsCreated' => 0,
             'productsSkipped' => 0,
             'unitsAdded' => 0,
         ];
 
         DB::connection('pos')->transaction(function () use ($matchedItems, $extraItems, $delID, &$updateResults) {
-            // Update stock for matched items (on invoice AND scanned)
-            foreach ($matchedItems as $item) {
-                if ($item->scanned !== null && $item->scanned > 0 && $item->productID) {
-                    $affected = DB::connection('pos')->table('STOCKCURRENT')
-                        ->where('PRODUCT', $item->productID)
-                        ->increment('UNITS', $item->scanned);
-
-                    if ($affected > 0) {
-                        $updateResults['productsUpdated']++;
-                        $updateResults['unitsAdded'] += $item->scanned;
-                    } else {
-                        $updateResults['productsSkipped']++;
-                    }
-                }
-            }
-
-            // Update stock for extra items (scanned but NOT on invoice)
-            foreach ($extraItems as $item) {
-                if ($item->scanned !== null && $item->scanned > 0 && $item->productID) {
-                    $affected = DB::connection('pos')->table('STOCKCURRENT')
-                        ->where('PRODUCT', $item->productID)
-                        ->increment('UNITS', $item->scanned);
-
-                    if ($affected > 0) {
-                        $updateResults['productsUpdated']++;
-                        $updateResults['unitsAdded'] += $item->scanned;
-                    } else {
-                        $updateResults['productsSkipped']++;
-                    }
+            // Matched items (on invoice AND scanned), then extra items (scanned
+            // but NOT on invoice): the same rule for both.
+            foreach ([$matchedItems, $extraItems] as $items) {
+                foreach ($items as $item) {
+                    $this->addDeliveredStock($item, $updateResults);
                 }
             }
 
@@ -1663,6 +1644,50 @@ class DeliveryLegacyController extends Controller
             ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
             ->with('success', 'Stock updated successfully. Delivery marked as complete.')
             ->with('updateResults', $updateResults);
+    }
+
+    /**
+     * Add one delivered item to stock. A product with no STOCKCURRENT row at all
+     * used to be skipped and its delivered amount lost; it now gets a row holding
+     * that amount (undo takes it back to 0, it does not delete it). A barcode that
+     * matches no product still cannot be stocked.
+     *
+     * @param  array{productsUpdated: int, productsCreated: int, productsSkipped: int, unitsAdded: int|float}  $results
+     */
+    private function addDeliveredStock(object $item, array &$results): void
+    {
+        if ($item->scanned === null || $item->scanned <= 0 || ! $item->productID) {
+            return;
+        }
+
+        $affected = DB::connection('pos')->table('STOCKCURRENT')
+            ->where('PRODUCT', $item->productID)
+            ->increment('UNITS', $item->scanned);
+
+        if ($affected === 0) {
+            try {
+                // Every POS stock row is at location '0'; LOCATION is NOT NULL and
+                // part of the key, so MySQL refuses the insert without it.
+                StockCurrent::create([
+                    'PRODUCT' => $item->productID,
+                    'UNITS' => $item->scanned,
+                    'LOCATION' => '0',
+                    'ATTRIBUTESETINSTANCE_ID' => null,
+                ]);
+                $results['productsCreated']++;
+            } catch (\Exception $e) {
+                \Log::warning('Failed to create STOCKCURRENT for a delivered product', [
+                    'product_id' => $item->productID,
+                    'error' => $e->getMessage(),
+                ]);
+                $results['productsSkipped']++;
+
+                return;
+            }
+        }
+
+        $results['productsUpdated']++;
+        $results['unitsAdded'] += $item->scanned;
     }
 
     /**

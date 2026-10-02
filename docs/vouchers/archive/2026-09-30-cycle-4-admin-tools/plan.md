@@ -1,6 +1,6 @@
 # Admin tools for existing and test vouchers (vouchers cycle 4)
 
-Status: READY
+Status: ACCEPTED
 Revision: 2
 Planner: Fable 5.1
 Date: 2026-09-29
@@ -207,4 +207,48 @@ Check: `grep -n "VOUCHER_ADMIN_TOOLS" docs/features/voucher-management.md` finds
 
 ## Review
 
-(Planner fills this in after reading implemented.md and the diff.)
+Reviewed 2026-09-30 against `implemented.md` (read to the end, five deviations, six notes and the heredoc incident) and the committed diff `65477718..9f796b28`. The owner committed the cycle before review. Production was not touched.
+
+**Criteria**
+- Step 0 baseline — pass (15 failed, 862 passed).
+- Step 1 config and types — pass.
+- Step 2 deleted voucher's till product — pass: `[deleted]`, price 0, checked before `isForSale()`.
+- Step 3 admin service — pass. Five actions, each voucher in its own transaction under `withTrashed()->lockForUpdate()`, skip reasons as specified, one audit row per voucher with the admin, till product synced after each commit. Make for sale checks status, balance, no deduct ever, balance equal to the initial value, then sets `face_value`, zeroes the balance and clears `initial_value`.
+- Step 4 deleted vouchers elsewhere — pass. Sync resolves and locks `withTrashed()` and refuses a deleted voucher right after the lock (`inactive` / `sale_flagged` with the agreed notes); lookup answers `found false, deleted true`; activate refuses a deleted code; the activity log and totals leave deleted vouchers out while `unknown` rows still show.
+- Step 5 controller and routes — pass. Five routes in `role:admin` (verified with `route:list -v`), 404 when the switch is off, validation as specified, flash with done and skipped.
+- Step 6 list page — pass with Deviation 1. Checkboxes joined to the form by `form=`, per-page select, Deleted view, in-page dialogs, delete Confirm disabled until a reason of 3 characters.
+- Step 7 lookup screens and tests — pass. Both screens have a deleted state; 39 tests added; the one named assertion changed.
+- Step 8 retire command — pass. Per product in one POS transaction: button removed, name suffixed, code and reference re-coded; `--restore` reverses; `--dry-run` writes nothing; refuses when the switch is off. Dry run on the dev copy shows the three products; nothing was written (re-checked by the Planner).
+- Step 9 docs — pass. The owner's five-step production checklist is in the feature doc.
+
+**Verification (rerun by the Planner)**
+1. `pint --test` on the 17 changed PHP files → PASS.
+2. `php artisan test --filter='Voucher|ShopVouchers|Schedule|ConfinePinSession|ShopViewContract'` → 181 passed (1111 assertions).
+3. `php artisan test` → 15 failed, 921 passed (4080 assertions); the 15 are the baseline classes. The extra passing tests over the implementer's 901 come from unrelated uncommitted work in the tree (help pages), not from this cycle.
+4. `route:list --name=vouchers.bulk -v` → five routes, each with `RoleMiddleware:admin`.
+5. `node --check` on the shop module and the four extracted inline scripts (list ×2, partial, index) → clean.
+6. Dev run: the implementer's evidence; the Planner re-checked afterwards that the three fixed products still have their codes, names and buttons, no `GVDEV%` products remain and no simulated tickets remain. The heredoc incident left no trace.
+6b. Dry run of the retire command → three rows, nothing written.
+7. Browser check: owner (below).
+
+**Deviations** — all five accepted.
+1. Buttons open the dialog and JS submits the form: the plan's `formaction` submit buttons would have bypassed the confirmation the plan also asked for. The Planner's inconsistency.
+2. `already deleted` as the reason for deleting twice: fine.
+3. `#<id> (not found)` and `#<id> (error)`: fine, and the error is logged.
+4. `--restore` reports `not retired`: fine.
+5. "Made for sale: N vouchers.": fine.
+
+**Notes for Planner**
+1. A deleted voucher's log page is a 404 — deferred; nothing links to it. If admins ever need it, add `withTrashed()` to that route's binding.
+2. Select all is per page — accepted as planned; 200 per page covers production.
+3. The single-voucher Edit modal stays beside the bar — accepted; it is the pre-existing tool and is removed with the rest later if wanted.
+4. Make for sale keeps the old `issue` row — accepted; the history reads Issued → Made for sale → Sold at till, which is the truth.
+5. A restored exhausted voucher reads `[€0.00 used up]` — accepted; the name follows the status.
+6. Dev data noted — accepted.
+7. **The heredoc incident**: the implementer's report-writing command executed text as shell. Everything it could have run was read-only or a dry run, the implementer re-checked the tree and the till data, and the Planner re-checked the same. Lesson for `planimp.md`: write reports with the file tools, never with an unquoted shell heredoc.
+
+**Owner actions**
+- Browser check as an admin on dev (plan Verification 7), then deploy.
+- The production changeover, in this order (also in `docs/features/voucher-management.md` under "Changeover on production"): identify the one sold voucher; Active, 200 per page, tick all, untick it, Make for sale (expect 36); delete the five test vouchers with a reason and destroy their labels; on the server as the web user `php artisan vouchers:retire-fixed-products --dry-run` then for real; restart uniCenta on each till; check `/vouchers/activity`.
+
+**Archive**: done by the Planner on 2026-09-30, `docs/vouchers/archive/2026-09-30-cycle-4-admin-tools/`.

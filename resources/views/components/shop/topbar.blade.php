@@ -25,6 +25,7 @@
     @endif
 
     @auth
+        <x-shop.help-button />
         <details class="shop-usermenu">
             <summary class="shop-chip"><span class="shop-avatar">{{ $initials }}</span><span class="shop-chip__name">{{ $firstName }}</span><x-shop.icon name="chevron-down" size="sm" class="shop-chip__caret" /></summary>
             <div class="shop-menu" role="menu">

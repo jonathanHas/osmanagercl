@@ -77,7 +77,7 @@
             <div class="shop-facts shop-facts--2">
                 <div class="shop-fact">
                     <span class="shop-label">Units to add</span>
-                    <span class="shop-fact__value" x-text="unitsToAdd"></span>
+                    <span class="shop-fact__value" x-text="quantityText(unitsToAdd)"></span>
                 </div>
                 <div class="shop-fact">
                     <span class="shop-label">Products</span>

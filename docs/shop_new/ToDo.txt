@@ -1,0 +1,1 @@
+Customer Requests - When taking a new customer request - if there are a lot of existing requests the user needs to browse all the way to the bottom of the page to add a new one, this should be improved to speed up taking a new request

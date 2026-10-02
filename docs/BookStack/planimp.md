@@ -1,9 +1,10 @@
-# Plan / Implement protocol — vouchers track
+# Plan / Implement protocol — BookStack (SOPs) track
 
-> Copy of `docs/planImp/planimp.md` for gift-voucher work, with paths pointing at
-> `docs/vouchers/`. The Shop mode cycles continue in `docs/planImp/`. If the two
-> protocols diverge, the original is the reference. See `README.md` for where the
-> voucher work stands.
+> Copy of `docs/planImp/planimp.md` for the procedures (SOP) work, with paths
+> pointing at `docs/BookStack/`. The Shop mode cycles continue in `docs/planImp/`
+> and the voucher work in `docs/vouchers/`. If the protocols diverge, the
+> original is the reference. Cycle numbers quoted below as the source of a rule
+> are Shop mode cycles, archived under `docs/planImp/archive/`.
 
 Two Claude Code sessions share this folder. They never share context, so the
 files here are the only channel between them.
@@ -14,8 +15,10 @@ files here are the only channel between them.
 | Implementer | Opus         | `implemented.md` | `plan.md`                            |
 
 Both sessions read `planimp.md` (this file), `plan.md`, `implemented.md`, and
-the project `CLAUDE.md` before doing anything. Neither commits, deploys, or
-runs `deploy.sh` unless `plan.md` says so explicitly.
+the project `CLAUDE.md` before doing anything. Neither commits or deploys
+unless `plan.md` says so explicitly. Neither session changes anything in
+BookStack itself or on the production server: BookStack content, roles and API
+tokens are the owner's, and the app only ever reads from it.
 
 ## The loop
 
@@ -41,19 +44,19 @@ you start. Do not act on a `plan.md` that is `DRAFT`, and do not review an
 Planner session:
 
 ```
-Read docs/vouchers/planimp.md. You are the Planner. <describe the task>
+Read docs/BookStack/planimp.md. You are the Planner. <describe the task>
 ```
 
 Implementer session:
 
 ```
-Read docs/vouchers/planimp.md. You are the Implementer. Implement docs/vouchers/plan.md.
+Read docs/BookStack/planimp.md. You are the Implementer. Implement docs/BookStack/plan.md.
 ```
 
 Planner review:
 
 ```
-Read docs/vouchers/planimp.md. You are the Planner. Review docs/vouchers/implemented.md.
+Read docs/BookStack/planimp.md. You are the Planner. Review docs/BookStack/implemented.md.
 ```
 
 ## Planner (Fable)
@@ -69,12 +72,13 @@ Do:
 - Run read-only commands freely: `git log`, `grep`, `php artisan route:list`,
   `php artisan tinker` with queries, `php artisan test --filter=...`.
 - Write steps that are small, ordered, and each have a concrete check.
-  "Add the column" is not a step. "Add nullable `published_at` timestamp to
-  `rosters` via a new migration; `php artisan migrate` runs clean and
-  `Schema::hasColumn('rosters','published_at')` is true" is a step.
+  "Add the route" is not a step. "Add `GET /help/{screen}` named `help.show`
+  inside the `auth` group; `php artisan route:list --name=help` lists it and a
+  guest request redirects to login" is a step.
 - State what is out of scope. The Implementer will otherwise decide for you.
-- Name the business rule or law behind a constraint (UK/Irish employment law
-  matters in this app) so the Implementer doesn't "simplify" it away.
+- Name the rule behind a constraint (in this track: PIN-session confinement,
+  the Shop view contract, and which BookStack pages a shop-floor user may be
+  shown) so the Implementer doesn't "simplify" it away.
 - Include short code snippets only where wording would be ambiguous.
   Snippets illustrate intent; the Implementer owns the final code.
 - When reviewing, read the actual diff (`git diff`, `git status`), not just
@@ -103,17 +107,17 @@ Don't:
   decide and record the decision) or mark the plan `DRAFT`.
 
 When the work is accepted, set `Status: ACCEPTED` and tell the user to
-archive: `mkdir -p docs/vouchers/archive/YYYY-MM-DD-<slug>` and move both
+archive: `mkdir -p docs/BookStack/archive/YYYY-MM-DD-<slug>` and move both
 `plan.md` and `implemented.md` there. The next task starts with empty files.
 
 A small fix that must not wait for the current cycle can run beside it as a
-side plan: `docs/vouchers/plan-<slug>.md`, reported in
-`docs/vouchers/implemented-<slug>.md`, reviewed and archived like any cycle.
+side plan: `docs/BookStack/plan-<slug>.md`, reported in
+`docs/BookStack/implemented-<slug>.md`, reviewed and archived like any cycle.
 The side plan names the files it touches so the two implementer sessions
 cannot collide; the kickoff prompt names the file.
 
 Something found after a cycle is accepted (a browser check, a later thought)
-goes in `docs/vouchers/findings/YYYY-MM-DD-<slug>.md`: what happened, why, the
+goes in `docs/BookStack/findings/YYYY-MM-DD-<slug>.md`: what happened, why, the
 options, a recommendation, and what it does not affect. The Planner folds it
 into the next plan (or a short follow-up cycle) and moves the finding file into
 that cycle's archive folder on acceptance. A finding never edits code.
@@ -124,7 +128,7 @@ click the result, submit the form, tap the button, and watch the console.
 stopped at "results appear".)
 
 A plan the user wants to put aside before it is implemented goes to
-`docs/vouchers/parked/YYYY-MM-DD-<slug>/plan.md` with `Status: PARKED` and a
+`docs/BookStack/parked/YYYY-MM-DD-<slug>/plan.md` with `Status: PARKED` and a
 line saying how to resume. Resuming means copying it back to `plan.md`,
 re-checking its Context against the code, and setting `Status: READY`.
 
@@ -163,7 +167,7 @@ Check: command or observation that proves it worked.
 
 ## Verification
 Commands to run at the end, in order, with expected outcomes.
-Example: `php artisan test --filter=RosterTest` → all pass.
+Example: `php artisan test --filter=HelpTest` → all pass.
 
 ## Risks
 Where this could go wrong and what to watch for.
@@ -213,10 +217,6 @@ Don't:
 - Edit `plan.md`. Disagreements go in `implemented.md`.
 - Commit, push, or deploy unless the plan's Constraints section says to.
 - Mark a step done because the code "should" work. Run the check.
-- Write `implemented.md` with the file tools (Write/Edit), never by piping text
-  through an unquoted shell heredoc: backtick-quoted fragments in the report
-  get executed as commands. (Vouchers cycle 4, 2026-09-29: harmless that time,
-  because everything the report quoted was read-only or a dry run.)
 - Delete or rewrite existing tests to make verification pass. Report the
   failure and set `BLOCKED`.
 

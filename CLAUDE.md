@@ -187,6 +187,9 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - Camera Invoice Capture
 - AI Diagnostics & Settings
 
+**Staff Procedures**
+- Procedures (SOPs) from BookStack ("How to do this" button per screen, read-only API, `screen` tag = route name, shown in Shop and office layouts)
+
 **Shop Mode**
 - Shop Mode shell (`/shop`, touch-first, `<x-shop-layout>`, view contract)
 - Trusted Devices, PIN Sign-in & Idle Lock (shared shop-floor tablets)
@@ -254,6 +257,7 @@ php artisan optimize:clear     # Clear caches
 - **Product Search**: [Product Search](./docs/features/product-search.md) - `x-product-search` component, `/api/products/search` JSON shape, POS collation performance rules
 - **Shop Mode**: [Shop Mode](./docs/features/shop-mode.md) - The `/shop` shell and view contract, trusted devices, PIN sign-in and confinement, idle lock
 - **Customer Accounts**: [Customer Statements & Receivables](./docs/features/customer-statements.md) - Invoicing, payment matching, statements, aged debtors
+- **Staff Procedures**: [Staff Procedures (SOPs) from BookStack](./docs/features/sops-bookstack.md) - Help button per screen, `screen` tag, caching, image proxy, owner setup in BookStack
 - **Customer Requests**: [Customer Requests](./docs/features/customer-requests.md) - Public board, login-gated writes, line status lifecycle, delivery put-aside flag
 - **Order Comparison**: [Order Comparison & Difference Orders](./docs/features/order-management/order-comparison.md) - Comparing two orders, and creating an order from the difference
 - **Udea Pallet Space**: [Udea Pallet Volumes](./docs/features/udea-pallet-volumes.md) - Basket-only data source, sync page, order-page pallet fill

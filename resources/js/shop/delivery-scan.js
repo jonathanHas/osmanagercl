@@ -15,6 +15,12 @@
  * the prompt has closed — never while it is open, or the code still in frame
  * would confirm the prompt and silently add another unit.
  *
+ * Items without a barcode (the weekly cheese) are picked from a list instead:
+ * "No barcode? Find by name" opens the supplier's products, with a filter and a
+ * search of every product as a fallback. Picking one runs the same lookup a
+ * scan does, by its code, and opens the same prompt with an empty "Quantity or
+ * weight" field. The list stays open between items until it is closed.
+ *
  * Screen 05 v2: a row is a button. Tapping it opens a correction card beside the
  * list, because a button cannot hold the stepper's own buttons. Sort is a single
  * toggle whose label names the order in force.
@@ -25,10 +31,12 @@
  */
 import mix from './mix.js';
 import productImages from './product-images.js';
+import productTypeahead from './product-typeahead.js';
+import { parseQuantity, quantityText } from './quantity.js';
 
 const TOAST_MS = 3000;
 
-export default () => mix(productImages(), {
+export default () => mix(productImages(), productTypeahead(), {
     session: null,
     rows: [],
     progress: { total: 0, checked: 0, issues: 0 },
@@ -37,16 +45,26 @@ export default () => mix(productImages(), {
     recent: [],
     latest: null,
     // The open prompt: a looked-up product awaiting a quantity. Nothing is
-    // recorded while this is set.
+    // recorded while this is set. `pending.typed` is null while the stepper is
+    // in charge, or the text of a typed quantity or weight.
     pending: null,
     busy: false,
     editing: null,
+    // The correction card's typed quantity: null while its stepper is in charge.
+    editTyped: null,
     toast: null,
     toastTimer: null,
     flag: null,
     error: null,
+    // The "Find by name" list is open, and whether it searches every product
+    // rather than this supplier's.
+    manual: false,
+    everywhere: false,
+    searchWhenEmpty: true,
 
     init() {
+        // A typed correction belongs to the row it was typed for.
+        this.$watch('editing', () => { this.editTyped = null; });
         this.load();
     },
 
@@ -89,23 +107,55 @@ export default () => mix(productImages(), {
             : 0;
     },
 
-    get unitsToAdd() {
+    /**
+     * The quantity the prompt would record: the stepper's, or the typed one —
+     * null while the typed text is not a valid positive quantity (see
+     * parseQuantity: a barcode typed into the field never is one).
+     */
+    get qtyValue() {
         if (! this.pending) {
+            return null;
+        }
+
+        return this.pending.typed === null ? this.pending.qty : parseQuantity(this.pending.typed);
+    },
+
+    /**
+     * The prompt's typed text for x-model. Null-safe both ways: the field stays
+     * in the DOM (x-show) while no prompt is open.
+     */
+    get typedQty() {
+        return this.pending?.typed ?? '';
+    },
+
+    set typedQty(value) {
+        if (this.pending) {
+            this.pending.typed = value;
+        }
+    },
+
+    get unitsToAdd() {
+        if (this.qtyValue === null) {
             return 0;
         }
 
-        return this.pending.qty * (this.pending.scanType === 'case' ? this.pending.caseUnits : 1);
+        return this.qtyValue * (this.pending.scanType === 'case' ? this.pending.caseUnits : 1);
     },
 
     get addLabel() {
-        if (! this.pending) {
-            return '';
-        }
+        const n = this.qtyValue;
 
-        const n = this.pending.qty;
+        if (n === null) {
+            return 'Add';
+        }
 
         if (this.pending.scanType === 'case') {
             return `Add ${n} case${n === 1 ? '' : 's'} · ${this.unitsToAdd} units`;
+        }
+
+        // A fraction is a weight, not a number of units.
+        if (! Number.isInteger(n)) {
+            return `Add ${quantityText(n)}`;
         }
 
         return `Add ${n} unit${n === 1 ? '' : 's'}`;
@@ -180,12 +230,21 @@ export default () => mix(productImages(), {
         }
     },
 
+    /** A code from the scan field or the camera. */
+    onScan(code) {
+        return this.lookup(code, false);
+    },
+
     /**
      * Step one: look the code up without recording anything. A scan arriving
      * while a prompt is open confirms that prompt first, so "scan, scan, scan"
      * stays as fast as the office page.
+     *
+     * `manual` is a product picked by name: its prompt starts with an empty
+     * field to type the amount into, and keeps focus there rather than handing
+     * it to the scan field.
      */
-    async onScan(code) {
+    async lookup(code, manual) {
         if (this.pending) {
             await this.commit();
         }
@@ -218,6 +277,8 @@ export default () => mix(productImages(), {
                 scanType: data.scanType || 'unit',
                 caseUnits: data.caseUnits || 1,
                 qty: 1,
+                typed: manual ? '' : null,
+                manual,
             };
 
             // The prompt sits above the scan field, but someone who has scrolled
@@ -225,7 +286,15 @@ export default () => mix(productImages(), {
             // card makes.
             this.$nextTick(() => this.$refs.prompt?.scrollIntoView({ block: 'nearest' }));
 
-            this.announceDone();
+            if (manual) {
+                this.focusField('qty');
+            }
+
+            // Not for a picked product: shop-scan-done hands focus to the scan
+            // field, away from the quantity field just focused.
+            if (! manual) {
+                this.announceDone();
+            }
         } catch (e) {
             this.announceError('Scan failed');
         } finally {
@@ -242,6 +311,31 @@ export default () => mix(productImages(), {
     },
 
     /**
+     * Swap the stepper for a field, for a weight or a count too big to step to.
+     * Not offered on a case prompt: a case count stays a whole number.
+     */
+    typeQuantity() {
+        if (! this.pending || this.pending.scanType === 'case') {
+            return;
+        }
+
+        this.pending.typed = String(this.pending.qty);
+        this.focusField('qty');
+    },
+
+    /**
+     * Focus and select a typed-quantity field once it is visible. x-show reveals
+     * it after $nextTick has run (measured: still display:none there), and a
+     * hidden element ignores focus(), so wait a frame as scan-input.js does.
+     */
+    focusField(ref) {
+        this.$nextTick(() => requestAnimationFrame(() => {
+            this.$refs[ref]?.focus();
+            this.$refs[ref]?.select();
+        }));
+    },
+
+    /**
      * Step two: record the quantity.
      *
      * The `busy` half of the guard is load-bearing, not decoration. A typed scan
@@ -251,18 +345,19 @@ export default () => mix(productImages(), {
      * await makes the second call a no-op.
      */
     async commit() {
-        if (! this.pending || this.busy) {
+        if (! this.pending || this.busy || this.qtyValue === null) {
             return;
         }
 
         this.busy = true;
         const item = this.pending;
+        const quantity = this.qtyValue;
 
         try {
             const data = await this.post(this.scanUrl, {
                 delID: this.delId,
                 barcode: item.code,
-                quantity: item.qty,
+                quantity,
                 supplierID: this.supplierId,
             });
 
@@ -283,6 +378,10 @@ export default () => mix(productImages(), {
             this.reportRow(this.latest);
             this.announceDone();
             this.announceSaved();
+
+            if (item.manual) {
+                this.resetManual();
+            }
         } catch (e) {
             this.showToast('bad', 'Not saved, try again');
         } finally {
@@ -291,9 +390,79 @@ export default () => mix(productImages(), {
     },
 
     cancelPending() {
+        const wasManual = this.pending?.manual;
+
         this.pending = null;
         this.announceDone();
         this.announceSaved();
+
+        if (wasManual) {
+            this.resetManual();
+        }
+    },
+
+    // ---- Find by name -------------------------------------------------------
+
+    /** The supplier's stocked products by default; every product when asked. */
+    searchParams(q) {
+        return this.everywhere
+            ? { q, stocked: 0, per_page: 20 }
+            : { q, supplier_id: this.supplierId, stocked: 1, per_page: 50 };
+    },
+
+    openManual() {
+        this.manual = true;
+        this.everywhere = false;
+        this.query = '';
+        this.editing = null;
+        this.search();
+
+        this.$nextTick(() => {
+            this.$refs.manual?.scrollIntoView({ block: 'nearest' });
+
+            // On a touch device the keyboard would cover a list that usually
+            // needs no filtering.
+            if (! document.getElementById('shop-root')?.classList.contains('is-touch')) {
+                this.$refs.filter?.focus();
+            }
+        });
+    },
+
+    closeManual() {
+        this.manual = false;
+        this.everywhere = false;
+        this.query = '';
+        this.results = [];
+        this.total = 0;
+        this.announceDone();
+    },
+
+    filterManual() {
+        if (this.query.trim() === '') {
+            this.everywhere = false;
+        }
+
+        this.search();
+    },
+
+    searchEverywhere() {
+        this.everywhere = true;
+        this.search();
+    },
+
+    /** Back to the supplier's list for the next item; the list stays open. */
+    resetManual() {
+        this.query = '';
+        this.everywhere = false;
+        this.search();
+    },
+
+    /**
+     * Overrides the typeahead's: the list stays as it is under the prompt, and
+     * picking records nothing until the amount is typed and added.
+     */
+    pickResult(p) {
+        return this.lookup(p.code, true);
     },
 
     /**
@@ -315,10 +484,10 @@ export default () => mix(productImages(), {
                 this.showToast('ok', 'Matches invoice');
                 break;
             case 'short':
-                this.showToast('warn', `Short: ${row.scanned} of ${row.expected}`);
+                this.showToast('warn', `Short: ${this.stockText(row.scanned)} of ${this.stockText(row.expected)}`);
                 break;
             case 'over':
-                this.showToast('warn', `Over: ${row.scanned} of ${row.expected}`);
+                this.showToast('warn', `Over: ${this.stockText(row.scanned)} of ${this.stockText(row.expected)}`);
                 break;
             default:
                 this.showToast('warn', 'Not on this invoice');
@@ -346,9 +515,37 @@ export default () => mix(productImages(), {
         }
     },
 
-    async adjust(row, delta) {
-        const target = Math.max(0, (row.scanned ?? 0) + delta);
+    adjust(row, delta) {
+        return this.saveQuantity(row, Math.max(0, Number(((row.scanned ?? 0) + delta).toFixed(3))));
+    },
 
+    /** Swap the correction card's stepper for a field. */
+    typeCorrection() {
+        if (! this.editingRow) {
+            return;
+        }
+
+        this.editTyped = this.stockText(this.editingRow.scanned ?? 0);
+        this.focusField('editQty');
+    },
+
+    /**
+     * Set the typed correction. 0 is allowed, as on the stepper: it deletes an
+     * unexpected row, and load() then closes the card.
+     */
+    async setCorrection() {
+        const value = parseQuantity(this.editTyped, { allowZero: true });
+
+        if (value === null || ! this.editingRow || this.busy) {
+            return;
+        }
+
+        await this.saveQuantity(this.editingRow, value);
+        this.editTyped = null;
+    },
+
+    /** PATCH an absolute quantity for a row, then refetch the list. */
+    async saveQuantity(row, target) {
         this.busy = true;
 
         try {
@@ -389,17 +586,12 @@ export default () => mix(productImages(), {
     },
 
     /**
-     * A STOCKCURRENT figure as a person would read it. The column is a decimal, so
-     * a whole number arrives as 4 and must not read "4.0", and a weighed item can
-     * arrive as 1.5200000000000011. Up to 3 dp, trailing zeros trimmed.
-     *
+     * A stock figure or a quantity as a person would read it (see quantity.js).
      * Takes the number rather than the row, because the scan prompt has the figure
      * on `pending.product.currentStock` while rows have it on `row.stock`.
      */
     stockText(value) {
-        const n = Number(value ?? 0);
-
-        return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(3)));
+        return quantityText(value);
     },
 
     expectedLabel(row) {

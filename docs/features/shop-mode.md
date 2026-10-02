@@ -21,7 +21,12 @@ Eloquent models, services and office endpoints, with a different shell.
   `resources/js/shop.js` inside its `alpine:init` listener (app.js starts Alpine
   on evaluation, so a registration at module scope would be too late).
 - **Icons**: `public/images/shop-icons.svg`, one `<symbol>` per id; used as
-  `<x-shop.icon name="…" />`.
+  `<x-shop.icon name="…" />`. App additions to the design sprite: `more`,
+  `phone`, `info`, `help`.
+- **Help button**: the topbar shows a "How to do this" icon button
+  (`components/shop/help-button.blade.php`) before the user chip when the
+  screen has a procedure in BookStack (managers: on every screen). See
+  [Staff Procedures](./sops-bookstack.md).
 
 ### The view contract
 
@@ -83,6 +88,40 @@ them — a stepper button, say — and treats an Enter within a second of the la
 character as the end of a scan. A lone Enter still presses a focused button.
 As a backstop, the delivery endpoints cap `quantity` at 9999, so a barcode can
 never be written as a quantity.
+Delivery quantities are stored rounded to 3 decimals, so typed weights add up
+without floating-point tails (`1.94 + 3.74` is stored as `5.68`).
+Completing a delivery creates a stock record for a delivered product that had
+none, holding the delivered amount, instead of skipping it. This is the shared
+`delivery-legacy.complete`, so it applies on the office page too; undoing the
+completion takes that record back to 0 (it is not deleted).
+
+### Deliveries: items without a barcode
+
+Some deliveries cannot be scanned — the weekly Mossfield cheese has no barcode
+and arrives as a weight per wheel. The delivery scan screen has a small **No
+barcode? Find by name** button under the scan field (for anyone with
+`products.view`; not on a completed delivery). It opens a list, in the page
+flow, of the supplier's stocked products, with a filter; once something is
+typed, **Search all products** searches the whole catalogue instead, for a
+product not linked to the supplier. Both use `GET /api/products/search`
+through `product-typeahead.js`.
+
+Picking a product opens the same quantity prompt a scan opens, with an empty
+**Quantity or weight** field focused and Add disabled until something valid is
+typed. Typing `4.35` and Add records 4.35 (the product is stocked in kg, so
+4.35 is added to stock at completion). The pick posts the product's code to
+`delivery-legacy.scan-increment`, exactly as a scan does, so nothing
+distinguishes a typed row from a scanned one. The list stays open between
+items — pick, type, Add, pick, type, Add — until it is closed, and scanning
+keeps working in the same delivery.
+
+Typed amounts are also available where a quantity already exists: tap the
+number on a scan prompt (not on a case prompt, where the count stays whole on
+the stepper), or the number on the correction card (type, then **Set**; 0
+removes an unexpected row, as the stepper can). A typed quantity is a positive
+number of at most 4 whole digits and 3 decimals (a decimal comma is accepted):
+a barcode typed or wedge-scanned into the field is 8–14 digits, so it can never
+be saved as a quantity — Add simply stays disabled.
 
 ## Shared devices, PINs and locking
 
@@ -161,7 +200,10 @@ The allow-list is the Shop itself plus every office endpoint a Shop screen
 calls. `products.image` is on it (cycle 27): `ProductSearchService::imageUrl()`
 hands Shop screens that URL as a product's picture whenever the POS holds a
 blob, and leaving it off cost PIN users their thumbnails on Find product and
-the request typeahead. The route keeps its own `products.view` gate. `ConfinePinSessionTest::test_every_route_a_shop_view_names_is_on_the_allow_list`
+the request typeahead. The route keeps its own `products.view` gate. `help.*` is on it too (the
+procedure reader, its image proxy and the manager Refresh form; see
+[Staff Procedures](./sops-bookstack.md)); `help.refresh` keeps its own
+`role:manager,admin` gate. `ConfinePinSessionTest::test_every_route_a_shop_view_names_is_on_the_allow_list`
 greps `resources/views/shop/**`, the Shop components, the Shop layout and
 `resources/js/shop/**` for `route('…')` and fails the suite if one is missing —
 so a new Shop screen that calls a new endpoint breaks a test rather than 403-ing

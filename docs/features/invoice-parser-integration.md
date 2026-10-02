@@ -988,13 +988,19 @@ Points that matter:
   `V.A.T. 23%`. That figure is authoritative. The line items only cross-check it, because a
   freight charge (€7.50 on small orders, per the footer) may appear without the leading quantity
   that the item pattern needs. When they disagree, the parser warns and keeps the stated net.
+- **The RRP column is sometimes filled in** (e.g. S26-0824-2606: `6 Dishwashing Liquid Lemon
+  1 l 2.69 16.14 4.95`), so a row ends in two or three figures. The line total is therefore
+  the figure equal to quantity × the figure before it, not whichever figure comes last.
+  Summing the last figure adds up the RRPs, which on that invoice gave €597.20 against a
+  stated net of €739.60. A row that fits no pair is flagged individually.
+- **Invoice numbers changed format**: `No. 2603` became `No. S26-0824-2606` in August 2026.
 - **The date is long-hand** (`3 April 2026`) on a line of its own. The pattern is anchored to
   the start of the line so it skips the `to be paid before 3 May 2026` due date.
 - **Detection matches `SONETT IRELAND` / `sonettireland@`, not the brand**, and runs last in
   `detect_supplier`. Wholesalers list Sonett products by name, so a bare `SONETT` would take
   their invoices.
 - Returns `'Sonett'`, which is how `accounting_suppliers` records them (id 45).
-- Only one PDF sample exists (No. 2603), because earlier invoices were captured as photos. The
+- Two PDF samples exist (2603 and S26-0824-2606); earlier invoices were captured as photos. The
   tests in `tests/test_sonett.py` add synthetic cases for thousands separators, a freight line
   and a mismatched total.
 

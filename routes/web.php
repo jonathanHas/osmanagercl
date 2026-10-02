@@ -19,6 +19,7 @@ use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\Financials\CardReconciliationController;
 use App\Http\Controllers\FruitVegController;
 use App\Http\Controllers\HarvestController;
+use App\Http\Controllers\HelpController;
 use App\Http\Controllers\KdsController;
 use App\Http\Controllers\KdsProductController;
 use App\Http\Controllers\KitchenController;
@@ -140,6 +141,14 @@ Route::middleware('auth')->group(function () {
     Route::post('/ui-mode/{mode}', [UiModeController::class, 'set'])
         ->whereIn('mode', ['shop', 'office'])
         ->name('ui-mode.set');
+
+    // Procedures (SOPs) read from BookStack. See docs/features/sops-bookstack.md.
+    Route::prefix('help')->name('help.')->group(function () {
+        Route::get('/image/{path}', [HelpController::class, 'image'])->where('path', 'uploads/images/.+')->name('image');
+        Route::get('/page/{id}', [HelpController::class, 'page'])->whereNumber('id')->name('page');
+        Route::post('/refresh', [HelpController::class, 'refresh'])->middleware('role:manager,admin')->name('refresh');
+        Route::get('/{screen}', [HelpController::class, 'show'])->where('screen', '[A-Za-z0-9._-]+')->name('show');
+    });
 
     // Role & Permission Test Routes
     Route::prefix('roles-test')->name('roles.')->group(function () {

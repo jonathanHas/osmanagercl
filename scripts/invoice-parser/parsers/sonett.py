@@ -6,10 +6,12 @@ import sys
 # No "€" is printed against any figure on this layout.
 MONEY = r'-?[\d,]+\.\d{2}'
 
-# "<qty> <description> <unit price> <line total>" — line totals are net, and every
-# Sonett product is standard-rated, so all of it lands in the 23% bucket.
+# "<qty> <description> <unit price> <line total> [<rrp>]" — line totals are net, and every
+# Sonett product is standard-rated, so all of it lands in the 23% bucket. Some invoices
+# fill the RRP column and some leave it blank, so a row ends in two or three figures and
+# position alone cannot say which is the line total (see _line_total).
 LINE_ITEM_RE = re.compile(
-    r'^(?P<qty>\d+)\s+(?P<desc>.+?)\s+(?P<unit>' + MONEY + r')\s+(?P<total>' + MONEY + r')\s*$',
+    r'^(?P<qty>\d+)\s+(?P<desc>.+?)(?P<figures>(?:\s+' + MONEY + r'){2,3})\s*$',
     re.MULTILINE
 )
 
@@ -18,7 +20,8 @@ NET_RE = re.compile(r'^(' + MONEY + r')\s*\n\s*V\.A\.T\.\s*23%', re.MULTILINE)
 VAT_RE = re.compile(r'V\.A\.T\.\s*23%\s+(' + MONEY + r')')
 TOTAL_RE = re.compile(r'Final amount in Euro\s*\n\s*(' + MONEY + r')')
 
-INVOICE_NUMBER_RE = re.compile(r'^No\.\s*(\d+)', re.MULTILINE)
+# "No. 2603" on older invoices, "No. S26-0824-2606" from August 2026
+INVOICE_NUMBER_RE = re.compile(r'^No\.\s*(\S+)', re.MULTILINE)
 # "3 April 2026" on a line of its own. Anchoring on the line start skips the
 # "to be paid before 3 May 2026" due date further down.
 DATE_RE = re.compile(r'^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{4})\s*$', re.MULTILINE)
@@ -32,6 +35,37 @@ MONTHS = {
 def _amount(raw):
     """Convert '1,234.56' into a float."""
     return float(raw.replace(',', '').strip())
+
+
+def _line_total(qty, figures):
+    """
+    The line total is the figure that equals quantity times the figure before it (the unit
+    price); the RRP, when printed, bears no such relation. Returns None when no adjacent
+    pair fits, e.g. a discounted line, so the caller can flag it.
+    """
+    for unit, total in zip(figures, figures[1:]):
+        if abs(qty * unit - total) <= 0.01:
+            return total
+    return None
+
+
+def _parse_line_items(text, warnings):
+    lines_net = 0.0
+    rows = 0
+    for match in LINE_ITEM_RE.finditer(text):
+        qty = int(match.group('qty'))
+        figures = [_amount(f) for f in match.group('figures').split()]
+        total = _line_total(qty, figures)
+        if total is None:
+            # Best guess from position: the RRP, when present, is last
+            total = figures[1] if len(figures) == 3 else figures[-1]
+            warnings.append(
+                f"Line \"{match.group(0).strip()}\": quantity times unit price does not match "
+                f"any figure; took €{total:.2f} as the line total"
+            )
+        lines_net += total
+        rows += 1
+    return round(lines_net, 2), rows
 
 
 def _parse_date(text):
@@ -63,14 +97,13 @@ def parse_invoice(text, filename):
         invoice_date = _parse_date(text)
         print(f"[DEBUG] Invoice Date: {invoice_date}", file=sys.stderr)
 
-        lines = LINE_ITEM_RE.findall(text)
-        lines_net = round(sum(_amount(total) for _, _, _, total in lines), 2)
-        print(f"[DEBUG] {len(lines)} line items totalling {lines_net}", file=sys.stderr)
+        lines_net, rows = _parse_line_items(text, warnings)
+        print(f"[DEBUG] {rows} line items totalling {lines_net}", file=sys.stderr)
 
         net_match = NET_RE.search(text)
         if net_match:
             net = _amount(net_match.group(1))
-            if lines and abs(lines_net - net) > 0.01:
+            if rows and abs(lines_net - net) > 0.01:
                 warnings.append(
                     f"Line items total €{lines_net:.2f} but the invoice states a net of €{net:.2f}"
                 )

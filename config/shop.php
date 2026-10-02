@@ -57,6 +57,10 @@ return [
      */
     'pin_session_routes' => [
         'shop.*',
+        // Procedures (SOPs) from BookStack: the reader, its images and the
+        // refresh form are named by Shop views. help.refresh keeps its own
+        // role:manager,admin gate, and managers have no PIN.
+        'help.*',
         'api.products.search',
         'customer-requests.*',
         'delivery-legacy.items',
