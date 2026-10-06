@@ -12,25 +12,19 @@
  */
 import mix from './mix.js';
 import productImages from './product-images.js';
+import productPeek from './product-peek.js';
 
 const DEBOUNCE_MS = 300;
 const MIN_CHARS = 2;
 const PER_PAGE = 20;
-// Hover preview panel: 272px wide, and the panel's outer height rounded up.
-// Measured from the APP ADDITIONS rules: 8 + 8 padding, 1 + 1 border, 256 image,
-// 8 caption margin and one 16px line at 1.4 => ~304px. Used to keep it inside
-// the viewport, so rounding up is the safe direction.
-const PEEK_W = 272;
-const PEEK_H = 320;
-const PEEK_GAP = 12;
-const PEEK_EDGE = 8;
 
 export default () => {
     // Built per component, not at module scope, so each screen gets its own
     // `failed` map.
     const base = productImages();
 
-    return mix(base, {
+    // The hover panel (peek, peekAt, unpeek, canHover, …) is the shared part.
+    return mix(base, productPeek(), {
         q: '',
         stocked: true,
         results: [],
@@ -40,19 +34,12 @@ export default () => {
         selected: null,
         error: null,
         enlarged: false,
-        // { product, x, y } while a row thumbnail is hovered; null otherwise.
-        peek: null,
-        // Held so destroy() can remove the same reference init() added.
-        onScroll: null,
         seq: 0,
         timer: null,
 
         init() {
             this.$refs.input?.focus();
-            // The panel is positioned against the viewport, so a scroll would leave
-            // it stranded beside the wrong row.
-            this.onScroll = () => this.unpeek();
-            window.addEventListener('scroll', this.onScroll, { passive: true });
+            this.watchPeekScroll();
         },
 
         /**
@@ -61,23 +48,11 @@ export default () => {
          * a leak waiting for the next module to copy it.
          */
         destroy() {
-            if (this.onScroll) {
-                window.removeEventListener('scroll', this.onScroll);
-                this.onScroll = null;
-            }
+            this.unwatchPeekScroll();
         },
 
         get searchUrl() {
             return this.$root.dataset.searchUrl;
-        },
-
-        /**
-         * Touch devices get nothing: there is no hover, and the detail card already
-         * enlarges on tap. The stylesheet gates this too; this check just avoids
-         * doing the work.
-         */
-        get canHover() {
-            return window.matchMedia?.('(hover: hover) and (pointer: fine)').matches ?? false;
         },
 
         get hasMore() {
@@ -225,39 +200,6 @@ export default () => {
             if (this.peek?.product.id === p?.id) {
                 this.unpeek();
             }
-        },
-
-        /**
-         * Place the panel to the right of the thumbnail, flipping to the left when it
-         * would run off the right edge, and clamped so it never hangs below the
-         * window. Coordinates are viewport-relative, matching `position: fixed`.
-         */
-        peekAt(p, el) {
-            if (! this.canHover || ! this.hasImage(p)) {
-                return;
-            }
-
-            const r = el.getBoundingClientRect();
-            let x = r.right + PEEK_GAP;
-
-            if (x + PEEK_W > window.innerWidth - PEEK_EDGE) {
-                x = r.left - PEEK_GAP - PEEK_W;
-            }
-
-            if (x < PEEK_EDGE) {
-                x = PEEK_EDGE;
-            }
-
-            const y = Math.min(
-                Math.max(PEEK_EDGE, r.top - PEEK_EDGE),
-                window.innerHeight - PEEK_H - PEEK_EDGE,
-            );
-
-            this.peek = { product: p, x, y };
-        },
-
-        unpeek() {
-            this.peek = null;
         },
 
         price(p) {

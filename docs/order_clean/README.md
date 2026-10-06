@@ -15,10 +15,10 @@ generation, review and comparison pages.
 
 | | |
 |---|---|
-| Current task | **Cycle 1: Shop order review** (design screen 20). Revision 1 implemented and reviewed 2026-10-06 (all criteria pass; full suite 15 failed / 1019 passed, same five classes). `plan.md` is READY at **Revision 2**: window the rows (a 1,461-item Udea order took 18 s to show all rows), tag pills keep their dot, read-only rows say "Suggested N", `exportToCsv()` skips a product gone from the POS. Kickoff: `Read docs/order_clean/planimp.md. You are the Implementer. Implement docs/order_clean/plan.md (Revision 2, steps 11–14).` |
+| Current task | none. **Cycle 2** (week readout on the chart, product pictures with the shared hover panel `product-peek.js`, chilled groups Cheese/Refrigerated first) ACCEPTED 2026-10-06, archived to `archive/2026-10-06-cycle-2-readout-pictures-groups/`. Cycle 1 (Shop order review, screen 20) ACCEPTED the same day, `archive/2026-10-06-cycle-1-shop-order-review/`. Both uncommitted; the owner commits. Next: whatever the owner brings; the tablet check of an Udea draft decides whether `PAGE` drops to 25 |
 | HEAD | `36207bbf` on `feature/modularization-phase1` |
 | Working tree | cycle 1 uncommitted (see `implemented.md` Files changed) on top of the deposit track's uncommitted cycles 1–3 (parsers, migrations, models, services, `/deposits`, tests) and the glennon parser; none of it touches order code. The Implementer records the baseline `git status --short` so the reviewer can tell the two apart |
-| Test baseline | 15 failed / 999 passed, 65 s (2026-10-06). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1 |
+| Test baseline | 15 failed / 1023 passed after cycle 2 (2026-10-06; 999 before cycle 1). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1 |
 
 ## Where the order code is
 
@@ -31,7 +31,7 @@ generation, review and comparison pages.
 | Office review page | `resources/views/orders/show.blade.php` + `partials/review-table.blade.php` (≈4000 lines, inline JS); variants `show-layout-a2*.blade.php`, `grid-view.blade.php`, `show-christmas.blade.php` |
 | Feature docs | `docs/features/order-management/order-generation.md`, `order-comparison.md`, `christmas-comparison.md` |
 | Existing tests | `tests/Feature/OrderDifferenceCreationTest.php`, `tests/Unit/OrderDifferenceTest.php`, `tests/Unit/SpecialOrderCategoriesTest.php`; nothing yet covers the review endpoints |
-| Shop screen (cycle 1) | `app/Http/Controllers/Shop/OrderReviewController.php`, `app/Services/Shop/OrderReviewService.php`, `resources/views/shop/orders.blade.php`, `order-review.blade.php`, `resources/js/shop/order-review.js`, routes `shop.orders*`, permission `orders.review` |
+| Shop screen (cycles 1–2) | `app/Http/Controllers/Shop/OrderReviewController.php`, `app/Services/Shop/OrderReviewService.php`, `resources/views/shop/orders.blade.php`, `order-review.blade.php`, `resources/js/shop/order-review.js`, shared `product-peek.js` (hover panel, also used by Find product), `SpecialOrderCategories::displayGroups()`, routes `shop.orders*`, permission `orders.review` |
 | Design | `docs/design/shop-mode/screen-20-order-review.html` (and `screen-19-new-order.html`, not yet planned), `shop.css` (608 lines since 2026-10-06), `shop-icons.svg` (`download`, `chart` added) |
 
 ## Rules every change must respect
@@ -66,6 +66,9 @@ generation, review and comparison pages.
 
 ## Facts that are easy to get wrong
 
+- Shop order review rows: the chart bars are `x-html` strings (`sparkPast` / `sparkFuture` in `order-review.js`), not Alpine-bound elements, and `.shop-ord` has `content-visibility: auto`; groups render 50 rows at a time (`PAGE`). A 1,461-item Udea order is the common case, so keep per-row bindings few.
+- Timing in the automation browser: the tab is hidden, so `requestAnimationFrame` and `x-show` wait on throttled timers; measure with microtask turns plus a forced layout and read component state.
+
 - `OrderItem::final_cases` and `suggested_cases` are `decimal:3` casts and
   arrive as strings; `unit_cost` is per **unit** even though the code
   comments wonder whether `PRICEBUY` is per case (`total_cost = final_quantity × unit_cost`).
@@ -82,6 +85,10 @@ generation, review and comparison pages.
 
 ## Open items (owner chooses)
 
+- **Try an Udea draft on the tablet.** First render of a 1,461-item order is about 0.9–1.2 s in the hidden automation tab (four groups × 50-row windows = 150 rows); sorts 0.7–1.5 s there. If it drags on the device, `PAGE` in `order-review.js` to 25 is the first thing to try.
+- Phone width (390 px): the five filter pills scroll sideways and the sort select squeezes the search field, both as the design behaves; a stacked tools row would be a small cycle.
+- Negative snapshot stock shows as it is (−39 on a muffin); the office has a "reset stock to 0" button, the Shop does not.
+- Tidy: `OrderReviewService::rows()` filters product codes with a bare `filter()`, which also drops a code of `"0"`; and the first-name logic is duplicated between the Orders list view and the service.
 - Screen 19 New order in Shop mode (creating a session from the tablet).
 - The office review partial is ≈4000 lines with inline JS; the clean-up this
   track is named for.

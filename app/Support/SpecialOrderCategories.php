@@ -68,6 +68,33 @@ class SpecialOrderCategories
     }
 
     /**
+     * Every special group across all suppliers, keyed by group key in first-seen
+     * order, each with its label and the union of its category codes.
+     *
+     * Used by the Shop order review to group chilled lines together whatever the
+     * supplier; the per-supplier definitions above stay the office's rule for
+     * coverage overrides.
+     *
+     * @return array<string, array{label: string, category_codes: array<int, string>}>
+     */
+    public static function displayGroups(): array
+    {
+        $groups = [];
+
+        foreach (self::definitions() as $definition) {
+            foreach ($definition['groups'] ?? [] as $key => $group) {
+                $groups[$key] ??= ['label' => $group['label'], 'category_codes' => []];
+                $groups[$key]['category_codes'] = array_values(array_unique(array_merge(
+                    $groups[$key]['category_codes'],
+                    $group['category_codes'] ?? []
+                )));
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
      * Map suppliers to their groups for easy view consumption.
      *
      * @return array<string, array<string, mixed>>

@@ -1,7 +1,7 @@
 <x-shop-layout :title="'Order · '.$header['supplier']"
                :subtitle="'Delivery '.($header['delivery_date'] ?? 'not set').' · '.$header['status'].' by '.$header['created_by']"
                :back="route('shop.orders')">
-    <main class="shop-page" x-data="shopOrderReview()" data-items-url="{{ route('shop.orders.items', $order) }}">
+    <main class="shop-page" x-data="shopOrderReview()" data-items-url="{{ route('shop.orders.items', $order) }}" x-on:click.window="maybeUnpin($event)">
         <div class="shop-facts shop-facts--4">
             <div class="shop-fact"><span class="shop-label">Order value</span><span class="shop-fact__value" x-text="eur(totalValue)">€{{ number_format($header['total_value'], 2) }}</span></div>
             <div class="shop-fact"><span class="shop-label">Products ordered</span><span class="shop-fact__value" x-text="orderedCount + ' of ' + allCount">{{ $header['ordered_count'] }} of {{ $header['item_count'] }}</span></div>
@@ -43,24 +43,28 @@
                 <div class="shop-list">
                     <template x-for="it in shown(g)" :key="it.id">
                         <article class="shop-ord" :class="{ 'is-unordered': isUnordered(it) }">
-                            <div class="shop-ord__product">
-                                <h3 class="shop-row__title" x-text="it.name"></h3>
-                                <span class="shop-row__meta"><span class="shop-code" x-text="it.code"></span> · <span x-text="packLabel(it)"></span></span>
-                                <div class="shop-ord__tags">
-                                    <span :class="'shop-pill shop-pill--' + prio(it)[0]" x-text="prio(it)[1]"></span>
-                                    <template x-for="t in it.tags" :key="t">
-                                        <span class="shop-pill shop-pill--muted" x-text="t"></span>
-                                    </template>
+                            <div class="shop-ord__product shop-ord__product--pic">
+                                <x-shop.product-thumb expr="it" x-on:mouseenter="peekAt(it, $el)" x-on:mouseleave="unpeek()" x-on:click="pinPeek(it, $el)" />
+                                <div class="shop-ord__text">
+                                    <h3 class="shop-row__title" x-text="it.name"></h3>
+                                    <span class="shop-row__meta"><span class="shop-code" x-text="it.code"></span> · <span x-text="packLabel(it)"></span></span>
+                                    <div class="shop-ord__tags">
+                                        <span :class="'shop-pill shop-pill--' + prio(it)[0]" x-text="prio(it)[1]"></span>
+                                        <template x-for="t in it.tags" :key="t">
+                                            <span class="shop-pill shop-pill--muted" x-text="t"></span>
+                                        </template>
+                                    </div>
                                 </div>
                             </div>
                             <div class="shop-spark">
                                 <div class="shop-spark__head"><span><strong x-text="fmt(it.sold)"></strong> sold</span><span class="shop-spark__key" x-text="'avg ' + fmt(it.avg_weekly) + '/wk'"></span><span x-text="'peak ' + fmt(it.peak_weekly)"></span><span class="shop-spark__key shop-spark__key--proj">stock</span></div>
-                                <div class="shop-spark__plot" role="img" :aria-label="chartLabel(it)">
+                                <div class="shop-spark__plot" role="img" :aria-label="chartLabel(it)" x-on:pointermove="hover(it, $event)" x-on:pointerleave="unhover(it, $el)" x-on:pointerdown="pinBar(it, $event)" x-on:click.outside="unpinBar(it, $el)">
                                     {{-- Bars come from one x-html per side (sparkPast / sparkFuture in
                                          order-review.js): per-bar x-for bindings made a 1,461-item
                                          Udea order too slow to render (order_clean cycle 1, Revision 2). --}}
                                     <div class="shop-spark__past" x-html="sparkPast(it)"></div>
                                     <div class="shop-spark__future" x-html="sparkFuture(it)"></div>
+                                    <span class="shop-spark__tip" x-show="it.hot" :class="'is-' + (it.hot?.align ?? 'mid')" :style="'left:' + (it.hot?.x ?? 0) + 'px'" x-text="it.hot ? tipText(it) : ''"></span>
                                 </div>
                                 <div class="shop-spark__axis"><span><span x-text="order.history_weeks + ' wk ago'"></span><span>last wk</span></span><span>after delivery</span></div>
                             </div>
@@ -110,6 +114,12 @@
                 <span class="shop-toast__icon" x-show="toast && toast.tone !== 'ok'" x-cloak><x-shop.icon name="alert" size="sm" /></span>
                 <span class="shop-toast__text" x-text="toast?.text"></span>
             </div>
+        </div>
+
+        {{-- The larger picture beside a hovered (or, on touch, tapped) thumbnail: Find product's panel, shared through product-peek.js. --}}
+        <div class="shop-peek" :class="{ 'is-open': peek, 'is-pinned': peekPinned }" :style="peek ? 'left:' + peek.x + 'px; top:' + peek.y + 'px' : ''" aria-hidden="true">
+            <img :src="peek?.product.image_url" :alt="peek?.product.name || ''" decoding="async">
+            <div class="shop-peek__name" x-text="peek?.product.name"></div>
         </div>
     </main>
 </x-shop-layout>

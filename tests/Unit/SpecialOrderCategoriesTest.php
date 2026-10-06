@@ -33,4 +33,13 @@ class SpecialOrderCategoriesTest extends TestCase
         $this->assertArrayHasKey('refrigerated', $mapped['37']);
         $this->assertArrayNotHasKey('99', $mapped); // Supplier without config should be excluded
     }
+
+    public function test_display_groups_are_the_union_in_first_seen_order(): void
+    {
+        $groups = SpecialOrderCategories::displayGroups();
+
+        $this->assertSame(['cheese', 'refrigerated'], array_keys($groups));
+        $this->assertSame(['label' => 'Cheese', 'category_codes' => ['032']], $groups['cheese']);
+        $this->assertSame(['label' => 'Refrigerated', 'category_codes' => ['002']], $groups['refrigerated']);
+    }
 }

@@ -6,6 +6,8 @@ use App\Models\KitchenProduct;
 use App\Models\OrderItem;
 use App\Models\OrderSession;
 use App\Services\OrderService;
+use App\Support\SpecialOrderCategories;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -25,7 +27,10 @@ class OrderReviewService
 
     public const COMPLETED_LIMIT = 5;
 
-    public function __construct(private OrderService $orderService) {}
+    public function __construct(
+        private OrderService $orderService,
+        private ProductImageUrls $images,
+    ) {}
 
     /**
      * @return array{drafts: Collection, completed: Collection, draft_total: int}
@@ -66,6 +71,7 @@ class OrderReviewService
             'ordered_count' => (clone $items)->where('final_quantity', '>', 0)->count(),
             'item_count' => (clone $items)->count(),
             'export_url' => route('shop.orders.export', $order),
+            'groups' => $this->displayGroups(),
         ];
     }
 
@@ -73,28 +79,33 @@ class OrderReviewService
     {
         $kitchenIds = $this->kitchenIds();
 
-        return $order->items()
+        $items = $order->items()
             ->with('product.stocking')
             ->orderBy('id')
-            ->get()
-            ->map(fn (OrderItem $item) => $this->row($order, $item, $kitchenIds))
+            ->get();
+
+        // One batched picture lookup for the whole order, never per row.
+        $imageUrls = $this->images->byCode($items->map(fn (OrderItem $item) => $item->product?->CODE)->filter()->values()->all());
+
+        return $items
+            ->map(fn (OrderItem $item) => $this->row($order, $item, $kitchenIds, $imageUrls))
             ->all();
     }
 
     /**
      * @param  array<string, true>  $kitchenIds  product ids, as keys
+     * @param  array<string, string|null>  $imageUrls  CODE => picture url, from ProductImageUrls::byCode()
      */
-    public function row(OrderSession $order, OrderItem $item, array $kitchenIds): array
+    public function row(OrderSession $order, OrderItem $item, array $kitchenIds, array $imageUrls = []): array
     {
         $item->loadMissing('product.stocking');
 
         $product = $item->product;
         $context = is_array($item->context_data) ? $item->context_data : [];
 
-        $weekly = array_values(array_map(
-            fn ($week) => (float) (is_array($week) ? ($week['units'] ?? 0) : $week),
-            is_array($context['weekly_sales'] ?? null) ? $context['weekly_sales'] : []
-        ));
+        $weeks = array_values(is_array($context['weekly_sales'] ?? null) ? $context['weekly_sales'] : []);
+        $weekly = array_map(fn ($week) => (float) (is_array($week) ? ($week['units'] ?? 0) : $week), $weeks);
+        $weeklyLabels = array_map(fn ($week) => self::weekLabel($week), $weeks);
 
         $tags = [];
         if ($product && ! $product->stocking) {
@@ -122,6 +133,9 @@ class OrderReviewService
             'final_cases' => (float) $item->final_cases,
             'total_cost' => (float) $item->total_cost,
             'weekly_sales' => $weekly,
+            'weekly_labels' => $weeklyLabels,
+            'category' => $product?->CATEGORY !== null ? (string) $product->CATEGORY : null,
+            'image_url' => $product ? ($imageUrls[$product->CODE] ?? null) : null,
             'avg_weekly' => (float) ($context['avg_weekly_sales'] ?? 0),
             'peak_weekly' => (float) ($context['peak_weekly_sales'] ?? ($weekly ? max($weekly) : 0)),
             'sold' => (float) ($context['weekly_sales_total'] ?? array_sum($weekly)),
@@ -141,9 +155,35 @@ class OrderReviewService
         $item = $this->orderService->updateOrderItemCases($item, $cases);
 
         return [
-            'item' => $this->row($order, $item, $this->kitchenIds()),
+            'item' => $this->row(
+                $order,
+                $item,
+                $this->kitchenIds(),
+                $item->product ? $this->images->byCode([$item->product->CODE]) : [],
+            ),
             'order' => $this->header($order->fresh()),
         ];
+    }
+
+    /**
+     * The groups the review lists rows under, in order: the chilled groups
+     * (matched on POS category, for every supplier), then Case products, then
+     * Single units, which take whatever the chilled groups did not.
+     *
+     * @return array<int, array{key: string, title: string, codes: array<int, string>}>
+     */
+    private function displayGroups(): array
+    {
+        $groups = [];
+
+        foreach (SpecialOrderCategories::displayGroups() as $key => $group) {
+            $groups[] = ['key' => $key, 'title' => $group['label'], 'codes' => $group['category_codes']];
+        }
+
+        $groups[] = ['key' => 'case', 'title' => 'Case products', 'codes' => []];
+        $groups[] = ['key' => 'unit', 'title' => 'Single units', 'codes' => []];
+
+        return $groups;
     }
 
     /**
@@ -154,6 +194,27 @@ class OrderReviewService
         return KitchenProduct::pluck('product_id')
             ->mapWithKeys(fn ($id) => [(string) $id => true])
             ->all();
+    }
+
+    /**
+     * "3 Aug" for a stored week, for the chart readout. Older sessions may hold
+     * a bare number per week, or a week_start that does not parse.
+     */
+    private static function weekLabel(mixed $week): string
+    {
+        if (! is_array($week)) {
+            return '';
+        }
+
+        try {
+            if (! empty($week['week_start'])) {
+                return Carbon::parse($week['week_start'])->format('j M');
+            }
+        } catch (\Throwable) {
+            // fall through to the stored label
+        }
+
+        return (string) ($week['label'] ?? '');
     }
 
     private static function firstName(?string $name): string

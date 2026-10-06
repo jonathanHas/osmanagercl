@@ -10,6 +10,7 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\AliasesMysqlConnection;
 use Tests\Concerns\CreatesProductSearchPosTables;
@@ -26,6 +27,9 @@ class ShopOrderReviewTest extends TestCase
     use AliasesMysqlConnection;
     use CreatesProductSearchPosTables;
     use RefreshDatabase;
+
+    /** Stand-in for a till photo; the URL builder only hashes it and tests for null. */
+    private const BLOB = "\xFF\xD8\xFFfake-jpeg";
 
     private User $reviewer;
 
@@ -49,8 +53,11 @@ class ShopOrderReviewTest extends TestCase
         $pos = DB::connection('pos');
         $pos->table('suppliers')->insert(['SupplierID' => 'S1', 'Supplier' => 'Sonett']);
         $pos->table('PRODUCTS')->insert([
-            ['ID' => 'P1', 'CODE' => '4007547307025', 'NAME' => 'Sonett Dishwashing Liquid 1 L'],
-            ['ID' => 'P2', 'CODE' => '4007547309029', 'NAME' => 'Sonett Dishwasher Tablets 25 pcs'],
+            // P1 has a till photo (stand-in blob); P2 has none and no supplier picture.
+            ['ID' => 'P1', 'CODE' => '4007547307025', 'NAME' => 'Sonett Dishwashing Liquid 1 L', 'IMAGE' => self::BLOB, 'CATEGORY' => null],
+            ['ID' => 'P2', 'CODE' => '4007547309029', 'NAME' => 'Sonett Dishwasher Tablets 25 pcs', 'IMAGE' => null, 'CATEGORY' => null],
+            // A chilled product: POS category 002 is Refrigerated.
+            ['ID' => 'P3', 'CODE' => '5390000000003', 'NAME' => 'Glenisk Natural Yogurt 500g', 'IMAGE' => null, 'CATEGORY' => '002'],
         ]);
         $pos->table('supplier_link')->insert([
             ['Barcode' => '4007547307025', 'SupplierCode' => 'SON-1', 'SupplierID' => 'S1', 'CaseUnits' => 6],
@@ -126,8 +133,12 @@ class ShopOrderReviewTest extends TestCase
             'review_priority' => 'standard',
             'added_via_search' => $addedViaSearch,
             'context_data' => [
+                // Real Mondays, a week apart, as generation stores them.
                 'weekly_sales' => array_map(fn ($units, $i) => [
-                    'week_start' => "2026-08-0{$i}", 'week_end' => "2026-08-0{$i}", 'label' => "W{$i}", 'units' => $units,
+                    'week_start' => Carbon::parse('2026-08-03')->addWeeks($i)->toDateString(),
+                    'week_end' => Carbon::parse('2026-08-03')->addWeeks($i)->addDays(6)->toDateString(),
+                    'label' => Carbon::parse('2026-08-03')->addWeeks($i)->format('d M'),
+                    'units' => $units,
                 ], $weekly, array_keys($weekly)),
                 'avg_weekly_sales' => 1.0,
                 'peak_weekly_sales' => 3,
@@ -211,6 +222,7 @@ class ShopOrderReviewTest extends TestCase
         $this->assertSame('standard', $p1['priority']);
         $this->assertCount(8, $p1['weekly_sales']);
         $this->assertEquals([1, 1, 0, 1, 3, 1, 1, 0], $p1['weekly_sales']);
+        $this->assertSame(['3 Aug', '10 Aug', '17 Aug', '24 Aug', '31 Aug', '7 Sep', '14 Sep', '21 Sep'], $p1['weekly_labels']);
         // Decimal casts arrive as strings from Eloquent; the row must carry numbers.
         // (JSON drops the ".0", so "a number" is int or float, never a string.)
         $this->assertIsNotString($p1['suggested_cases']);
@@ -223,6 +235,30 @@ class ShopOrderReviewTest extends TestCase
         $this->assertSame('unit', $p2['group']);
         $this->assertSame('added', $p2['priority']);
         $this->assertSame(['Destocked', 'Kitchen'], $p2['tags']);
+
+        // Till photo → the Shop thumbnail route (with a ?v= cache key); nothing → null.
+        $this->assertStringStartsWith(route('shop.product-photo', ['code' => '4007547307025']), $p1['image_url']);
+        $this->assertNull($p2['image_url']);
+        $this->assertNull($p1['category']);
+    }
+
+    public function test_items_json_carries_the_display_groups_and_each_rows_category(): void
+    {
+        $session = $this->orderSession('draft');
+        $yogurt = $this->item($session, 'P3', caseUnits: 1, suggestedCases: 4, unitCost: 2.10);
+
+        $response = $this->actingAs($this->reviewer)->getJson(route('shop.orders.items', $session));
+
+        $response->assertOk()
+            ->assertJsonPath('order.groups', [
+                ['key' => 'cheese', 'title' => 'Cheese', 'codes' => ['032']],
+                ['key' => 'refrigerated', 'title' => 'Refrigerated', 'codes' => ['002']],
+                ['key' => 'case', 'title' => 'Case products', 'codes' => []],
+                ['key' => 'unit', 'title' => 'Single units', 'codes' => []],
+            ])
+            ->assertJsonPath('items.0.id', $yogurt->id)
+            ->assertJsonPath('items.0.category', '002')
+            ->assertJsonPath('items.0.group', 'unit');
     }
 
     public function test_items_json_survives_a_product_gone_from_the_pos_and_old_context_data(): void
@@ -249,7 +285,35 @@ class ShopOrderReviewTest extends TestCase
             ->assertJsonPath('items.0.name', 'Unknown product')
             ->assertJsonPath('items.0.code', 'GONE')
             ->assertJsonPath('items.0.weekly_sales', [])
+            ->assertJsonPath('items.0.weekly_labels', [])
+            ->assertJsonPath('items.0.image_url', null)
             ->assertJsonPath('items.0.tags', []);
+    }
+
+    public function test_week_labels_fall_back_to_the_stored_label_and_keep_their_length(): void
+    {
+        $session = $this->orderSession('draft');
+        OrderItem::create([
+            'order_session_id' => $session->id,
+            'product_id' => 'P1',
+            'suggested_quantity' => 0,
+            'final_quantity' => 0,
+            'suggested_cases' => 0,
+            'final_cases' => 0,
+            'case_units' => 6,
+            'unit_cost' => 1,
+            'total_cost' => 0,
+            'review_priority' => 'standard',
+            'context_data' => [
+                'weekly_sales' => [['week_start' => 'not-a-date', 'label' => 'W1', 'units' => 2], 5],
+                'current_stock' => 0,
+            ],
+        ]);
+
+        $this->actingAs($this->reviewer)->getJson(route('shop.orders.items', $session))
+            ->assertOk()
+            ->assertJsonPath('items.0.weekly_sales', [2, 5])
+            ->assertJsonPath('items.0.weekly_labels', ['W1', '']);
     }
 
     // --- PATCH --------------------------------------------------------------
@@ -262,6 +326,8 @@ class ShopOrderReviewTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('item.id', $this->p1Item->id);
+        // The single-row lookup in update() keeps the row complete.
+        $this->assertStringStartsWith(route('shop.product-photo', ['code' => '4007547307025']), $response->json('item.image_url'));
         $this->assertEquals(3, $response->json('item.final_cases'));
 
         $item = $this->p1Item->fresh();

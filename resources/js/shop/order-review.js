@@ -19,6 +19,8 @@
  * search starts the windows again (watchers set up in init()).
  */
 import mix from './mix.js';
+import productImages from './product-images.js';
+import productPeek from './product-peek.js';
 
 const TOAST_MS = 3000;
 const SAVE_MS = 400;
@@ -31,9 +33,14 @@ const PRIO = {
     added: ['sage', 'Added'],
 };
 
+// Until the order arrives (its header carries the real list, chilled groups first).
+const DEFAULT_GROUPS = [{ key: 'case', title: 'Case products', codes: [] }, { key: 'unit', title: 'Single units', codes: [] }];
+
 const FILTERS = [['all', 'All'], ['review', 'Review'], ['standard', 'Standard'], ['safe', 'Safe'], ['added', 'Added']];
 
-export default () => mix({
+// Row thumbnails (productImages) and the larger picture beside them (productPeek)
+// are the shared Shop parts; the order item's `id` is the image key.
+export default () => mix(productImages(), productPeek(), {
     order: { editable: false },
     items: [],
     filter: 'all',
@@ -41,8 +48,9 @@ export default () => mix({
     sort: 'sales',
     q: '',
     loading: true,
-    // How many rows each group renders; see shown() and more().
-    windows: { case: PAGE, unit: PAGE },
+    // How many rows each group renders, by group key, filled on demand (PAGE
+    // until "Show more" raises it); see shown() and more().
+    windows: {},
     toast: null,
     toastTimer: null,
 
@@ -51,7 +59,12 @@ export default () => mix({
             this.$watch(key, () => this.resetWindows());
         }
 
+        this.watchPeekScroll();
         this.load();
+    },
+
+    destroy() {
+        this.unwatchPeekScroll();
     },
 
     get itemsUrl() {
@@ -75,7 +88,7 @@ export default () => mix({
             }
             const data = await response.json();
             this.order = data.order;
-            this.items = data.items.map((it) => ({ ...it, busy: false, savedCases: it.final_cases, timer: null }));
+            this.items = data.items.map((it) => ({ ...it, busy: false, savedCases: it.final_cases, timer: null, hot: null, pinned: false }));
         } catch (e) {
             this.showToast('bad', 'Could not load the order');
         } finally {
@@ -188,10 +201,10 @@ export default () => mix({
      */
     sparkPast(it) {
         const peak = it.peak_weekly;
-        const bars = it.weekly_sales.map((v) => {
+        const bars = it.weekly_sales.map((v, i) => {
             const cls = v === peak && v > 0 ? 'shop-spark__bar is-peak' : 'shop-spark__bar';
 
-            return `<span class="${cls}" style="height:${this.barHeight(it, v)}%"></span>`;
+            return `<span class="${cls}" data-w="${i}" style="height:${this.barHeight(it, v)}%"></span>`;
         });
 
         return bars.join('') + `<span class="shop-spark__avg" style="bottom:${this.avgBottom(it)}%"></span>`;
@@ -201,8 +214,123 @@ export default () => mix({
         return this.projection(it).map((v, w) => {
             const cls = v < it.avg_weekly ? 'shop-spark__bar is-proj is-low' : 'shop-spark__bar is-proj';
 
-            return `<span class="${cls}" style="height:${this.barHeight(it, v)}%" title="${this.projTitle(v, w)}"></span>`;
+            return `<span class="${cls}" data-p="${w}" style="height:${this.barHeight(it, v)}%" title="${this.projTitle(v, w)}"></span>`;
         }).join('');
+    },
+
+    // --- week readout ----------------------------------------------------
+    //
+    // The bars are x-html output, so there are no per-bar handlers: the plot
+    // delegates pointer events and the readout reads which bar it was. On
+    // touch pointerleave fires as the finger lifts, so a tap pins the readout
+    // until the next tap. The plot element is passed in from the view and never
+    // stored on the item (Alpine would proxy it).
+
+    /**
+     * { kind: 'w' | 'p', i, x, align } for a bar element, else null. `x` is the
+     * bar's centre in plot pixels. The pill is wider than a phone-width plot's
+     * outer thirds, so near either end it is anchored by its edge rather than
+     * centred (`align` start / end / mid), which keeps it inside the row.
+     */
+    tipFor(bar) {
+        if (! bar) {
+            return null;
+        }
+
+        const x = bar.offsetLeft + bar.offsetWidth / 2 + bar.parentElement.offsetLeft;
+        const width = bar.parentElement.parentElement.clientWidth || 1;
+        const align = x < width / 3 ? 'start' : (x > width * 2 / 3 ? 'end' : 'mid');
+
+        if (bar.dataset.w !== undefined) {
+            return { kind: 'w', i: Number(bar.dataset.w), x, align };
+        }
+        if (bar.dataset.p !== undefined) {
+            return { kind: 'p', i: Number(bar.dataset.p), x, align };
+        }
+
+        return null;
+    },
+
+    tipText(it) {
+        const hot = it.hot;
+
+        if (! hot) {
+            return '';
+        }
+        if (hot.kind === 'p') {
+            return this.projTitle(this.projection(it)[hot.i] ?? 0, hot.i);
+        }
+
+        const label = it.weekly_labels?.[hot.i] ?? '';
+        const sold = `${this.fmt(it.weekly_sales[hot.i])} sold`;
+
+        return label ? `Week of ${label} · ${sold}` : `Week ${hot.i + 1} · ${sold}`;
+    },
+
+    hover(it, e) {
+        if (it.pinned) {
+            return;
+        }
+
+        const bar = this.barAt(e);
+
+        // pointermove fires constantly; only touch state when the bar changes.
+        if (bar === null ? it.hot !== null : ! bar.classList.contains('is-hot')) {
+            this.setHot(it, e.currentTarget, bar);
+        }
+    },
+
+    /**
+     * The bar under the pointer's column, not only the bar element itself: a
+     * week with no sales is a 3 px stub, which nobody could point at or tap.
+     */
+    barAt(e) {
+        const direct = e.target.closest('.shop-spark__bar');
+
+        if (direct) {
+            return direct;
+        }
+
+        for (const bar of e.currentTarget.querySelectorAll('.shop-spark__bar')) {
+            const r = bar.getBoundingClientRect();
+
+            if (e.clientX >= r.left - 2 && e.clientX <= r.right + 2) {
+                return bar;
+            }
+        }
+
+        return null;
+    },
+
+    unhover(it, plot) {
+        if (! it.pinned) {
+            this.setHot(it, plot, null);
+        }
+    },
+
+    pinBar(it, e) {
+        const bar = this.barAt(e);
+        const same = it.pinned && bar && bar.classList.contains('is-hot');
+
+        this.setHot(it, e.currentTarget, same ? null : bar);
+        it.pinned = !! it.hot;
+    },
+
+    unpinBar(it, plot) {
+        if (it.hot || it.pinned) {
+            this.setHot(it, plot, null);
+            it.pinned = false;
+        }
+    },
+
+    /** Set the readout and mark its bar; a later x-html re-render simply drops the mark. */
+    setHot(it, plot, bar) {
+        it.hot = this.tipFor(bar);
+
+        plot.querySelectorAll('.is-hot').forEach((el) => el.classList.remove('is-hot'));
+        if (it.hot) {
+            bar.classList.add('is-hot');
+        }
     },
 
     chartLabel(it) {
@@ -249,18 +377,37 @@ export default () => mix({
 
         list = [...list].sort(by);
 
-        return [['case', 'Case products'], ['unit', 'Single units']]
-            .map(([key, title]) => ({ key, title, items: list.filter((it) => it.group === key) }))
+        // The group list comes with the order (chilled groups first, then case
+        // and unit); one pass buckets the sorted rows, keeping their order.
+        const defs = this.order.groups ?? DEFAULT_GROUPS;
+        const buckets = Object.fromEntries(defs.map((g) => [g.key, []]));
+
+        for (const it of list) {
+            (buckets[this.groupKey(it)] ?? buckets[it.group])?.push(it);
+        }
+
+        return defs
+            .map((g) => ({ key: g.key, title: g.title, items: buckets[g.key] }))
             .filter((g) => g.items.length);
+    },
+
+    /**
+     * The chilled group whose POS categories include the row's, else the row's
+     * own case/unit group. A chilled row keeps its case or unit stepper wording.
+     */
+    groupKey(it) {
+        const chilled = (this.order.groups ?? []).find((g) => g.codes.length && g.codes.includes(it.category));
+
+        return chilled ? chilled.key : it.group;
     },
 
     /** The rows a group renders now; the group itself keeps the full list. */
     shown(g) {
-        return g.items.slice(0, this.windows[g.key]);
+        return g.items.slice(0, this.windows[g.key] ?? PAGE);
     },
 
     remaining(g) {
-        return Math.max(0, g.items.length - this.windows[g.key]);
+        return Math.max(0, g.items.length - (this.windows[g.key] ?? PAGE));
     },
 
     moreLabel(g) {
@@ -268,11 +415,12 @@ export default () => mix({
     },
 
     more(g) {
-        this.windows[g.key] += PAGE;
+        // Reassigned so Alpine sees a key it has not seen before.
+        this.windows = { ...this.windows, [g.key]: (this.windows[g.key] ?? PAGE) + PAGE };
     },
 
     resetWindows() {
-        this.windows = { case: PAGE, unit: PAGE };
+        this.windows = {};
     },
 
     get totalValue() {

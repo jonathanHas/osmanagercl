@@ -1,6 +1,6 @@
 # Shop order review (design screen 20)
 
-Status: READY
+Status: ACCEPTED
 Revision: 2
 Planner: Fable 5.1
 Date: 2026-10-06 (Revision 2 the same day, after review)
@@ -786,3 +786,53 @@ code and not `GONE`.
 
 Check: `php artisan test --filter=ShopOrderReviewTest` passes;
 `php artisan test tests/Feature/Shop` passes; pint clean on `OrderService.php`.
+
+## Review (Revision 2, 2026-10-06) — ACCEPTED
+
+Read the Revision 2 report to the end and the diffs of the five files it
+touches; reran `css-ok`, `sprite-ok`, the inline-style grep (0 and 0),
+pint, `tests/Feature/Shop` (314 passed) and the full suite:
+**15 failed / 1020 passed**, the same five classes as the baseline.
+
+### Criteria
+
+| Step | Result |
+|---|---|
+| 11 Window the rows | pass. 50 per group, "Show N more · M left", full counts kept, windows reset on filter/switch/sort/search via `$watch`. First render of session 20 is 564 ms in a hidden tab (was about 2.7 s for 329 rows plus the fetch; showing every row was 18 s). Sorts are 327–655 ms there, above the 300 ms I asked for; see below |
+| 12 Tag pill dot | pass: both rules and the class gone, `css-ok` |
+| 13 Read-only "Suggested N" | pass: exactly the planned span, checked in component state on session 20 |
+| 14 Export guard | pass: four lines in `exportToCsv()`, a test that fails without them |
+
+### Deviations
+
+7. **Bars as `x-html` strings** — accepted. Only numbers and fixed class
+   names enter the string, the markup is the design's, and halving the
+   directives per row is what made the windowed page quick. The Blade
+   comment explains it to the next reader. Cycle 2 builds on it.
+8. **`content-visibility: auto` on `.shop-ord`** — accepted; it is an
+   app rule under the marker. Cycle 2 notes the paint-containment
+   consequence.
+9. **Timing by microtasks plus a forced layout** — accepted; the plan's
+   `requestAnimationFrame` advice was wrong for a hidden tab. Added to
+   `docs/shop_new/README.md` under "Checking a change".
+
+### Notes for Planner
+
+- **Sorts above 300 ms** — deferred, the Implementer's option (c): the
+  numbers come from a background renderer, and the real question is how
+  the tablet feels. If it drags, `PAGE` 25 is one constant away. Owner to
+  try an Udea draft on the tablet.
+- Hidden-tab timing method → recorded in the Shop README (done by the
+  Planner).
+- "36 units · €61.56" on session 20 — no action, ordinary maths.
+- From the Revision 1 notes, still open for the owner: filters scroll
+  sideways at 390 px and the sort select squeezes the search field (both
+  as the design behaves; a phone tweak if wanted); negative snapshot
+  stock shows as it is.
+- Dev state: draft 306 has item 177715 at 13 cases with eight
+  `order_adjustments` rows (9766–9773) from the owner's own taps; left
+  alone. The owner can reset the row from the screen; the eight rows
+  feed the learning average for that product until deleted.
+
+Archived to `archive/2026-10-06-cycle-1-shop-order-review/`. Cycle 2 (week
+readout on the chart) starts from a fresh `plan.md`.

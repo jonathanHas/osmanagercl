@@ -174,6 +174,21 @@ export).
 - **`orders.review`** is held by employee, manager and admin (migration
   `2026_10_06_000001_add_orders_review_permission`, and the seeder). It is not
   `orders.manage`, which stays manager-only.
+- **Week readout**: pointing at a sales bar shows that week's sales in a small
+  pill above it ("Week of 3 Aug · 25 sold", from `context_data.weekly_sales[*].week_start`);
+  a projected bar shows its stock estimate ("Week 2: about 12 in stock"). On the
+  tablet a tap pins the readout until the next tap. The bars are rendered from one
+  `x-html` per side for speed, so the plot delegates the pointer events.
+- **Pictures**: each row shows the product thumbnail (till photo, else supplier
+  picture, else the placeholder; `ProductImageUrls::byCode()` once per order).
+  Hovering it shows the larger picture in Find product's panel, now the shared
+  part `resources/js/shop/product-peek.js`; on touch a tap on the thumbnail pins
+  the panel and a tap anywhere else closes it.
+- **Chilled groups first**: rows in the chilled POS categories, Cheese (`032`)
+  then Refrigerated (`002`), from `SpecialOrderCategories::displayGroups()`, are
+  listed in their own groups ahead of Case products and Single units, **for every
+  supplier**. A chilled row keeps its case or unit stepper. The groups come with
+  the order's header, and each group shows 50 rows at a time ("Show 50 more").
 - **Office-only**: generating or completing an order, priorities, adding
   products by search, destock/kitchen toggles, min-stock, coverage overrides,
   pallet fill, and the Christmas comparison view (a Christmas session opens as

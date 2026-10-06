@@ -148,6 +148,9 @@ holding the new `orders.review` permission (employee, manager, admin). Per produ
 sales, the generation-time stock snapshot, projected cover after delivery and a case stepper; each tap
 saves through `OrderService::updateOrderItemCases()`. Export CSV is the same file as the office export.
 Non-draft sessions are read-only (409 on a write). Everything else stays on `/orders/{order}`.
+Chilled lines (Cheese `032`, Refrigerated `002`) are grouped first on the Shop screen for every
+supplier (`SpecialOrderCategories::displayGroups()`); the office keeps its per-supplier groups, which
+also drive coverage overrides.
 
 📖 **[Shop Mode — Orders](../shop-mode.md#orders-list-and-order-review)**
 

@@ -122,6 +122,11 @@ KDS is deliberately outside the Shop view.
 - Phone width: `resize_window` does not change the viewport on this machine;
   use a same-origin iframe sized 390 × 844.
 - The idle lock (5 min) fires on a trusted device during long checks.
+- The automation tab is hidden (`document.hidden` is true), so `requestAnimationFrame`
+  and `x-show` wait on timers throttled to about a second; a timing check that waits on
+  rAF can hang for tens of seconds. Time a change with a few microtask turns
+  (`await Promise.resolve()` ×5) plus a forced layout (`document.body.offsetHeight`), and
+  read component state instead of waiting for `x-show` (order_clean cycle 1, 2026-10-06).
 - On `/shop/labels` `total` is a getter (`rows.length`); to fake a queue in a
   browser check, set `rows`.
 - Browser automation here runs in a hidden tab and degrades over a long
