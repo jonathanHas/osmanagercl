@@ -17,6 +17,7 @@ return [
         ['key' => 'find-product', 'label' => 'Find product', 'hint' => 'Search and check stock', 'icon' => 'search', 'route' => 'shop.find-product', 'permissions' => ['products.view'], 'badge' => null],
         ['key' => 'deliveries', 'label' => 'Receive delivery', 'hint' => 'Scan a delivery in', 'icon' => 'truck', 'route' => 'shop.deliveries', 'permissions' => ['deliveries.process'], 'badge' => 'deliveries'],
         ['key' => 'labels', 'label' => 'Print labels', 'hint' => 'Shelf and Zebra labels', 'icon' => 'printer', 'route' => 'shop.labels', 'permissions' => ['labels.print'], 'badge' => 'labels'],
+        ['key' => 'orders', 'label' => 'Orders', 'hint' => 'Review supplier orders', 'icon' => 'chart', 'route' => 'shop.orders', 'permissions' => ['orders.review'], 'badge' => null],
         ['key' => 'requests', 'label' => 'Customer requests', 'hint' => 'Pre-orders and sourcing', 'icon' => 'requests', 'route' => 'customer-requests.index', 'permissions' => ['customer-requests.manage'], 'badge' => 'requests'],
         ['key' => 'vouchers', 'label' => 'Vouchers', 'hint' => 'Balance and redeem', 'icon' => 'gift', 'route' => 'shop.vouchers', 'permissions' => ['vouchers.redeem'], 'badge' => null],
         ['key' => 'fruit-veg', 'label' => 'Fruit & veg', 'hint' => 'Waste and harvest logs', 'icon' => 'carrot', 'route' => 'shop.fv.waste', 'permissions' => ['fruit_veg.operate'], 'badge' => null, 'tone' => 'sage'],

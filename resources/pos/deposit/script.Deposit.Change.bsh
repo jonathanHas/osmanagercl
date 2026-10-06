@@ -1,0 +1,42 @@
+// script.Deposit.Change - uniCenta oPOS 3.91.3, event ticket.change.
+// Rule: a deposit line is valid only when the line directly above it is a
+// product carrying deposit.id equal to the deposit line's product, and then
+// its quantity equals that product's quantity. Orphans are removed; a marked
+// product with no deposit line under it gets one back.
+import com.openbravo.pos.ticket.TicketLineInfo;
+
+try {
+    // Pass 1: deposit lines - drop orphans, sync quantities (walk backwards: removals keep indexes valid)
+    for (int i = ticket.getLinesCount() - 1; i >= 0; i--) {
+        TicketLineInfo l = ticket.getLine(i);
+        if (l.getProperty("deposit.for") == null) continue;
+        TicketLineInfo above = (i > 0) ? ticket.getLine(i - 1) : null;
+        boolean ok = above != null
+                  && above.getProperty("deposit.for") == null
+                  && l.getProductID() != null
+                  && l.getProductID().equals(above.getProperty("deposit.id"));
+        if (!ok) { ticket.removeLine(i); continue; }
+        if (Math.abs(l.getMultiply() - above.getMultiply()) > 0.0001) {
+            l.setMultiply(above.getMultiply());
+        }
+    }
+    // Pass 2: marked products with no deposit line directly under them
+    for (int i = ticket.getLinesCount() - 1; i >= 0; i--) {
+        TicketLineInfo p = ticket.getLine(i);
+        String depId = p.getProperty("deposit.id");
+        if (depId == null || p.getProperty("deposit.for") != null) continue;
+        boolean has = (i + 1 < ticket.getLinesCount())
+                   && ticket.getLine(i + 1).getProperty("deposit.for") != null
+                   && depId.equals(ticket.getLine(i + 1).getProductID());
+        if (has) continue;
+        TicketLineInfo dep = new TicketLineInfo(depId, p.getProperty("deposit.name", "Bottle deposit"), "000",
+                p.getMultiply(), Double.parseDouble(p.getProperty("deposit.price")),
+                taxeslogic.getTaxInfo("000", ticket.getCustomer()));
+        dep.setProperty("deposit.for", p.getProductID());
+        dep.setProperty("product.service", "true");
+        ticket.insertLine(i + 1, dep);
+    }
+} catch (Exception e) {
+    // never block the till
+}
+return null;

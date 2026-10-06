@@ -434,6 +434,7 @@ class InvoiceUdeaParser:
                     'content': content,
                     'country': country,
                     'date': date,
+                    'barrel_code': None,
                 }
 
                 lines.append(line_item)
@@ -465,6 +466,7 @@ class InvoiceUdeaParser:
                     'content': content,
                     'country': country,
                     'date': date,
+                    'barrel_code': None,
                 }
 
                 lines.append(line_item)
@@ -495,6 +497,7 @@ class InvoiceUdeaParser:
                     'content': content,
                     'country': country,
                     'date': date,
+                    'barrel_code': extra,  # deposit (Brl) code after the country, e.g. '313'
                 }
 
                 lines.append(line_item)
@@ -524,6 +527,7 @@ class InvoiceUdeaParser:
                     'gbrek': gbrek,
                     'parse_status': 'full',
                     'date': date,
+                    'barrel_code': None,
                 }
 
                 lines.append(line_item)
@@ -552,6 +556,7 @@ class InvoiceUdeaParser:
                     'gbrek': gbrek,
                     'parse_status': 'full',
                     'date': date,
+                    'barrel_code': None,
                 }
 
                 lines.append(line_item)
@@ -622,6 +627,7 @@ class InvoiceUdeaParser:
                     'gbrek': gbrek,
                     'parse_status': 'full',
                     'date': date,
+                    'barrel_code': None,
                 }
 
                 lines.append(line_item)
@@ -666,6 +672,7 @@ class InvoiceUdeaParser:
                         'parse_status': 'partial',
                         'raw_line_text': raw_line.strip()[:150],
                         'date': date,
+                        'barrel_code': None,
                     }
 
                     lines.append(line_item)

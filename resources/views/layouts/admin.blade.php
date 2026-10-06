@@ -429,6 +429,22 @@
                                 </svg>
                                 Deliveries
                             </a>
+
+                            <a href="{{ route('deposits.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('deposits.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3h6M10 3v4l-3 4v9a1 1 0 001 1h8a1 1 0 001-1v-9l-3-4V3" />
+                                </svg>
+                                Bottle Deposits
+                            </a>
+
+                            <a href="{{ route('barrel-codes.index') }}"
+                               class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('barrel-codes.*') ? 'bg-gray-800 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }}">
+                                <svg class="mr-3 h-6 w-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                Barrel Codes
+                            </a>
                             @endif
 
                             @if(auth()->user()->can('deliveries.process'))

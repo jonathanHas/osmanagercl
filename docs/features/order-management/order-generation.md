@@ -141,6 +141,16 @@ built to fill whole pallets rather than discovering the shortfall after it is pl
 📖 **[Udea Pallet Volumes](../udea-pallet-volumes.md)** — where the data comes from, the sync page,
 and why it can only be read from the Udea basket.
 
+### 2026-10 Shop mode review
+
+Draft orders can be reviewed on the shop-floor tablet at `/shop/orders` (design screen 20), by anyone
+holding the new `orders.review` permission (employee, manager, admin). Per product it shows weekly
+sales, the generation-time stock snapshot, projected cover after delivery and a case stepper; each tap
+saves through `OrderService::updateOrderItemCases()`. Export CSV is the same file as the office export.
+Non-draft sessions are read-only (409 on a write). Everything else stays on `/orders/{order}`.
+
+📖 **[Shop Mode — Orders](../shop-mode.md#orders-list-and-order-review)**
+
 ### 4. Learning System
 The system tracks manual adjustments to improve future suggestions:
 - Records user modifications to suggested quantities
@@ -464,6 +474,7 @@ $productData = $collection->where('product_id', $productId);  // O(n) each time
 ## Operational Notes
 - **Database Migration**: Run `php artisan migrate` to add `coverage_days`, `coverage_ends_on`, and `sales_history_weeks` columns to `order_sessions`.
 - **Sales Cache**: Keep `sales_daily_summary` populated via `/sales-import` (UI) or CLI (`php artisan sales:import-daily`, `php artisan sales:import-monthly`) so order generation uses the fast summaries.
+- **Shop mode**: shop-floor staff review drafts at `/shop/orders` (permission `orders.review`, migration `2026_10_06_000001_add_orders_review_permission`).
 - **UI Parameters**: The order review table accepts `?sort=sales|name|priority|value` and `?show_all=1` to control sort order and whether unordered items are visible.
 
 ---

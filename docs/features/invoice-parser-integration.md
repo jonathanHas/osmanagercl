@@ -1004,6 +1004,37 @@ Points that matter:
   tests in `tests/test_sonett.py` add synthetic cases for thousands separators, a freight line
   and a mismatched total.
 
+### Sean Glennon & Sons Invoice Parser
+
+`scripts/invoice-parser/parsers/glennon.py` handles Sean Glennon & Sons, the cash & carry in
+Drumbane, Birr. The invoice footer has a VAT analysis block with one row per rate:
+
+```
+Total Goods: 154.25
+Total VAT: 35.48
+2 23.00% 154.25 35.48 Cash 0.00 Deposit Fee: 0.00
+0.00% 0.00 0.00 Cheque 0.00
+Invoice Total 189.73
+```
+
+Points that matter:
+
+- **The VAT analysis rows are the source of truth.** Each rate in use has a leading VAT code.
+  The unused rows print as `0.00% 0.00 0.00`. Total Goods, Total VAT, the line values and the
+  Invoice Total are all checked against those rows. Any mismatch becomes a warning.
+- **Line items are matched by their tail only.** That tail is ordered and supplied (cases/units,
+  `3/0`), then price, value, VAT code and SRP. Long descriptions wrap above and below the code
+  row. The SRP's euro sign comes out of pdfplumber as `(cid:128)`.
+- **The Deposit Fee (Re-Turn) is outside VAT.** When it's non-zero, the parser keeps the stated
+  total and adds a warning, so the invoice is flagged for a manual check.
+- The invoice number and date are read from the line under the `INVOICE NO. INVOICE DATE` labels.
+- Detection matches `SEAN GLENNON` or `GLENNONSCC.IE`. The parser returns `'Sean Glennon & Sons'`,
+  which is how `accounting_suppliers` records them (id 38).
+- There's only one sample so far (INV-186536, all 23%). The tests in `tests/test_glennon.py` add
+  synthetic cases for a second rate, thousands separators, a deposit fee and a mismatched total.
+  Credit notes are detected by a negative total or the words `CREDIT NOTE`, but no real credit
+  note has been seen yet.
+
 ### Menton's Organic Farm Invoice Parser
 
 `scripts/invoice-parser/parsers/mentons.py` handles Menton's Organic Farm. Unlike every other

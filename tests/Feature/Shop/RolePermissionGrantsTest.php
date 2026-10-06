@@ -29,6 +29,9 @@ class RolePermissionGrantsTest extends TestCase
         'vouchers.manage',
     ];
 
+    /** Order clean-up cycle 1: the Shop order review. */
+    private const ORDERS_REVIEW_MIGRATION = 'database/migrations/2026_10_06_000001_add_orders_review_permission.php';
+
     private const NEW_PERMISSIONS = [
         'stocking.scan',
         'fruit_veg.operate',
@@ -293,5 +296,46 @@ class RolePermissionGrantsTest extends TestCase
         // products.create predates the migration, so only the grant is undone.
         $this->assertDatabaseHas('permissions', ['name' => 'products.create']);
         $this->assertFalse($this->role('manager')->fresh()->hasPermission('products.create'));
+    }
+
+    // --- order clean-up cycle 1: orders.review ------------------------------
+
+    public function test_seeder_grants_orders_review_to_employees_but_not_orders_manage(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $this->assertTrue($this->role('employee')->hasPermission('orders.review'));
+        $this->assertFalse($this->role('employee')->hasPermission('orders.manage'));
+        $this->assertTrue($this->role('manager')->hasPermission('orders.review'));
+        $this->assertTrue($this->role('admin')->hasPermission('orders.review'));
+        $this->assertFalse($this->role('barista')->hasPermission('orders.review'));
+    }
+
+    public function test_orders_review_migration_grants_it_on_an_existing_database(): void
+    {
+        // RefreshDatabase has already run the migration with no roles present,
+        // so remove the permission to get the state an existing install is in.
+        Permission::where('name', 'orders.review')->delete();
+
+        foreach (['admin', 'manager', 'employee', 'barista'] as $name) {
+            Role::create(['name' => $name, 'display_name' => ucfirst($name)]);
+        }
+
+        $migration = require base_path(self::ORDERS_REVIEW_MIGRATION);
+        $migration->up();
+        $migration->up(); // idempotent
+
+        $this->assertSame(1, Permission::where('name', 'orders.review')->count());
+
+        foreach (['admin', 'manager', 'employee'] as $name) {
+            $this->assertTrue($this->role($name)->hasPermission('orders.review'), "{$name} must hold orders.review.");
+        }
+        $this->assertFalse($this->role('employee')->hasPermission('orders.manage'));
+        $this->assertSame([], $this->role('barista')->permissions->pluck('name')->all());
+
+        $migration->down();
+
+        $this->assertDatabaseMissing('permissions', ['name' => 'orders.review']);
+        $this->assertFalse($this->role('employee')->fresh()->hasPermission('orders.review'));
     }
 }

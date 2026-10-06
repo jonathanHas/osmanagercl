@@ -15,6 +15,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\DeliveryDocumentController;
 use App\Http\Controllers\DeliveryLegacyController;
+use App\Http\Controllers\DepositController;
 use App\Http\Controllers\Financials\BankStatementController;
 use App\Http\Controllers\Financials\CardReconciliationController;
 use App\Http\Controllers\FruitVegController;
@@ -121,6 +122,18 @@ Route::middleware('auth')->group(function () {
         Route::middleware('permission:fruit_veg.operate')->group(function () {
             Route::get('/fv/waste', [\App\Http\Controllers\Shop\FruitVegController::class, 'waste'])->name('fv.waste');
             Route::get('/fv/harvest', [\App\Http\Controllers\Shop\FruitVegController::class, 'harvest'])->name('fv.harvest');
+        });
+
+        // Supplier order review (order_clean cycle 1). Narrower than the office's
+        // orders.manage: review, adjust quantities on drafts, export.
+        Route::middleware('permission:orders.review')->group(function () {
+            Route::get('/orders', [\App\Http\Controllers\Shop\OrderReviewController::class, 'index'])->name('orders');
+            Route::get('/orders/{order}', [\App\Http\Controllers\Shop\OrderReviewController::class, 'show'])->name('orders.review');
+            Route::get('/orders/{order}/items', [\App\Http\Controllers\Shop\OrderReviewController::class, 'items'])->name('orders.items');
+            Route::patch('/orders/{order}/items/{item}', [\App\Http\Controllers\Shop\OrderReviewController::class, 'updateItem'])
+                ->name('orders.item')
+                ->scopeBindings();
+            Route::get('/orders/{order}/export', [\App\Http\Controllers\Shop\OrderReviewController::class, 'export'])->name('orders.export');
         });
 
         // Trusting this device for PIN sign-in. A manager's password is the
@@ -698,6 +711,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'image'])->name('barrel-codes.image');
         Route::post('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'updateImage'])->name('barrel-codes.update-image');
         Route::delete('/barrel-codes/{barrelCode}/image', [BarrelCodeController::class, 'removeImage'])->name('barrel-codes.remove-image');
+
+        // Customer bottle deposits (docs/deposit/)
+        Route::get('/deposits', [DepositController::class, 'index'])->name('deposits.index');
+        Route::patch('/deposits/tiers/{barrelCode}', [DepositController::class, 'updateTier'])->name('deposits.tiers.update');
+        Route::post('/deposits/products', [DepositController::class, 'storeProduct'])->name('deposits.products.store');
+        Route::post('/deposits/products/confirm-all', [DepositController::class, 'confirmAll'])->name('deposits.products.confirm-all');
+        Route::patch('/deposits/products/{productDeposit}', [DepositController::class, 'updateProduct'])->name('deposits.products.update');
+        Route::delete('/deposits/products/{productDeposit}', [DepositController::class, 'destroyProduct'])->name('deposits.products.destroy');
+        Route::post('/deposits/refresh', [DepositController::class, 'refresh'])->name('deposits.refresh');
+        Route::post('/deposits/sync', [DepositController::class, 'sync'])->name('deposits.sync');
     });
 
     // Delivery Legacy (Invoice Match) - replicates legacy PHP workflow

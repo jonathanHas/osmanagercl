@@ -365,6 +365,7 @@ class DeliveryParsingService
                 'weight_unit' => $item['weight_unit'] ?? null,
                 'total_weight' => $item['total_weight'] ?? null,
                 'order_number' => $item['order_number'] ?? null,
+                'barrel_code' => $item['barrel_code'] ?? null,
             ];
         }
 

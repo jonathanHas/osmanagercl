@@ -1326,6 +1326,10 @@ class OrderService
 
         foreach ($items as $item) {
             $product = $item->product;
+            // A product deleted from the POS since generation cannot be ordered; skip it rather than crash.
+            if (! $product) {
+                continue;
+            }
             $supplierLink = $product->supplierLinks
                 ->where('SupplierID', $orderSession->supplier_id)
                 ->first();

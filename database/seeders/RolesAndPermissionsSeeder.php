@@ -318,6 +318,14 @@ class RolesAndPermissionsSeeder extends Seeder
                 'description' => 'Can manage kitchen recipes, ingredient profiles and kitchen orders',
                 'module' => 'Kitchen',
             ],
+
+            // Shop order review (see 2026_10_06_000001_add_orders_review_permission)
+            [
+                'name' => 'orders.review',
+                'display_name' => 'Review supplier orders in Shop mode',
+                'description' => 'Can open draft supplier orders in Shop mode, adjust quantities and export the CSV',
+                'module' => 'Ordering',
+            ],
         ];
 
         // Create all permissions
@@ -344,6 +352,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'customer-requests.manage',
             'stocking.scan',
             'fruit_veg.operate',
+            'orders.review',
             // Employees hold this on the live database (granted by the cash
             // reconciliation migration); a fresh install needs it here too.
             'till_review.view',

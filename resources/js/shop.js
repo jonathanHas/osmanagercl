@@ -15,6 +15,7 @@ import startIdleLock from './shop/idle-lock';
 import fvHarvest from './shop/fv-harvest';
 import fvWaste from './shop/fv-waste';
 import labels from './shop/labels';
+import orderReview from './shop/order-review';
 import pinPad from './shop/pin-pad';
 import requestEdit from './shop/request-edit';
 import requestForm from './shop/requests';
@@ -44,4 +45,5 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('shopFvWaste', fvWaste);
     Alpine.data('shopFvHarvest', fvHarvest);
     Alpine.data('shopPinPad', pinPad);
+    Alpine.data('shopOrderReview', orderReview);
 });

@@ -4,9 +4,14 @@
             <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
                 {{ __('Barrel Codes') }}
             </h2>
-            <a href="{{ route('deliveries.index') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
-                &larr; Back to Deliveries
-            </a>
+            <div class="flex items-center gap-4">
+                <a href="{{ route('deposits.index') }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">
+                    Bottle deposits for customers &rarr;
+                </a>
+                <a href="{{ route('deliveries.index') }}" class="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                    &larr; Back to Deliveries
+                </a>
+            </div>
         </div>
     </x-slot>
 

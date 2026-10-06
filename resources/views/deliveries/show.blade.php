@@ -542,22 +542,77 @@
             @endif
 
             {{-- Permanent Barrel Deposits Section (from database) - Collapsible --}}
-            @if($delivery->barrels->count() > 0)
+            @php
+                // Deposit codes on product lines vs the barrels section, kept at import (deposit cycle 3).
+                $depositRecon = $delivery->import_data['deposit_reconciliation'] ?? null;
+                $depositReconRows = collect($depositRecon['line_units'] ?? [])->map(function ($units, $code) use ($depositRecon) {
+                    $section = $depositRecon['section'][$code] ?? null;
+
+                    return [
+                        'code' => (string) $code,
+                        'lines' => (int) $units,
+                        'section' => $section,
+                        'status' => $section === null ? 'not in section' : ((int) $section === (int) $units ? 'matches' : 'differs by '.abs((int) $section - (int) $units)),
+                    ];
+                })->values();
+                $depositReconWarnings = $depositRecon['warnings'] ?? [];
+            @endphp
+            @if($delivery->barrels->count() > 0 || $depositRecon)
                 <div class="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3" x-data="{ expanded: false }">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
                             <span class="font-semibold text-amber-800 dark:text-amber-200">Barrels/Deposits:</span>
-                            <span class="font-bold text-amber-900 dark:text-amber-100">&euro;{{ number_format($delivery->barrels_total, 2) }}</span>
-                            <span class="text-sm text-amber-600 dark:text-amber-400">({{ $delivery->barrels->count() }} items)</span>
+                            @if($delivery->barrels->count() > 0)
+                                <span class="font-bold text-amber-900 dark:text-amber-100">&euro;{{ number_format($delivery->barrels_total, 2) }}</span>
+                                <span class="text-sm text-amber-600 dark:text-amber-400">({{ $delivery->barrels->count() }} items)</span>
+                            @endif
+                            @if($depositReconWarnings)
+                                <span class="text-sm font-medium text-red-700 dark:text-red-400">{{ count($depositReconWarnings) }} deposit {{ Str::plural('mismatch', count($depositReconWarnings)) }}</span>
+                            @elseif($depositReconRows->isNotEmpty())
+                                <span class="text-sm text-green-700 dark:text-green-400">deposit codes match</span>
+                            @endif
                         </div>
-                        <button @click="expanded = !expanded" class="flex items-center gap-1 text-sm text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors">
+                        <button x-on:click="expanded = !expanded" class="flex items-center gap-1 text-sm text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 transition-colors">
                             <span x-text="expanded ? 'Hide' : 'Show'">Show</span>
                             <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': expanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                             </svg>
                         </button>
                     </div>
+                    @if($depositReconWarnings)
+                        <ul class="mt-2 list-disc list-inside text-sm text-red-700 dark:text-red-400">
+                            @foreach($depositReconWarnings as $warning)
+                                <li>{{ $warning }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
                     <div x-show="expanded" x-collapse class="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
+                        @if($depositReconRows->isNotEmpty())
+                            <h4 class="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">Deposit codes on product lines</h4>
+                            <div class="overflow-x-auto mb-4">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="text-amber-700 dark:text-amber-400 text-left">
+                                            <th class="py-1 pr-4">Code</th>
+                                            <th class="py-1 pr-4 text-right">Units on lines</th>
+                                            <th class="py-1 pr-4 text-right">Units in barrels section</th>
+                                            <th class="py-1">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-amber-900 dark:text-amber-100">
+                                        @foreach($depositReconRows as $row)
+                                            <tr class="border-t border-amber-200 dark:border-amber-800">
+                                                <td class="py-1.5 pr-4 font-mono text-xs">{{ $row['code'] }}</td>
+                                                <td class="py-1.5 pr-4 text-right">{{ $row['lines'] }}</td>
+                                                <td class="py-1.5 pr-4 text-right">{{ $row['section'] ?? '—' }}</td>
+                                                <td class="py-1.5 {{ $row['status'] === 'matches' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400 font-medium' }}">{{ $row['status'] }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                        @if($delivery->barrels->count() > 0)
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead>
@@ -582,6 +637,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        @endif
                     </div>
                 </div>
             @endif

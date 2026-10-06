@@ -1,0 +1,29 @@
+// script.Deposit.AddLine - uniCenta oPOS 3.91.3, event ticket.addline.
+// `line` is the TicketLineInfo about to be added. Return null to let the till
+// add it; return anything else to say "handled" (the till then adds nothing).
+// A product the app marked with deposit.* properties gets its deposit line
+// directly under it. Never throws out of the script: a thrown exception would
+// cancel the scan.
+import com.openbravo.pos.ticket.TicketLineInfo;
+
+String depId = null;
+TicketLineInfo dep = null;
+try {
+    depId = line.getProperty("deposit.id");
+    if (depId == null || line.getProperty("deposit.for") != null || line.isProductCom()) {
+        return null;
+    }
+    double price = Double.parseDouble(line.getProperty("deposit.price"));
+    String name = line.getProperty("deposit.name", "Bottle deposit");
+    dep = new TicketLineInfo(depId, name, "000", line.getMultiply(), price,
+                             taxeslogic.getTaxInfo("000", ticket.getCustomer()));
+    dep.setProperty("deposit.for", line.getProductID());
+    dep.setProperty("product.service", "true");   // no stock movement for the deposit line
+} catch (Exception e) {
+    return null;                                   // fall back to a plain add
+}
+// Nothing below can throw: both adds or neither.
+ticket.addLine(line);
+ticket.addLine(dep);
+sales.setSelectedIndex(ticket.getLinesCount() - 2);
+return "deposit";

@@ -10,6 +10,13 @@
                     </svg>
                     <span class="hidden sm:inline">Barrel Codes</span>
                 </a>
+                <a href="{{ route('deposits.index') }}"
+                   class="inline-flex items-center px-2 py-1.5 sm:px-4 sm:py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-md transition-colors duration-200">
+                    <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3h6M10 3v4l-3 4v9a1 1 0 001 1h8a1 1 0 001-1v-9l-3-4V3"/>
+                    </svg>
+                    <span class="hidden sm:inline">Bottle Deposits</span>
+                </a>
                 <a href="{{ route('deliveries.create') }}"
                    class="inline-flex items-center px-2 py-1.5 sm:px-4 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md transition-colors duration-200">
                     <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

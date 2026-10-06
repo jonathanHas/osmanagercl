@@ -70,6 +70,7 @@ class RoutePermissionsTest extends TestCase
             ['employee', 'get', '/till-review', 'open'],
             ['employee', 'get', '/coffee', 'open'],
             ['employee', 'get', '/categories', 'open'],
+            ['employee', 'get', '/shop/orders', 'open'],
 
             // Barista: KDS and nothing else.
             ['barista', 'get', '/products', '403'],
@@ -80,10 +81,12 @@ class RoutePermissionsTest extends TestCase
             ['barista', 'get', '/till-review', '403'],
             ['barista', 'get', '/coffee', '403'],
             ['barista', 'get', '/categories', '403'],
+            ['barista', 'get', '/shop/orders', '403'],
             ['barista', 'get', '/kds', 'open'],
 
             // Manager: office work opens up; admin-only tooling does not.
             ['manager', 'get', '/orders', 'open'],
+            ['manager', 'get', '/shop/orders', 'open'],
             ['manager', 'get', '/invoices', 'open'],
             ['manager', 'get', '/rtd', 'open'],
             ['manager', 'get', '/kitchen', 'open'],

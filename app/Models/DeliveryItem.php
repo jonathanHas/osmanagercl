@@ -20,6 +20,7 @@ class DeliveryItem extends Model
         'outer_code',
         'quantity_type',
         'description',
+        'barrel_code',
         'units_per_case',
         'supplier_case_units',
         'unit_cost',

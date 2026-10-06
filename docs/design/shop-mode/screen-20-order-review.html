@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>20 Order review — Shop mode design</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="shop.css">
+<style>body{margin:0;background:#f5ead8} a{color:#8c491a} a:hover{color:#643312}</style>
+</head>
+<body>
+<!--
+  Reference copy of Claude Design "Screen 20 Order review.dc.html" (project
+  9402165e-9955-461d-8ff4-3e934897b600), saved 2026-10-06 by the Planner.
+  The design is a dc-runtime template: {{ … }} are bindings, <sc-for> repeats,
+  <sc-if> conditionals. They are kept as written so the markup is verbatim;
+  the page does not render live. The data model and behaviour follow in the
+  script block at the end, also verbatim.
+-->
+<div class="shop is-touch" data-screen-label="20 Order review">
+  <header class="shop-topbar">
+    <a class="shop-iconbtn" href="screen-01-home.html" aria-label="Back"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></a>
+    <div class="shop-topbar__titles"><h1 class="shop-topbar__title">Order · Sonett</h1><span class="shop-topbar__sub">Delivery Fri 9 Oct · Draft by Jessika</span></div>
+    <details class="shop-usermenu">
+      <summary class="shop-chip"><span class="shop-avatar">J</span><span class="shop-chip__name">Jessika</span><svg class="shop-ico shop-ico--sm shop-chip__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+      <div class="shop-menu" role="menu">
+        <a class="shop-menu__item" role="menuitem" href="screen-16-switch-user.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Switch user</a>
+        <a class="shop-menu__item" role="menuitem" href="screen-18-locked.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Lock</a>
+        <a class="shop-menu__item" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect></svg>Office</a>
+        <div class="shop-menu__sep"></div>
+        <a class="shop-menu__item shop-menu__item--danger" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>Log out</a>
+      </div>
+    </details>
+  </header>
+  <main class="shop-page">
+    <div class="shop-facts shop-facts--4">
+      <div class="shop-fact"><span class="shop-label">Order value</span><span class="shop-fact__value">{{ totalValue }}</span></div>
+      <div class="shop-fact"><span class="shop-label">Products ordered</span><span class="shop-fact__value">{{ orderedCount }} of {{ allCount }}</span></div>
+      <div class="shop-fact"><span class="shop-label">Lasts until</span><span class="shop-fact__value">Fri 23 Oct</span><span class="shop-hint">2.1 weeks after delivery</span></div>
+      <div class="shop-fact"><span class="shop-label">Based on</span><span class="shop-fact__value">8 weeks</span><span class="shop-hint">of sales</span></div>
+    </div>
+    <div class="shop-stack" style="gap:12px">
+      <div class="shop-between">
+        <div class="shop-seg" role="radiogroup" aria-label="Show">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4"><button class="shop-seg__opt" type="button" style="{{ f.style }}" aria-pressed="{{ f.on }}" onClick="{{ f.pick }}">{{ f.label }}</button></sc-for>
+        </div>
+        <label class="shop-switch"><input type="checkbox" checked="{{ showUnordered }}" onChange="{{ toggleUnordered }}"><span class="shop-switch__track"></span><span class="shop-meta" style="font-weight:700">Show not ordered</span></label>
+      </div>
+      <div class="shop-inline" style="flex-wrap:nowrap">
+        <div class="shop-search" style="flex:1;min-width:0"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg><input class="shop-input" type="search" placeholder="Find in this order" value="{{ q }}" onChange="{{ setQ }}"></div>
+        <select class="shop-input shop-select" style="width:auto;flex:none" aria-label="Sort" value="{{ sort }}" onChange="{{ setSort }}"><option value="sales">Best sellers</option><option value="cover">Lowest cover</option><option value="name">A–Z</option></select>
+      </div>
+    </div>
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="1">
+    <section class="shop-stack shop-stack--tight">
+      <h2 class="shop-group-title">{{ g.title }} <small>{{ g.count }}</small></h2>
+      <div class="shop-list">
+        <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+        <article class="shop-ord" data-unordered="{{ it.unordered }}">
+          <div class="shop-ord__product">
+            <h3 class="shop-row__title">{{ it.name }}</h3>
+            <span class="shop-row__meta"><span class="shop-code">{{ it.code }}</span> · {{ it.packLabel }}</span>
+            <div class="shop-ord__tags"><span class="{{ it.prioClass }}">{{ it.prioLabel }}</span><sc-for list="{{ it.tags }}" as="t" hint-placeholder-count="0"><span class="shop-pill shop-pill--muted" style="padding-left:12px">{{ t }}</span></sc-for></div>
+          </div>
+          <div class="shop-spark">
+            <div class="shop-spark__head"><span><strong>{{ it.sold }}</strong> sold</span><span class="shop-spark__key">avg {{ it.avg }}/wk</span><span>peak {{ it.peak }}</span><span class="shop-spark__key shop-spark__key--proj">stock</span></div>
+            <div class="shop-spark__plot" role="img" aria-label="{{ it.chartLabel }}">
+              <div class="shop-spark__past">
+                <sc-for list="{{ it.bars }}" as="b" hint-placeholder-count="8"><span class="{{ b.cls }}" style="{{ b.style }}"></span></sc-for>
+                <span class="shop-spark__avg" style="{{ it.avgStyle }}"></span>
+              </div>
+              <div class="shop-spark__future">
+                <sc-for list="{{ it.proj }}" as="p" hint-placeholder-count="4"><span class="{{ p.cls }}" style="{{ p.style }}" title="{{ p.title }}"></span></sc-for>
+              </div>
+            </div>
+            <div class="shop-spark__axis"><span><span>8 wk ago</span><span>last wk</span></span><span>after delivery</span></div>
+          </div>
+          <div class="shop-ord__stock">
+            <div class="shop-stack" style="gap:4px"><span class="shop-label">In stock</span><span class="{{ it.stockClass }}">{{ it.stock }}</span></div>
+            <div class="shop-stack" style="gap:4px"><span class="shop-label">After delivery</span><span class="shop-ord__num">{{ it.after }}</span></div>
+            <span class="{{ it.coverClass }}">{{ it.coverLabel }}</span>
+          </div>
+          <div class="shop-ord__order">
+            <div class="shop-ord__stepper">
+              <button class="shop-iconbtn" type="button" aria-label="One case less" onClick="{{ it.dec }}"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+              <output class="{{ it.qtyClass }}">{{ it.cases }}<small>{{ it.caseWord }}</small></output>
+              <button class="shop-iconbtn" type="button" aria-label="One case more" onClick="{{ it.inc }}"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></button>
+            </div>
+            <div class="shop-ord__line"><span>{{ it.unitsLabel }} · <strong>{{ it.cost }}</strong></span>
+              <sc-if value="{{ it.changed }}" hint-placeholder-val="{{ false }}"><button class="shop-ord__reset" type="button" onClick="{{ it.reset }}"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>Suggested {{ it.sug }}</button></sc-if>
+              <sc-if value="{{ it.same }}" hint-placeholder-val="{{ true }}"><span>Suggested</span></sc-if>
+            </div>
+          </div>
+        </article>
+        </sc-for>
+      </div>
+    </section>
+    </sc-for>
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+      <div class="shop-card"><div class="shop-empty"><span class="shop-empty__icon"><svg class="shop-ico shop-ico--xl" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></span><p class="shop-empty__title">Nothing matches</p><p class="shop-empty__text">Try another filter, or turn on “Show not ordered”.</p></div></div>
+    </sc-if>
+    <div class="shop-actions">
+      <div class="shop-actions__spacer shop-stack" style="gap:0;flex:1;min-width:0"><span class="shop-label">Total</span><span style="font-size:var(--shop-fs-xl);font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums">{{ totalValue }}</span></div>
+      <button class="shop-btn shop-btn--primary shop-btn--lg" type="button" style="flex:0 0 auto"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path><path d="M12 15V3"></path></svg>Export CSV</button>
+    </div>
+  </main>
+</div>
+<script type="text/x-dc" data-dc-script>
+const TARGET = 2.1, WEEKS = 8;
+const DATA = [
+  { id: 1, group: 'case', name: 'Sonett Dishwashing Liquid 1 L', code: '4007547307025', per: 6, unit: 2.69, stock: 0, sales: [1,1,0,1,3,1,1,0], prio: 'standard', tags: ['Destock', 'Kitchen'] },
+  { id: 2, group: 'case', name: 'Sonett Bleach Complex & Stain Remover 450 g', code: '4007547103924', per: 4, unit: 2.69, stock: 1, sales: [1,0,1,0,2,1,0,1], prio: 'review', tags: [] },
+  { id: 3, group: 'case', name: 'Sonett Laundry Liquid Lavender 2 L', code: '4007547205024', per: 4, unit: 9.95, stock: 3, sales: [2,3,2,4,3,2,3,3], prio: 'standard', tags: [] },
+  { id: 4, group: 'case', name: 'Sonett Hand Soap Calendula 300 ml', code: '4007547401020', per: 6, unit: 3.49, stock: 5, sales: [2,1,3,2,2,4,2,3], prio: 'safe', tags: [] },
+  { id: 5, group: 'case', name: 'Sonett All-Purpose Cleaner Orange 500 ml', code: '4007547304529', per: 6, unit: 3.29, stock: 8, sales: [1,1,1,2,1,1,1,1], prio: 'standard', tags: [] },
+  { id: 6, group: 'case', name: 'Sonett Toilet Cleaner Cedar 750 ml', code: '4007547304123', per: 6, unit: 3.19, stock: 2, sales: [1,2,1,1,2,2,1,2], prio: 'standard', tags: [] },
+  { id: 7, group: 'unit', name: 'Sonett Washing-up Liquid Calendula 5 L refill', code: '4007547307520', per: 1, unit: 21.9, stock: 1, sales: [0,1,0,1,1,0,1,0], prio: 'standard', tags: ['Refill'] },
+  { id: 8, group: 'unit', name: 'Sonett Dishwasher Tablets 25 pcs', code: '4007547309029', per: 1, unit: 6.49, stock: 2, sales: [1,2,2,1,3,2,2,3], prio: 'added', tags: [] },
+  { id: 9, group: 'unit', name: 'Sonett Rinse Aid 500 ml', code: '4007547309524', per: 1, unit: 4.29, stock: 4, sales: [0,0,1,0,0,1,0,0], prio: 'standard', tags: [] },
+];
+const PRIO = { review: ['bad', 'Review'], standard: ['warn', 'Standard'], safe: ['ok', 'Safe'], added: ['sage', 'Added'] };
+const eur = n => '€' + n.toFixed(2);
+const fmt = n => (Math.round(n * 10) / 10).toString();
+
+class Component extends DCLogic {
+  state = { cases: {}, filter: 'all', showUnordered: false, sort: 'sales', q: '' };
+  setCases(id, v) { this.setState(s => ({ cases: { ...s.cases, [id]: Math.max(0, v) } })); }
+  renderVals() {
+    const st = this.state;
+    const all = DATA.map(d => {
+      const sold = d.sales.reduce((a, b) => a + b, 0), avg = sold / WEEKS, peak = Math.max(...d.sales, 1);
+      const sug = Math.max(0, Math.ceil((avg * TARGET - d.stock) / d.per));
+      const cases = st.cases[d.id] ?? sug, units = cases * d.per, after = d.stock + units;
+      const cover = avg ? after / avg : 99;
+      const [pk, pl] = PRIO[d.prio];
+      const coverState = cover < 1 ? ['bad', 'Runs out within a week'] : cover < TARGET * 0.85 ? ['warn', `Lasts ${fmt(cover)} wk · below target`] : ['ok', cover > 20 ? 'Plenty of stock' : `Lasts ${fmt(cover)} wk`];
+      return {
+        ...d, sold, avg: fmt(avg), peak, sug, cases, after, cover, unordered: sug === 0 && cases === 0,
+        packLabel: d.per > 1 ? `${d.per} per case` : 'single unit',
+        caseWord: d.per > 1 ? (cases === 1 ? 'case' : 'cases') : (cases === 1 ? 'unit' : 'units'),
+        unitsLabel: d.per > 1 ? `${units} units` : `${eur(d.unit)} each`,
+        cost: eur(units * d.unit), costN: units * d.unit,
+        prioClass: `shop-pill shop-pill--${pk}`, prioLabel: pl,
+        stockClass: d.stock === 0 ? 'shop-ord__num is-zero' : 'shop-ord__num',
+        coverClass: `shop-pill shop-pill--${coverState[0]}`, coverLabel: coverState[1],
+        qtyClass: 'shop-ord__qty ' + (d.per > 1 ? 'is-case' : 'is-unit') + (cases !== sug ? ' is-changed' : ''),
+        changed: cases !== sug, same: cases === sug,
+        ...(() => {
+          const proj = [0, 1, 2, 3].map(w => Math.max(0, after - avg * w));
+          const top = Math.max(peak, after, 1);
+          return {
+            bars: d.sales.map(v => ({ cls: v === peak ? 'shop-spark__bar is-peak' : 'shop-spark__bar', style: { height: Math.max(4, v / top * 100) + '%' } })),
+            avgStyle: { bottom: (avg / top * 100) + '%' },
+            proj: proj.map((v, w) => ({ cls: v < avg ? 'shop-spark__bar is-proj is-low' : 'shop-spark__bar is-proj', style: { height: Math.max(4, v / top * 100) + '%' }, title: `${w ? 'Week ' + w : 'Delivery'}: about ${fmt(v)} in stock` })),
+            chartLabel: `Weekly sales, last 8 weeks: ${d.sales.join(', ')}. Projected stock after delivery: ${proj.map(fmt).join(', ')}`,
+          };
+        })(),
+        inc: () => this.setCases(d.id, cases + 1), dec: () => this.setCases(d.id, cases - 1), reset: () => this.setCases(d.id, sug),
+      };
+    });
+    const q = st.q.trim().toLowerCase();
+    let list = all.filter(i => (st.showUnordered || !i.unordered) && (st.filter === 'all' || i.prio === st.filter) && (!q || i.name.toLowerCase().includes(q) || i.code.includes(q)));
+    const by = { sales: (a, b) => b.sold - a.sold, cover: (a, b) => a.cover - b.cover, name: (a, b) => a.name.localeCompare(b.name) }[st.sort];
+    list = [...list].sort(by);
+    const groups = [['case', 'Case products'], ['unit', 'Single units']].map(([k, title]) => {
+      const items = list.filter(i => i.group === k); return { title, count: items.length, items };
+    }).filter(g => g.count);
+    const visible = all.filter(i => st.showUnordered || !i.unordered);
+    const filters = [['all', 'All'], ['review', 'Review'], ['standard', 'Standard'], ['safe', 'Safe'], ['added', 'Added']].map(([k, l]) => {
+      const on = st.filter === k, n = k === 'all' ? visible.length : visible.filter(i => i.prio === k).length;
+      return { label: `${l} ${n}`, on, pick: () => this.setState({ filter: k }),
+        style: on ? { background: 'var(--shop-surface)', color: 'var(--shop-ink)', boxShadow: 'var(--shop-shadow-sm)' } : {} };
+    });
+    return {
+      groups, filters, empty: groups.length === 0,
+      totalValue: eur(all.reduce((a, i) => a + i.costN, 0)),
+      orderedCount: all.filter(i => i.cases > 0).length, allCount: all.length,
+      showUnordered: st.showUnordered, toggleUnordered: () => this.setState(s => ({ showUnordered: !s.showUnordered })),
+      sort: st.sort, setSort: e => this.setState({ sort: e.target.value }),
+      q: st.q, setQ: e => this.setState({ q: e.target.value }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -10,7 +10,7 @@ Port of the udea_cl4.py logic adapted for the delivery import system.
 import re
 import sys
 import os
-from typing import Dict, List, Optional, Tuple, Any, Pattern, Final
+from typing import Dict, List, Optional, Set, Tuple, Any, Pattern, Final
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -85,6 +85,16 @@ FALLBACK_REGEX: Final[Pattern[str]] = re.compile(rf"""
 
 # Detect lines that start with a code
 LINE_STARTS_WITH_CODE_REGEX: Final[Pattern[str]] = re.compile(r'^\d+')
+
+# A product line's description ends "<Country> <Brl>" when the product carries a
+# returnable deposit (bottle/jar), e.g. "... Bio-Dynamisch DE 313". pdfplumber
+# sometimes drops the space ("... NL10046"). Crate and pallet codes never
+# appear on product lines, only in the barrels section.
+BARREL_CODE_SUFFIX_REGEX: Final[Pattern[str]] = re.compile(r'^(?P<desc>.*?\b[A-Z]{2})\s*(?P<code>\d{1,5})$')
+
+# Fallback for a garbled country code: whitespace then a code at the end. Only
+# used with the codes the same docket's barrels section lists.
+BARE_BARREL_CODE_SUFFIX_REGEX: Final[Pattern[str]] = re.compile(r'\s(?P<code>\d{1,5})$')
 
 # Headers that trigger the start of data capture
 SECTION_HEADERS: Final[Tuple[str, ...]] = ("Underdelivery", "Products to deliver")
@@ -361,6 +371,59 @@ class DeliveryUdeaParser:
             return total / total_units
         return 0.0
 
+    @staticmethod
+    def split_barrel_code(description: str, known_codes: Optional[Set[str]] = None) -> Tuple[str, Optional[str]]:
+        """
+        Split a trailing deposit (barrel) code off a product description.
+
+        "Apple-mango-juice, Luna e Terra DE 313" -> ("Apple-mango-juice, Luna e Terra DE", "313")
+
+        pdfplumber sometimes interleaves the quality word with the country code
+        ("... Bio-quNeLlle 313"), so the country anchor fails. With known_codes
+        (the codes in the same docket's barrels section) a bare trailing code
+        is still accepted, but only if the docket itself lists it.
+        Descriptions without a code are returned unchanged with None.
+        """
+        match = BARREL_CODE_SUFFIX_REGEX.match(description)
+        if match:
+            return match.group('desc').rstrip(), match.group('code')
+
+        if known_codes:
+            bare = BARE_BARREL_CODE_SUFFIX_REGEX.search(description)
+            if bare and bare.group('code') in known_codes:
+                return description[:bare.start()].rstrip(), bare.group('code')
+
+        return description, None
+
+    @staticmethod
+    def reconcile_barrel_codes(items: List[Dict[str, Any]], barrels: Dict[str, Any]) -> Tuple[Dict[str, int], List[str]]:
+        """
+        Compare the units on product lines carrying a barrel code with the
+        quantities in the "Barrels delivered" section.
+
+        Returns ({code: line units}, warnings). A mismatch is only a warning.
+        """
+        line_units: Dict[str, int] = {}
+        for item in items:
+            code = item.get('barrel_code')
+            if code:
+                line_units[code] = line_units.get(code, 0) + int(item.get('total_delivered_units') or 0)
+
+        section_qty: Dict[str, int] = {}
+        for barrel in barrels.get('items', []):
+            section_qty[barrel['code']] = section_qty.get(barrel['code'], 0) + int(barrel['qty'])
+
+        warnings = []
+        for code, units in line_units.items():
+            if code not in section_qty:
+                warnings.append(f"Deposit code {code}: product lines total {units} units, not in the barrels section")
+            elif section_qty[code] != units:
+                warnings.append(
+                    f"Deposit code {code}: product lines total {units} units, barrels section says {section_qty[code]}"
+                )
+
+        return line_units, warnings
+
     def _parse_barrels_section(self, text: str) -> Dict[str, Any]:
         """Extract barrel deposits from the invoice.
 
@@ -608,6 +671,11 @@ class DeliveryUdeaParser:
                 self.log(f"Extracted order number: {order_number}", "DEBUG")
             result["metadata"]["order_number"] = order_number
 
+            # Barrels section first: its codes are the only ones a garbled
+            # product line may end in (see split_barrel_code).
+            barrels = self._parse_barrels_section(text)
+            barrel_codes = {b['code'] for b in barrels['items']}
+
             items = []
             total_value = 0.0
             capture = False
@@ -646,6 +714,7 @@ class DeliveryUdeaParser:
                         total = float(parsed["Total"]) if parsed["Total"] else 0.0
                         description = parsed.get("Description", "")
                         content = parsed.get("Content", "")
+                        description, barrel_code = self.split_barrel_code(description, barrel_codes)
 
                         # Weight-based product handling
                         is_weight_based = parsed.get("is_weight_based", False)
@@ -722,6 +791,7 @@ class DeliveryUdeaParser:
                             "weight_per_unit": weight_per_unit,
                             "weight_unit": weight_unit,
                             "total_weight": total_weight,
+                            "barrel_code": barrel_code,
                         }
 
                         items.append(item)
@@ -762,8 +832,10 @@ class DeliveryUdeaParser:
                 # Include the actual line content for user review
                 result["metadata"]["unmatched_lines"] = unmatched_product_lines
 
-            # Parse barrels section (crates, bottles, pallets - returnable deposits)
-            barrels = self._parse_barrels_section(text)
+            # Barrels section (crates, bottles, pallets - returnable deposits), parsed above
+            line_units, barrel_warnings = self.reconcile_barrel_codes(items, barrels)
+            barrels["line_units"] = line_units
+            result["warnings"].extend(barrel_warnings)
             result["barrels"] = barrels
 
             # Parse costs section (freight/transport charges)

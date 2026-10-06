@@ -13,6 +13,7 @@ use App\Models\Supplier;
 use App\Models\SupplierImageCache;
 use App\Services\DeliveryParsingService;
 use App\Services\DeliveryService;
+use App\Services\Deposits\DepositEvidenceService;
 use App\Services\DynamisAiSuggesterService;
 use App\Services\DynamisMatcherService;
 use App\Services\DynamisXlsxParserService;
@@ -21,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
@@ -38,13 +40,16 @@ class DeliveryController extends Controller
 
     private DynamisAiSuggesterService $dynamisAiSuggester;
 
+    private DepositEvidenceService $depositEvidenceService;
+
     public function __construct(
         DeliveryService $deliveryService,
         SupplierService $supplierService,
         DeliveryParsingService $deliveryParsingService,
         DynamisXlsxParserService $dynamisParser,
         DynamisMatcherService $dynamisMatcher,
-        DynamisAiSuggesterService $dynamisAiSuggester
+        DynamisAiSuggesterService $dynamisAiSuggester,
+        DepositEvidenceService $depositEvidenceService
     ) {
         $this->deliveryService = $deliveryService;
         $this->supplierService = $supplierService;
@@ -52,6 +57,7 @@ class DeliveryController extends Controller
         $this->dynamisParser = $dynamisParser;
         $this->dynamisMatcher = $dynamisMatcher;
         $this->dynamisAiSuggester = $dynamisAiSuggester;
+        $this->depositEvidenceService = $depositEvidenceService;
     }
 
     /**
@@ -522,6 +528,26 @@ class DeliveryController extends Controller
                     $barrels['items'],
                     $request->supplier_id
                 );
+            }
+
+            // Customer bottle deposits: record the per-line deposit codes and
+            // refresh suggestions and the till (never fails the import).
+            if ($this->depositEvidenceService->isUdeaSupplier((int) $request->supplier_id)) {
+                $this->depositEvidenceService->afterDeliveryImport($delivery);
+            }
+
+            // Keep the deposit-code reconciliation for the delivery page (never fails the import).
+            try {
+                $this->deliveryService->recordDepositReconciliation(
+                    $delivery,
+                    $barrels,
+                    $this->deliveryParsingService->getWarnings($result)
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Deposit reconciliation not recorded', [
+                    'delivery_id' => $delivery->id,
+                    'error' => $e->getMessage(),
+                ]);
             }
 
             // For single-file parses, build a synthetic file_results entry

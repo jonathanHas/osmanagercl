@@ -145,6 +145,7 @@ class DeliveryService
                     'order_number' => $record['order_number'] ?? null,
                     'supplier_code' => $productCode,
                     'description' => $productName,
+                    'barrel_code' => $record['barrel_code'] ?? null,
                     'units_per_case' => $caseSize,
                     'supplier_case_units' => $supplierLink?->CaseUnits,
 
@@ -975,6 +976,39 @@ class DeliveryService
         }
 
         return $deliveryItem;
+    }
+
+    /**
+     * Keep the parser's deposit-code reconciliation on the delivery, so the
+     * delivery page can show it after the import flash is gone: units on
+     * product lines per deposit code vs the "Barrels delivered" section.
+     *
+     * @param  array{items?: array<int, array{code: string|int, qty: int}>, line_units?: array<string, int>}  $barrels
+     * @param  array<int, string>  $warnings  all parser warnings; only the deposit ones are kept
+     */
+    public function recordDepositReconciliation(Delivery $delivery, array $barrels, array $warnings): void
+    {
+        $lineUnits = array_map('intval', $barrels['line_units'] ?? []);
+
+        $section = [];
+        foreach ($barrels['items'] ?? [] as $barrel) {
+            $code = (string) $barrel['code'];
+            $section[$code] = ($section[$code] ?? 0) + (int) $barrel['qty'];
+        }
+
+        if ($lineUnits === [] && $section === []) {
+            return;
+        }
+
+        $delivery->import_data = array_merge($delivery->import_data ?? [], [
+            'deposit_reconciliation' => [
+                'line_units' => $lineUnits,
+                'section' => $section,
+                'warnings' => array_values(array_filter($warnings, fn ($w) => is_string($w) && str_starts_with($w, 'Deposit code'))),
+                'checked_at' => now()->toDateTimeString(),
+            ],
+        ]);
+        $delivery->save();
     }
 
     /**

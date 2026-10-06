@@ -23,7 +23,8 @@ from parsers import (
     mossfield, slievebloom, garryhinch, oxigen, kellys, udea, breadelicious,
     kleepaper, ardu, vico, loughboora, coolnagrower, merrymill, flogas,
     oldyard_organics, amazon, ecobike, dunany_flour, beechlawn, mentons, kilbeggan,
-    hetzner, bean2cup, meadow_moss, berlin_packaging, sonett, default_parser
+    hetzner, bean2cup, meadow_moss, berlin_packaging, sonett, glennon,
+    default_parser
 )
 
 # Configure logging
@@ -106,6 +107,8 @@ def detect_supplier(text):
     elif ("BERLIN PACKAGING" in upper_text or "BERLINPACKAGING" in upper_text
           or "THEPACKSTOCK" in upper_text):
         return berlin_packaging, "Berlin Packaging Ltd"
+    elif "SEAN GLENNON" in upper_text or "GLENNONSCC.IE" in upper_text:
+        return glennon, "Sean Glennon & Sons"
     # Wholesalers (Udea, Independent, Dynamis) list Sonett products by name, so match the
     # Irish distributor's own letterhead and email rather than the brand, and check it last.
     elif "SONETT IRELAND" in upper_text or "SONETTIRELAND@" in upper_text:

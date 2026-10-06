@@ -120,6 +120,23 @@ class ShopHomeTest extends TestCase
             ->assertDontSee('Print labels');
     }
 
+    /** Order clean-up cycle 1: the Orders tile follows orders.review. */
+    public function test_orders_tile_follows_the_orders_review_permission(): void
+    {
+        $this->actingAs($this->userWith('employee', ['orders.review']))
+            ->get('/shop')
+            ->assertOk()
+            ->assertSee('Review supplier orders')
+            ->assertSee(route('shop.orders'), false)
+            ->assertSee('#chart', false);
+
+        $this->actingAs($this->userWith('cashier', ['stocking.scan']))
+            ->get('/shop')
+            ->assertOk()
+            ->assertDontSee('Review supplier orders')
+            ->assertDontSee(route('shop.orders').'"', false);
+    }
+
     /**
      * Since cycle 12 a barista lands on the KDS, so Coffee orders is no longer a
      * Home tile. A barista who reaches /shop anyway sees nothing to do.

@@ -1,0 +1,1 @@
+improve the search bar for adding products, currently it doesn't take barcodes - it could be switched to using the products search

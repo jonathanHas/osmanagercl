@@ -452,6 +452,7 @@ Track returnable deposit items (crates, bottles, pallets) from supplier deliveri
 - **Image Support**: Upload photos for visual identification of barrel types
 - **Collapsible Display**: Barrel section on delivery pages collapsed by default to save space
 - **Management Page**: Browse, filter, and edit all barrel codes at `/barrel-codes`
+- **Customer Bottle Deposits** (NEW! 2026-10): Udea's per-line deposit code (313 / 315 / 9936) is captured on delivery lines, suggested per product and confirmed at `/deposits`; confirmed products get a deposit line added automatically at the till, with refund buttons (`deposits:*` commands)
 
 📖 [Barrel Deposit Tracking Documentation](./features/barrel-deposit-tracking.md)
 
@@ -523,6 +524,7 @@ Intelligent order suggestion system with sales history analysis and coverage pla
 - **Priority Classification**: Products flagged as "Review", "Standard", or "Safe" based on analysis
 - **Min Stock Override**: User-defined minimum stock levels with absolute unit control
 - **Internal Customer Tracking**: Charts display Coffee (☕ purple) and Kitchen (🍳 orange) department transfers alongside regular sales
+- **Shop Order Review** (NEW! 2026-10-06): Draft orders reviewed on the shop-floor tablet at `/shop/orders` — weekly sales chart, stock snapshot, cover, case stepper, CSV export; permission `orders.review`. 📖 [Shop Mode](./features/shop-mode.md#orders-list-and-order-review)
 - **Udea Pallet Fill** (NEW! 2026-09-09): For Udea orders, a running pallet-space total at the top of the order review page with Europallet/blockpallet selectors. 📖 [Udea Pallet Volumes Documentation](./features/udea-pallet-volumes.md)
 
 📖 [Order Generation Documentation](./features/order-management/order-generation.md)

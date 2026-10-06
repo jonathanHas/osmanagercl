@@ -144,6 +144,45 @@ number of at most 4 whole digits and 3 decimals (a decimal comma is accepted):
 a barcode typed or wedge-scanned into the field is 8–14 digits, so it can never
 be saved as a quantity — Add simply stays disabled.
 
+### Orders: list and order review
+
+A Home tile **Orders** (permission `orders.review`) opens `/shop/orders`: the
+20 newest draft supplier orders and the 5 most recently completed, each opening
+`/shop/orders/{order}`, the order review (design screen 20). Orders are still
+generated in the office; the Shop only reviews them.
+
+The review shows, per product: name, code, pack size, the priority pill
+(Review / Standard / Safe, or Added for products added by search) and tags
+(`Destocked` when the product has no `stocking` row, `Kitchen` for kitchen
+products); a weekly sales chart over the session's history weeks with the
+average as a dashed line and four projected stock bars after delivery; stock,
+stock after delivery and a cover pill (`No recent sales` when the average is
+0); and a case stepper (units for single-unit products). Filters, a "Show not
+ordered" switch, a text search and three sorts work in the browser. The
+sticky bar shows the total and **Export CSV** (the same file as the office
+export).
+
+- **Stock is the generation-time snapshot** (`context_data.current_stock`), the
+  number the suggestion was computed from, not live stock. Sales come from
+  `context_data.weekly_sales`; there is no POS query per row.
+- **Each tap saves** (debounced 400 ms per item, optimistic, reverted with a
+  toast on failure) through `PATCH shop.orders.item`, which calls
+  `OrderService::updateOrderItemCases()`, so the learning log and session totals
+  stay right. Only drafts are editable: any other status answers **409**
+  `{error: 'Order is not editable'}` and the screen opens read-only (steppers
+  disabled, export still allowed).
+- **`orders.review`** is held by employee, manager and admin (migration
+  `2026_10_06_000001_add_orders_review_permission`, and the seeder). It is not
+  `orders.manage`, which stays manager-only.
+- **Office-only**: generating or completing an order, priorities, adding
+  products by search, destock/kitchen toggles, min-stock, coverage overrides,
+  pallet fill, and the Christmas comparison view (a Christmas session opens as
+  a plain review).
+- Code: `app/Http/Controllers/Shop/OrderReviewController.php`,
+  `app/Services/Shop/OrderReviewService.php`, `resources/views/shop/orders.blade.php`,
+  `order-review.blade.php`, `resources/js/shop/order-review.js`. See also
+  [Order Generation](./order-management/order-generation.md).
+
 ## Shared devices, PINs and locking
 
 Typing a password on a greasy 10-inch touchscreen, several times a shift, is
@@ -294,4 +333,5 @@ is HTTPS.
 - **Cycle history**: `docs/planImp/archive/YYYY-MM-DD-shop-mode-cycle-N/` — the
   plan and the implementation report for each cycle.
 - **Screens with their own docs**: [Customer Requests](./customer-requests.md),
-  [Fruit & Veg](./fruit-veg-system.md), [Vouchers](./voucher-management.md).
+  [Fruit & Veg](./fruit-veg-system.md), [Vouchers](./voucher-management.md),
+  [Order Generation](./order-management/order-generation.md) (Shop order review).
