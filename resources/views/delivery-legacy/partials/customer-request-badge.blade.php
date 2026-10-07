@@ -13,7 +13,7 @@
                title="Customer request #{{ $line->customer_request_id }}{{ $line->request?->wanted_on ? ' - wanted '.$line->request->wanted_on->format('D j M') : '' }}">
                 <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M3 3a1 1 0 011-1h12a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V3zm0 8a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z"/></svg>
                 {{ $arrived ? 'Put aside for' : 'Wanted by' }} {{ $line->request?->customer_name ?? 'customer' }}
-                &times; {{ rtrim(rtrim(number_format((float) $line->quantity, 2, '.', ''), '0'), '.') }}
+                &times; {{ $line->quantityLabel() }}
                 @if($line->request?->wanted_on)
                     <span class="font-normal opacity-80">({{ $line->request->wanted_on->format('j M') }})</span>
                 @endif

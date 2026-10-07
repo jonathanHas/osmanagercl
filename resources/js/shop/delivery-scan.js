@@ -389,7 +389,7 @@ export default () => mix(productImages(), productTypeahead(), {
             this.latest = data.product?.barcode ?? item.code;
             this.remember(this.latest);
             this.flag = data.customerRequests?.length
-                ? 'Put aside for '+ data.customerRequests.map((c) => c.customer_name).join(', ')
+                ? 'Put aside for ' + data.customerRequests.map((c) => c.customer_name + ' (' + c.quantity_label + ')').join(', ')
                 : null;
             this.pending = null;
 

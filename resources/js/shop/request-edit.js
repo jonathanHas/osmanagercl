@@ -24,6 +24,10 @@ const withKey = (line) => ({
     product_name: line.product_name ?? '',
     description: line.description ?? '',
     quantity: line.quantity ?? 1,
+    // 'unit' or 'case'. A line by the case keeps the size it was taken with;
+    // otherwise the product's current case size, so the line can switch to Case.
+    unit: line.unit === 'case' ? 'case' : 'unit',
+    case_units: line.case_units ?? line.product?.case_units ?? null,
     notes: line.notes ?? '',
     status: line.status ?? null,
     product: line.product ?? null,
@@ -56,6 +60,7 @@ export default (seed = null, statusLabels = {}) => mix(productImages(), productT
             product_name: p.name,
             description: p.name,
             quantity: 1,
+            case_units: p.case_units ?? null,
             product: { id: p.id, image_url: p.image_url ?? null },
         }));
     },
@@ -79,6 +84,8 @@ export default (seed = null, statusLabels = {}) => mix(productImages(), productT
         item.product_code = '';
         item.product_name = '';
         item.product = null;
+        item.unit = 'unit';
+        item.case_units = null;
     },
 
     remove(index) {
@@ -91,6 +98,11 @@ export default (seed = null, statusLabels = {}) => mix(productImages(), productT
      */
     canRemove(item) {
         return ! item.id || ! item.status || item.status === 'pending';
+    },
+
+    /** What a line's hidden unit input posts: Case only for a product with a case size. */
+    unitValue(item) {
+        return item.product_code && item.case_units ? item.unit : 'unit';
     },
 
     statusLabel(item) {

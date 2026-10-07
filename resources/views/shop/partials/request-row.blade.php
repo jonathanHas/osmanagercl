@@ -20,7 +20,6 @@
         default => 0,
     };
 
-    $qty = rtrim(rtrim(number_format((float) $item->quantity, 2, '.', ''), '0'), '.');
     $overdue = $request->isOverdue();
     $dueToday = $request->isDueToday();
 
@@ -91,7 +90,7 @@
             <h3 class="shop-req__title">{{ $item->label() }}</h3>
         @endif
         <div class="shop-req__meta">
-            <span>{{ $request->customer_name }} &middot; {{ $qty }}</span>
+            <span>{{ $request->customer_name }} &middot; {{ $item->quantityLabel() }}</span>
             @if ($request->customer_phone)
                 <span class="shop-inline"><x-shop.icon name="phone" size="sm" />{{ $request->customer_phone }}</span>
             @endif

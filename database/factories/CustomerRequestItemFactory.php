@@ -23,6 +23,8 @@ class CustomerRequestItemFactory extends Factory
             'product_name' => null,
             'description' => $name,
             'quantity' => 1,
+            'unit' => CustomerRequestItem::UNIT_UNIT,
+            'case_units' => null,
             'notes' => null,
             'position' => 0,
             'status' => CustomerRequestItem::STATUS_PENDING,
@@ -36,6 +38,14 @@ class CustomerRequestItemFactory extends Factory
             'product_code' => $code,
             'product_name' => $name,
             'description' => $name,
+        ]);
+    }
+
+    public function byTheCase(int $caseUnits = 6): static
+    {
+        return $this->state(fn () => [
+            'unit' => CustomerRequestItem::UNIT_CASE,
+            'case_units' => $caseUnits,
         ]);
     }
 

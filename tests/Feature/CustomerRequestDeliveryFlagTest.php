@@ -183,6 +183,32 @@ class CustomerRequestDeliveryFlagTest extends TestCase
         $response->assertJsonPath('customerRequests.0.status', 'pending');
     }
 
+    public function test_a_line_by_the_case_reads_as_cases_on_the_delivery_screens(): void
+    {
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Jane Doe', 'wanted_on' => today()->addDays(2)]);
+        CustomerRequestItem::factory()
+            ->for($request, 'request')
+            ->forProduct(self::BARCODE, 'Organic Oat Milk 1L')
+            ->byTheCase(6)
+            ->status(CustomerRequestItem::STATUS_ORDERED)
+            ->create(['quantity' => 2]);
+
+        $this->matchPage()->assertOk()->assertSee('2 cases of 6');
+        $this->get(route('customer-requests.index'))->assertOk()->assertSee('Jane Doe &middot; 2 cases of 6', false);
+        $this->get(route('customer-requests.show', $request))->assertOk()->assertSee('2 cases of 6');
+
+        $this->postJson(route('delivery-legacy.scan-increment'), [
+            'delID' => self::DELIVERY_ID,
+            'barcode' => self::BARCODE,
+            'quantity' => 1,
+            'supplierID' => self::SUPPLIER_ID,
+        ])->assertOk()
+            ->assertJsonPath('customerRequests.0.quantity', 2)
+            ->assertJsonPath('customerRequests.0.unit', 'case')
+            ->assertJsonPath('customerRequests.0.case_units', 6)
+            ->assertJsonPath('customerRequests.0.quantity_label', '2 cases of 6');
+    }
+
     public function test_scan_increment_returns_empty_list_for_unrequested_product(): void
     {
         $this->postJson(route('delivery-legacy.scan-increment'), [

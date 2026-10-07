@@ -196,12 +196,14 @@ class ProductSearchApiTest extends TestCase
         $this->assertEquals(12.0, $item['stock_units']);
         $this->assertTrue($item['has_stock_record']);
         $this->assertFalse($item['is_service']);
+        $this->assertSame(6, $item['case_units']);
         $this->assertSame('/products/'.$this->ids['P1'].'/edit', $item['edit_url']);
 
         $unlinked = collect($this->search(['q' => 'milk', 'stocked' => 0])->json('data'))->firstWhere('id', $this->ids['P3']);
         $this->assertNull($unlinked['supplier']);
         $this->assertFalse($unlinked['has_stock_record']);
         $this->assertEquals(0.0, $unlinked['stock_units']);
+        $this->assertNull($unlinked['case_units']);
 
         // Natural Medicine has no website_search template: supplier is present, link is null.
         $noWebsite = collect($this->search(['q' => 'delisted', 'stocked' => 0])->json('data'))->firstWhere('id', $this->ids['P5']);

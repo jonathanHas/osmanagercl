@@ -19,7 +19,7 @@ Customer Requests moves that spreadsheet into the app:
 - **`CustomerRequestRequest`** / **`UpdateCustomerRequestItemStatusRequest`** (`app/Http/Requests/`): validation. The first also checks that every `items.*.id` on an update belongs to the request being edited.
 - **Models**: `CustomerRequest`, `CustomerRequestItem`, `CustomerRequestItemStatusLog`.
 - **`<x-shop-layout>`** (`app/View/Components/ShopLayout.php`, `resources/views/layouts/shop.blade.php`): every customer-request page renders in the Shop shell since cycle 14; `BoardLayout` is gone. It renders for guests, and its `guestRefresh` prop gives a signed-out viewer a 5-minute `<meta http-equiv="refresh">` while signed-in users keep the stale-session check instead, so nobody is reloaded mid-edit.
-- **Views** (`resources/views/customer-requests/`): `index` (the board), `_form` (shared by `create` / `edit`, Alpine.js with dynamic lines and a product typeahead), `show` (detail + status history), and partials for the request card, status pill and status buttons.
+- **Views** (Shop screens in `resources/views/shop/`): `requests` (the board, staff rows and guest cards), `request-show` (detail + status history), `request-edit` (header and lines, Alpine `resources/js/shop/request-edit.js`), and partials `shop/partials/request-row` (staff row), `request-card` (guest card) and `request-form` (the New request sheet, Alpine `resources/js/shop/requests.js`). `create` redirects to the board with the sheet open.
 - **Delivery hook**: `resources/views/delivery-legacy/partials/customer-request-badge.blade.php`, included after every product name on the match page, plus a summary card and a scanner prompt with a one-tap **Mark put aside** button.
 
 ### Database Schema
@@ -46,7 +46,9 @@ CREATE TABLE customer_request_items (
     product_code        VARCHAR(64) NULL,           -- POS barcode; NULL for a "source this" line
     product_name        VARCHAR(255) NULL,          -- snapshot of the POS name at pick time
     description         VARCHAR(255) NOT NULL,      -- product name on pick, or the free text
-    quantity            DECIMAL(10,2) NOT NULL DEFAULT 1,
+    quantity            DECIMAL(10,2) NOT NULL DEFAULT 1,   -- how many of `unit`
+    unit                VARCHAR(8) NOT NULL DEFAULT 'unit', -- 'unit' | 'case'
+    case_units          SMALLINT UNSIGNED NULL,     -- supplier case size snapshotted when taken by the case
     notes               VARCHAR(500) NULL,
     position            INT UNSIGNED NOT NULL DEFAULT 0,
     status              VARCHAR(20) NOT NULL DEFAULT 'pending',
@@ -132,6 +134,33 @@ matches, the response is `Cache-Control: public, max-age=604800, immutable`, so 
 board that is already open re-renders with no image requests. A wrong version is
 served short-lived, so a stale link can never pin an old picture.
 
+## By the case or by the unit
+
+A pre-order line can be taken **by the case** or **by the unit** (requests cycle 1,
+2026-10-07). When staff pick a product on the New request sheet, the picked row
+shows what the app knows about it — `Case of 6 · 7 in stock · €6.25` (or `Sold
+singly`) — and, when the supplier sells it in cases, two cards: **Units** and
+**Case**. Choosing Case changes the Quantity label to Cases. The edit screen has the
+same choice per product line.
+
+- **Where the size comes from**: `supplier_link.CaseUnits` on the POS (read only),
+  the same figure supplier orders use. Case is only offered when it is **more than
+  1**; the product search API's `case_units`, the service's snapshot
+  (`CustomerRequestService::caseUnitsByCode()`) and the edit-screen seeds all apply
+  that rule.
+- **Snapshot**: the server stores `case_units` when the line is saved by the case;
+  a posted `case_units` is ignored. Editing a case line keeps the stored size even
+  if the supplier's case size has changed since; switching a line to units clears it.
+  A sourcing line is always by the unit.
+- **`quantity` keeps meaning "how many of the chosen unit"**: "2 cases of 6" is
+  `quantity 2, unit case, case_units 6`, not 12.
+- **Wording** (`CustomerRequestItem::quantityLabel()`, the only place it lives):
+  units → the bare number (`3`, `1.5`); cases → `1 case of 6`, `2 cases of 6`, or
+  `2 cases` when the size is unknown. The staff row, guest card, detail page, the
+  delivery match page badge, summary card and scanner prompt, and the Shop delivery
+  scan flag all use it; the delivery JSON carries `unit`, `case_units` and
+  `quantity_label` next to `quantity`.
+
 ## Usage
 
 ### User Perspective
@@ -214,6 +243,7 @@ php artisan test --filter=CustomerRequest
 ## Changelog
 
 - **2026-09-10**: Initial release.
+- **2026-10-07**: Lines can be taken by the case or by the unit; the New request sheet shows case size, stock and price for the picked product (requests cycle 1).
 
 ## Staff board v2 (cycle 13)
 

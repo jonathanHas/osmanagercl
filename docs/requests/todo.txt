@@ -1,0 +1,2 @@
+
+The new request screen works to find products in the shop but we could also do with some info for the user to be returned such as the case size of an item with the option to order a case then for the customer or individual units

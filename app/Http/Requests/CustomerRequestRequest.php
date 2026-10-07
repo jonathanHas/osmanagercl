@@ -9,8 +9,11 @@ use Illuminate\Validation\Validator;
 
 class CustomerRequestRequest extends FormRequest
 {
-    /** The only line keys accepted from the client. */
-    private const ITEM_KEYS = ['id', 'product_code', 'product_name', 'description', 'quantity', 'notes'];
+    /**
+     * The only line keys accepted from the client. case_units is not one: the
+     * service snapshots it from the supplier link.
+     */
+    private const ITEM_KEYS = ['id', 'product_code', 'product_name', 'description', 'quantity', 'unit', 'notes'];
 
     /**
      * Determine if the user is authorized to make this request.
@@ -39,6 +42,7 @@ class CustomerRequestRequest extends FormRequest
             // description from the POS product name. Free-text lines need a description.
             'items.*.description' => ['required_without:items.*.product_code', 'nullable', 'string', 'max:255'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'max:9999'],
+            'items.*.unit' => ['nullable', 'in:unit,case'],
             'items.*.notes' => ['nullable', 'string', 'max:500'],
         ];
     }
@@ -56,6 +60,7 @@ class CustomerRequestRequest extends FormRequest
             'items.*.quantity.numeric' => 'Line :position has an invalid quantity.',
             'items.*.quantity.gt' => 'Line :position must have a quantity greater than 0.',
             'items.*.quantity.max' => 'Line :position has a quantity that is too large.',
+            'items.*.unit.in' => 'Line :position has an invalid unit.',
             'items.*.id.exists' => 'Line :position no longer exists — reload the page and try again.',
         ];
     }

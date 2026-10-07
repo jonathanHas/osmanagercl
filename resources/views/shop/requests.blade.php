@@ -1,4 +1,3 @@
-@php($qtyOf = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.'))
 
 <x-shop-layout
     title="Customer requests"
@@ -47,7 +46,6 @@
                                     @include('shop.partials.request-card', [
                                         'item' => $row['item'],
                                         'request' => $row['request'],
-                                        'qty' => $qtyOf,
                                         'image' => $row['image_url'] ?? null,
                                     ])
                                 @endforeach

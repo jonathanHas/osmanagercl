@@ -51,11 +51,17 @@ class CustomerRequestTest extends TestCase
             $table->string('Barcode');
             $table->string('SupplierCode')->nullable();
             $table->string('SupplierID')->nullable();
+            $table->integer('CaseUnits')->nullable();
         });
 
         DB::connection('pos')->table('PRODUCTS')->insert([
             ['ID' => 'p1', 'NAME' => 'Organic Oat Milk 1L', 'CODE' => '5000000000017', 'REFERENCE' => 'OAT1', 'CATEGORY' => 'c1', 'PRICESELL' => 2.10, 'TAXCAT' => '001'],
             ['ID' => 'p2', 'NAME' => 'Almond Butter 250g', 'CODE' => '5000000000024', 'REFERENCE' => 'ALM250', 'CATEGORY' => 'c1', 'PRICESELL' => 5.50, 'TAXCAT' => '001'],
+        ]);
+
+        // The oat milk comes in cases of 6; the almond butter has no supplier link.
+        DB::connection('pos')->table('supplier_link')->insert([
+            'Barcode' => '5000000000017', 'SupplierCode' => 'SUP-OAT', 'SupplierID' => 's1', 'CaseUnits' => 6,
         ]);
     }
 
@@ -266,6 +272,90 @@ class CustomerRequestTest extends TestCase
         $response->assertSee('Kept Name');
         $response->assertSee('Kept line');
         $response->assertSee('x-data="{ open: true }"', false);
+    }
+
+    public function test_a_line_by_the_case_snapshots_the_supplier_case_size(): void
+    {
+        $user = $this->employee();
+
+        $this->actingAs($user)->post(route('customer-requests.store'), $this->payload([
+            ['product_code' => '5000000000017', 'quantity' => 2, 'unit' => 'case', 'case_units' => 99],
+            ['product_code' => '5000000000017', 'quantity' => 3],
+            ['description' => 'Sourced thing', 'quantity' => 1, 'unit' => 'case'],
+            ['product_code' => '5000000000024', 'quantity' => 1, 'unit' => 'case'],
+        ]))->assertRedirect(route('customer-requests.index'));
+
+        $items = CustomerRequest::sole()->items;
+        $byCase = $items->first(fn ($i) => $i->product_code === '5000000000017' && (float) $i->quantity === 2.0);
+        $byUnit = $items->first(fn ($i) => $i->product_code === '5000000000017' && (float) $i->quantity === 3.0);
+        $sourced = $items->firstWhere('description', 'Sourced thing');
+        $noLink = $items->firstWhere('product_code', '5000000000024');
+
+        $this->assertSame('case', $byCase->unit);
+        $this->assertSame(6, $byCase->case_units, 'case size comes from the supplier link, not the client');
+        $this->assertSame('2 cases of 6', $byCase->quantityLabel());
+
+        $this->assertSame('unit', $byUnit->unit);
+        $this->assertNull($byUnit->case_units);
+        $this->assertSame('3', $byUnit->quantityLabel());
+
+        $this->assertSame('unit', $sourced->unit, 'a sourcing line is always by the unit');
+        $this->assertNull($sourced->case_units);
+
+        $this->assertSame('case', $noLink->unit);
+        $this->assertNull($noLink->case_units);
+        $this->assertSame('1 case', $noLink->quantityLabel());
+    }
+
+    public function test_an_unknown_unit_is_rejected(): void
+    {
+        $this->actingAs($this->employee())
+            ->from(route('customer-requests.index'))
+            ->post(route('customer-requests.store'), $this->payload([
+                ['product_code' => '5000000000017', 'quantity' => 2, 'unit' => 'box'],
+            ]))
+            ->assertSessionHasErrors(['items.0.unit']);
+
+        $this->assertDatabaseCount('customer_request_items', 0);
+    }
+
+    public function test_update_snapshots_the_case_size_once_and_keeps_it(): void
+    {
+        $user = $this->employee();
+        $request = app(CustomerRequestService::class)->create(['customer_name' => 'Jane Doe'], [
+            ['product_code' => '5000000000017', 'quantity' => 2],
+        ], $user);
+        $line = $request->items->first();
+        $this->assertSame('unit', $line->unit);
+
+        // Switch the unit line to the case: the size is looked up.
+        $this->actingAs($user)->put(route('customer-requests.update', $request), $this->payload([
+            ['id' => $line->id, 'product_code' => '5000000000017', 'product_name' => 'Organic Oat Milk 1L', 'quantity' => 2, 'unit' => 'case'],
+        ]))->assertRedirect(route('customer-requests.index'));
+
+        $line->refresh();
+        $this->assertSame('case', $line->unit);
+        $this->assertSame(6, $line->case_units);
+
+        // The supplier changes the case size; editing the line keeps the size agreed.
+        DB::connection('pos')->table('supplier_link')->where('Barcode', '5000000000017')->update(['CaseUnits' => 12]);
+
+        $this->actingAs($user)->put(route('customer-requests.update', $request), $this->payload([
+            ['id' => $line->id, 'product_code' => '5000000000017', 'product_name' => 'Organic Oat Milk 1L', 'quantity' => 3, 'unit' => 'case'],
+        ]))->assertRedirect(route('customer-requests.index'));
+
+        $line->refresh();
+        $this->assertEquals(3, (float) $line->quantity);
+        $this->assertSame(6, $line->case_units);
+
+        // Back to units clears the size.
+        $this->actingAs($user)->put(route('customer-requests.update', $request), $this->payload([
+            ['id' => $line->id, 'product_code' => '5000000000017', 'product_name' => 'Organic Oat Milk 1L', 'quantity' => 3, 'unit' => 'unit'],
+        ]))->assertRedirect(route('customer-requests.index'));
+
+        $line->refresh();
+        $this->assertSame('unit', $line->unit);
+        $this->assertNull($line->case_units);
     }
 
     public function test_create_route_opens_the_new_request_modal_on_the_board(): void

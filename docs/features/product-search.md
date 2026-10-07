@@ -130,6 +130,7 @@ Response (this shape is canonical; do not add per-page variants):
       "is_stocked": true, "is_service": false, "has_image": false,
       "image_url": "https://cdn.ekoplaza.nl/ekoplaza/producten/small/8721325594341.jpg",
       "supplier": { "id": "5", "name": "Udea", "code": "6001397", "website_url": "https://www.udea.nl/search/?qry=6001397" },
+      "case_units": 6,
       "edit_url": "/products/98f8a46e-…/edit", "match_rank": 3
     }
   ],
@@ -141,7 +142,8 @@ Response (this shape is canonical; do not add per-page variants):
 }
 ```
 
-`supplier` is `null` without a `supplier_link` row. `image_url` is the POS blob route when
+`supplier` is `null` without a `supplier_link` row. `case_units` is the supplier case size
+(`supplier_link.CaseUnits`), `null` when there is no link or the size is unknown or 1 (sold singly). `image_url` is the POS blob route when
 the product has an image, else the supplier CDN URL (Udea by barcode; Independent by supplier
 code via `supplier_image_cache`, template URL when uncached), else `null`. `match_rank` is
 `null` for the browse listing.

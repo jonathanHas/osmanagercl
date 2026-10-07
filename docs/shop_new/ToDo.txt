@@ -1,1 +1,1 @@
-Customer Requests - When taking a new customer request - if there are a lot of existing requests the user needs to browse all the way to the bottom of the page to add a new one, this should be improved to speed up taking a new request
+When we are doing a stock check for a set to 0 we have to press the save stock level button so the system knows that item was checked on that date - right now the stock check button doesn't allow the user to save if there is no change to the stock amount.

@@ -150,10 +150,10 @@ trait CreatesProductSearchPosTables
         ]);
 
         $pos->table('supplier_link')->insert([
-            ['Barcode' => '8721325594341', 'SupplierCode' => '6001397', 'SupplierID' => '5'],
-            ['Barcode' => '8719324515672', 'SupplierCode' => '6001398', 'SupplierID' => '5'],
-            ['Barcode' => '1000001', 'SupplierCode' => 'IND-A', 'SupplierID' => '37'],
-            ['Barcode' => '1000009', 'SupplierCode' => 'NM-1', 'SupplierID' => '65'],
+            ['Barcode' => '8721325594341', 'SupplierCode' => '6001397', 'SupplierID' => '5', 'CaseUnits' => 6],
+            ['Barcode' => '8719324515672', 'SupplierCode' => '6001398', 'SupplierID' => '5', 'CaseUnits' => null],
+            ['Barcode' => '1000001', 'SupplierCode' => 'IND-A', 'SupplierID' => '37', 'CaseUnits' => null],
+            ['Barcode' => '1000009', 'SupplierCode' => 'NM-1', 'SupplierID' => '65', 'CaseUnits' => null],
         ]);
 
         $pos->table('STOCKCURRENT')->insert([

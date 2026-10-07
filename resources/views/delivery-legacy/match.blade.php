@@ -373,7 +373,7 @@
                                                 <div class="flex items-center justify-between gap-2 py-1">
                                                     <div class="min-w-0">
                                                         <span class="font-semibold" x-text="cr.customer_name"></span>
-                                                        <span>&times; <span x-text="cr.quantity"></span></span>
+                                                        <span>&times; <span x-text="cr.quantity_label"></span></span>
                                                         <span class="text-pink-100 text-xs" x-show="cr.wanted_on" x-text="'(wanted ' + cr.wanted_on + ')'"></span>
                                                         <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase bg-pink-800 text-pink-100" x-text="cr.status_label"></span>
                                                     </div>
@@ -706,7 +706,7 @@
                             <li class="flex flex-wrap items-center gap-x-2">
                                 <span class="font-medium">{{ $line->description }}</span>
                                 <span class="font-mono text-xs text-pink-700">{{ $barcode }}</span>
-                                <span>&rarr; {{ $line->request?->customer_name }} &times; {{ rtrim(rtrim(number_format((float) $line->quantity, 2, '.', ''), '0'), '.') }}</span>
+                                <span>&rarr; {{ $line->request?->customer_name }} &times; {{ $line->quantityLabel() }}</span>
                                 @if($line->request?->wanted_on)
                                     <span class="text-xs text-pink-700">wanted {{ $line->request->wanted_on->format('D j M') }}</span>
                                 @endif

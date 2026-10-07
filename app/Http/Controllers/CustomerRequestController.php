@@ -226,6 +226,7 @@ class CustomerRequestController extends Controller
         $old = old('items');
         if (is_array($old)) {
             $urls = $this->service->imageUrlsForRequestLines(array_column($old, 'product_code'));
+            $caseUnits = $this->service->caseUnitsByCode(array_column($old, 'product_code'));
 
             return array_values(array_map(fn ($i) => [
                 'id' => $i['id'] ?? null,
@@ -233,9 +234,10 @@ class CustomerRequestController extends Controller
                 'product_name' => $i['product_name'] ?? null,
                 'description' => $i['description'] ?? '',
                 'quantity' => $i['quantity'] ?? 1,
+                'unit' => $i['unit'] ?? CustomerRequestItem::UNIT_UNIT,
                 'notes' => $i['notes'] ?? '',
                 'status' => $i['status'] ?? null,
-                'product' => $this->seedProduct($i['product_code'] ?? null, $urls),
+                'product' => $this->seedProduct($i['product_code'] ?? null, $urls, $caseUnits),
             ], $old));
         }
 
@@ -243,9 +245,9 @@ class CustomerRequestController extends Controller
             return [];
         }
 
-        $urls = $this->service->imageUrlsForRequestLines(
-            $customerRequest->items->pluck('product_code')->all()
-        );
+        $codes = $customerRequest->items->pluck('product_code')->all();
+        $urls = $this->service->imageUrlsForRequestLines($codes);
+        $caseUnits = $this->service->caseUnitsByCode($codes);
 
         return $customerRequest->items->map(fn (CustomerRequestItem $i) => [
             'id' => $i->id,
@@ -253,9 +255,11 @@ class CustomerRequestController extends Controller
             'product_name' => $i->product_name,
             'description' => $i->description,
             'quantity' => (float) $i->quantity,
+            'unit' => $i->unit,
+            'case_units' => $i->case_units,
             'notes' => $i->notes ?? '',
             'status' => $i->status,
-            'product' => $this->seedProduct($i->product_code, $urls),
+            'product' => $this->seedProduct($i->product_code, $urls, $caseUnits),
         ])->values()->all();
     }
 
@@ -267,15 +271,19 @@ class CustomerRequestController extends Controller
      * Keyed by code because that is what a request line stores — `productImages()`
      * falls back from `id` to `code` (cycle 17c).
      *
+     * `case_units` is the supplier's current case size, so a line can still be
+     * switched to Case; a line already by the case shows its own stored size.
+     *
      * @param  array<string, string|null>  $urls
+     * @param  array<string, int|null>  $caseUnits
      * @return array<string, mixed>|null
      */
-    private function seedProduct(?string $code, array $urls): ?array
+    private function seedProduct(?string $code, array $urls, array $caseUnits = []): ?array
     {
         if (! $code) {
             return null;
         }
 
-        return ['code' => $code, 'image_url' => $urls[$code] ?? null];
+        return ['code' => $code, 'image_url' => $urls[$code] ?? null, 'case_units' => $caseUnits[$code] ?? null];
     }
 }

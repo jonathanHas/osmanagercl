@@ -8,7 +8,6 @@
         Line::STATUS_NOT_AVAILABLE => 'shop-pill--bad',
         Line::STATUS_CANCELLED => 'shop-pill--muted',
     ];
-    $qty = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
 
     // Same computation the office page used: every line's log entries, in time order.
     $logs = $customerRequest->items
@@ -82,7 +81,7 @@
                         <div class="shop-row__main">
                             <span class="shop-row__title">{{ $item->label() }}</span>
                             <span class="shop-row__meta">
-                                {{ $qty($item->quantity) }}
+                                {{ $item->quantityLabel() }}
                                 @if ($item->product_code)
                                     · <span class="shop-code">{{ $item->product_code }}</span>
                                 @endif

@@ -419,6 +419,8 @@ class ProductSearchService
                     'code' => $link->SupplierCode,
                     'website_url' => $this->supplierService->getSupplierWebsiteLink($product),
                 ] : null,
+                // Supplier case size; null when unknown or 1 (sold singly).
+                'case_units' => $link && (int) $link->CaseUnits > 1 ? (int) $link->CaseUnits : null,
                 'edit_url' => route('products.edit', $product->ID, false),
                 'match_rank' => isset($product->match_rank) ? (int) $product->match_rank : null,
             ];

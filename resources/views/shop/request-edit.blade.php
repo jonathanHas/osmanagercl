@@ -76,6 +76,7 @@
                             <input type="hidden" :name="`items[${idx}][id]`" :value="item.id ?? ''">
                             <input type="hidden" :name="`items[${idx}][product_code]`" :value="item.product_code">
                             <input type="hidden" :name="`items[${idx}][product_name]`" :value="item.product_name">
+                            <input type="hidden" :name="`items[${idx}][unit]`" :value="unitValue(item)">
 
                             <template x-if="item.product">
                                 <span class="shop-inline"><x-shop.product-thumb expr="item.product" /></span>
@@ -93,9 +94,23 @@
                                            :data-line-idx="idx" maxlength="255" required autocomplete="off">
                                 </div>
 
+                                {{-- Only for a product the supplier sells by the case. The radios have no name: the hidden input posts. --}}
+                                <div class="shop-choices" role="radiogroup" aria-label="Order by" x-show="item.product_code && item.case_units">
+                                    <label class="shop-choice">
+                                        <input type="radio" value="unit" x-model="item.unit">
+                                        Units
+                                        <small>single items</small>
+                                    </label>
+                                    <label class="shop-choice">
+                                        <input type="radio" value="case" x-model="item.unit">
+                                        Case
+                                        <small x-text="`${item?.case_units} per case`"></small>
+                                    </label>
+                                </div>
+
                                 <div class="shop-facts shop-facts--2">
                                     <div class="shop-field">
-                                        <label class="shop-field__label" :for="`item-${idx}-quantity`">Quantity</label>
+                                        <label class="shop-field__label" :for="`item-${idx}-quantity`" x-text="unitValue(item) === 'case' ? 'Cases' : 'Quantity'">Quantity</label>
                                         <input class="shop-input" type="text" inputmode="decimal" :id="`item-${idx}-quantity`"
                                                :name="`items[${idx}][quantity]`" x-model="item.quantity" required>
                                     </div>

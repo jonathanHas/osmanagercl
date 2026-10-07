@@ -1,6 +1,6 @@
 {{--
-    One card per requested line on the public guest board. Expects $item,
-    $request and the $qty formatter.
+    One card per requested line on the public guest board. Expects $item
+    and $request.
 
     Guest-only since cycle 14: no phone number, no notes, no edit link and no
     actions — staff see the request rows instead.
@@ -21,7 +21,7 @@
         @endif
         <div class="shop-stack shop-stack--tight">
             <span class="shop-request__item">{{ $item->label() }}</span>
-            <span class="shop-request__who">{{ $request->customer_name }} &middot; {{ $qty($item->quantity) }}</span>
+            <span class="shop-request__who">{{ $request->customer_name }} &middot; {{ $item->quantityLabel() }}</span>
         </div>
     </div>
 

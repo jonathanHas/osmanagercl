@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CustomerRequest;
 use App\Models\CustomerRequestItem;
 use App\Models\Product;
+use App\Models\SupplierLink;
 use App\Models\User;
 use App\Services\ProductSearch\ProductSearchService;
 use DomainException;
@@ -49,6 +50,7 @@ class CustomerRequestService
             ]));
 
             $items = $this->snapshotProductNames($items);
+            $items = $this->snapshotCaseUnits($items);
 
             foreach (array_values($items) as $position => $item) {
                 $this->createItem($request, $item, $position, $user);
@@ -78,6 +80,7 @@ class CustomerRequestService
             $request->save();
 
             $items = $this->snapshotProductNames($items);
+            $items = $this->snapshotCaseUnits($items, $request->items()->get()->keyBy('id'));
             $keptIds = [];
 
             foreach (array_values($items) as $position => $item) {
@@ -396,6 +399,9 @@ class CustomerRequestService
                 'customer_name' => $item->request?->customer_name,
                 'customer_phone' => $item->request?->customer_phone,
                 'quantity' => (float) $item->quantity,
+                'unit' => $item->unit,
+                'case_units' => $item->case_units,
+                'quantity_label' => $item->quantityLabel(),
                 'wanted_on' => $item->request?->wanted_on?->toDateString(),
                 'status' => $item->status,
                 'status_label' => $item->statusLabel(),
@@ -439,6 +445,10 @@ class CustomerRequestService
             'product_name' => $code !== null ? $name : null,
             'description' => $description,
             'quantity' => (float) ($item['quantity'] ?? 1),
+            // A sourcing line has no supplier case, so it is always by the unit.
+            'unit' => self::isCaseLine($item) ? CustomerRequestItem::UNIT_CASE : CustomerRequestItem::UNIT_UNIT,
+            // Only ever set by snapshotCaseUnits(), never from the client.
+            'case_units' => self::isCaseLine($item) ? ($item['case_units'] ?? null) : null,
             'notes' => self::nullIfBlank($item['notes'] ?? null),
             'position' => $position,
         ];
@@ -493,6 +503,93 @@ class CustomerRequestService
         }
 
         return $items;
+    }
+
+    /**
+     * Set each line's case_units: the supplier case size for a line taken by the
+     * case, null otherwise. Whatever the client sent is overwritten.
+     *
+     * On update, a line already stored by the case with a known size for the same
+     * product keeps that size: the request shows the case size that was agreed,
+     * even if the supplier's case size changes later.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @param  Collection<int, CustomerRequestItem>|null  $existing  the request's current lines, keyed by id
+     * @return array<int, array<string, mixed>>
+     */
+    private function snapshotCaseUnits(array $items, ?Collection $existing = null): array
+    {
+        $lookup = [];
+
+        foreach ($items as $k => $item) {
+            $items[$k]['case_units'] = null;
+
+            if (! self::isCaseLine($item)) {
+                continue;
+            }
+
+            $code = self::nullIfBlank($item['product_code']);
+            $id = isset($item['id']) && $item['id'] !== '' ? (int) $item['id'] : null;
+            $stored = $id !== null ? $existing?->get($id) : null;
+
+            if ($stored !== null && $stored->isByTheCase() && $stored->case_units !== null && $stored->product_code === $code) {
+                $items[$k]['case_units'] = $stored->case_units;
+
+                continue;
+            }
+
+            $lookup[$k] = $code;
+        }
+
+        if ($lookup !== []) {
+            $sizes = $this->caseUnitsByCode(array_values($lookup));
+            foreach ($lookup as $k => $code) {
+                $items[$k]['case_units'] = $sizes[$code] ?? null;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Supplier case sizes by barcode, from the POS supplier link. A size of 1 or
+     * less (or none) is null: the product is sold singly and the sheet does not
+     * offer Case. The product search API applies the same rule.
+     *
+     * @param  array<int, string|null>  $codes
+     * @return array<string, int|null>
+     */
+    public function caseUnitsByCode(array $codes): array
+    {
+        $codes = array_values(array_unique(array_filter(
+            array_map(fn ($c) => self::nullIfBlank($c), $codes),
+            fn ($c) => $c !== null
+        )));
+
+        if ($codes === []) {
+            return [];
+        }
+
+        $sizes = SupplierLink::whereIn('Barcode', $codes)->pluck('CaseUnits', 'Barcode');
+
+        $result = [];
+        foreach ($codes as $code) {
+            $size = (int) $sizes->get($code);
+            $result[$code] = $size > 1 ? $size : null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Whether a posted line is taken by the case: asked for, and linked to a product.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private static function isCaseLine(array $item): bool
+    {
+        return ($item['unit'] ?? CustomerRequestItem::UNIT_UNIT) === CustomerRequestItem::UNIT_CASE
+            && self::nullIfBlank($item['product_code'] ?? null) !== null;
     }
 
     private static function nullIfBlank(mixed $value): ?string

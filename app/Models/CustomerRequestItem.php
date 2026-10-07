@@ -82,12 +82,25 @@ class CustomerRequestItem extends Model
         self::STATUS_CANCELLED => [self::STATUS_PENDING],
     ];
 
+    /** A line taken by the single item. */
+    public const UNIT_UNIT = 'unit';
+
+    /** A line taken by the supplier case; case_units holds the size agreed. */
+    public const UNIT_CASE = 'case';
+
+    public const UNITS = [
+        self::UNIT_UNIT,
+        self::UNIT_CASE,
+    ];
+
     protected $fillable = [
         'customer_request_id',
         'product_code',
         'product_name',
         'description',
         'quantity',
+        'unit',
+        'case_units',
         'notes',
         'position',
         'status',
@@ -99,6 +112,7 @@ class CustomerRequestItem extends Model
     {
         return [
             'quantity' => 'decimal:2',
+            'case_units' => 'integer',
             'position' => 'integer',
             'status_changed_at' => 'datetime',
         ];
@@ -184,5 +198,35 @@ class CustomerRequestItem extends Model
     public function isLinkedToProduct(): bool
     {
         return $this->product_code !== null && $this->product_code !== '';
+    }
+
+    public function isByTheCase(): bool
+    {
+        return $this->unit === self::UNIT_CASE;
+    }
+
+    /**
+     * How much the customer asked for: "3" by the unit, "2 cases of 6" by the
+     * case ("2 cases" when the case size is not known).
+     */
+    public function quantityLabel(): string
+    {
+        $number = self::formatQuantity($this->quantity);
+
+        if (! $this->isByTheCase()) {
+            return $number;
+        }
+
+        $label = $number.' '.((float) $this->quantity === 1.0 ? 'case' : 'cases');
+
+        return $this->case_units ? $label.' of '.$this->case_units : $label;
+    }
+
+    /**
+     * A quantity without trailing zeros: 2.00 → "2", 1.50 → "1.5".
+     */
+    public static function formatQuantity(mixed $quantity): string
+    {
+        return rtrim(rtrim(number_format((float) $quantity, 2, '.', ''), '0'), '.');
     }
 }

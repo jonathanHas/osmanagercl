@@ -30,10 +30,25 @@
             <div class="shop-row__main">
                 <span class="shop-row__title" x-text="picked?.name"></span>
                 <span class="shop-row__meta shop-code" x-text="picked?.code"></span>
+                <span class="shop-row__meta" x-text="pickedFacts"></span>
             </div>
             <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Choose a different product" @click="unpick()">
                 <x-shop.icon name="x" />
             </button>
+        </div>
+
+        {{-- Only when the supplier sells it by the case. The radios have no name: the hidden input posts. --}}
+        <div class="shop-choices" role="radiogroup" aria-label="Order by" x-show="picked?.case_units" x-cloak>
+            <label class="shop-choice">
+                <input type="radio" value="unit" x-model="unit">
+                Units
+                <small>single items</small>
+            </label>
+            <label class="shop-choice">
+                <input type="radio" value="case" x-model="unit">
+                Case
+                <small x-text="`${picked?.case_units} per case`"></small>
+            </label>
         </div>
 
         <div class="shop-search" x-show="! picked" x-cloak>
@@ -71,6 +86,7 @@
     <input type="hidden" name="items[0][product_code]" :value="productCode">
     <input type="hidden" name="items[0][product_name]" :value="productName">
     <input type="hidden" name="items[0][description]" :value="descriptionValue">
+    <input type="hidden" name="items[0][unit]" :value="unitValue">
 
     @error('items.0.description')
         <span class="shop-pill shop-pill--bad">{{ $message }}</span>
@@ -88,7 +104,7 @@
 
     <div class="shop-facts shop-facts--2">
         <div class="shop-field">
-            <label class="shop-field__label" for="quantity">Quantity</label>
+            <label class="shop-field__label" for="quantity" x-text="unitValue === 'case' ? 'Cases' : 'Quantity'">Quantity</label>
             <input class="shop-input" id="quantity" name="items[0][quantity]" type="text"
                    inputmode="decimal" value="{{ old('items.0.quantity', 1) }}" required>
             @error('items.0.quantity')
