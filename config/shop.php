@@ -69,6 +69,7 @@ return [
         'delivery-legacy.update-quantity',
         'delivery-legacy.complete',
         'delivery-legacy.create-session',
+        'delivery-legacy.save-outer-barcode',
         'fruit-veg.harvest.rows',
         'fruit-veg.harvest.save-row',
         'fruit-veg.waste.entry',

@@ -689,6 +689,12 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
    already strips the border and inherits font and colour; a grid cell button
    still sizes to its content, so stretch it like the <output> it replaces. */
 .shop button.shop-stepper__value { width: 100%; }
+/* The delivery scan screen while an unknown code waits for its unit barcode
+   (deliveries cycle 1 rev 2): the card and the scan field turn amber so a scan
+   cannot be mistaken for counting the next item. */
+.shop-card--linking { background: var(--shop-warn-soft); box-shadow: inset 0 0 0 3px var(--shop-warn); }
+.is-linking .shop-scan__field { border-color: var(--shop-warn); background: var(--shop-warn-soft); }
+.is-linking .shop-scan__field > .shop-ico { color: var(--shop-warn-ink); }
 /* A wrapper that exists only for an Alpine scope or a form must not be a box,
    or a sticky .shop-actions inside it cannot stick (it cannot leave a parent
    that is only as tall as itself). */

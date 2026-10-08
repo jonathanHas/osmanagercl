@@ -1,0 +1,1 @@
+on our old deliveries screen ..delivery-legacy/match?delID= we were able to scan an outer barcode and if it didn't match a product the user would have the option to associate it with a product so that we could quickly add new outer barcodes while scanning in - can you replicate that feature in the new interface shop/deliveries/scan?delID=

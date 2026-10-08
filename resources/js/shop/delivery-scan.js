@@ -6,6 +6,7 @@
  *   - delivery-legacy.items           GET  the classified invoice lines and scans
  *   - delivery-legacy.scan-increment  POST one more unit (or one case)
  *   - delivery-legacy.update-quantity PATCH an absolute corrected quantity
+ *   - delivery-legacy.save-outer-barcode POST link a code to a product as its outer
  *
  * A scan is two steps, as on the office scanner: the code is looked up with a
  * zero quantity, which records nothing, a prompt shows the product with what has
@@ -13,7 +14,12 @@
  * it. Scanning an outer/case barcode adds whole cases, which the endpoint works
  * out. Detecting a code stops the camera, so `shop-scan-saved` reopens it once
  * the prompt has closed — never while it is open, or the code still in frame
- * would confirm the prompt and silently add another unit.
+ * would confirm the prompt and silently add another unit. A code no product
+ * has opens a "Not found" card that can link it as a product's outer barcode
+ * through delivery-legacy.save-outer-barcode: the next scan (or a pick by name)
+ * is looked up as the unit barcode and the product it names is shown, a tap on
+ * "Yes, link it" saves, and the code is then looked up again and opens a case
+ * prompt. A scan alone never saves a link.
  *
  * Items without a barcode (the weekly cheese) are picked from a list instead:
  * "No barcode? Find by name" opens the supplier's products, with a filter and a
@@ -49,6 +55,12 @@ export default () => mix(productImages(), productTypeahead(), {
     // in charge, or the text of a typed quantity or weight.
     pending: null,
     busy: false,
+    // An unknown code as { code, linking, candidate, error }. `linking` is true
+    // once "Link as outer barcode" was tapped, and then the next code scanned
+    // (or product picked by name) is looked up as the unit barcode; `candidate`
+    // is null or { code, product } for the product that lookup found, waiting
+    // for "Yes, link it". Nothing is saved until that tap.
+    unknown: null,
     editing: null,
     // The correction card's typed quantity: null while its stepper is in charge.
     editTyped: null,
@@ -78,6 +90,10 @@ export default () => mix(productImages(), productTypeahead(), {
 
     get updateUrl() {
         return this.$root.dataset.updateUrl;
+    },
+
+    get outerUrl() {
+        return this.$root.dataset.outerUrl;
     },
 
     get delId() {
@@ -170,6 +186,11 @@ export default () => mix(productImages(), productTypeahead(), {
         return this.pending?.product ?? null;
     },
 
+    /** The product the link step found, for the thumb component (as above). */
+    get candidateProduct() {
+        return this.unknown?.candidate?.product ?? null;
+    },
+
     /** The row the correction card is editing, or null. */
     get editingRow() {
         return this.rows.find((r) => r.barcode === this.editing) ?? null;
@@ -230,8 +251,15 @@ export default () => mix(productImages(), productTypeahead(), {
         }
     },
 
-    /** A code from the scan field or the camera. */
+    /**
+     * A code from the scan field or the camera. While the Not found card waits
+     * for a unit barcode, that is what this code is.
+     */
     onScan(code) {
+        if (this.unknown?.linking) {
+            return this.findUnit(code);
+        }
+
         return this.lookup(code, false);
     },
 
@@ -257,9 +285,10 @@ export default () => mix(productImages(), productTypeahead(), {
             await this.commit();
         }
 
-        // A scan is a new subject; an open correction card for another row would
-        // sit there looking current.
+        // A scan is a new subject; an open correction card for another row, or
+        // a Not found card for another code, would sit there looking current.
         this.editing = null;
+        this.unknown = null;
         this.busy = true;
 
         try {
@@ -271,8 +300,17 @@ export default () => mix(productImages(), productTypeahead(), {
             });
 
             if (! data.success || ! data.product) {
+                // A code no product has (not a validation failure): offer to link
+                // it as an outer barcode. The card sits above the scan field like
+                // the prompt, and is scrolled to for the same reason.
+                if (data.success) {
+                    this.unknown = { code, linking: false, candidate: null, error: null };
+                    this.$nextTick(() => this.$refs.unknown?.scrollIntoView({ block: 'nearest' }));
+                }
+
                 // No reportDropped() here: an unknown code leaves the open prompt
                 // in place, so the picked item is still waiting for its amount.
+                // The camera comes back so the next scan can be the unit barcode.
                 this.announceError(`Product not found for ${code}`);
                 this.announceSaved();
 
@@ -420,6 +458,165 @@ export default () => mix(productImages(), productTypeahead(), {
         }
     },
 
+    // ---- Not found: link an outer barcode ------------------------------------
+
+    /** "Link as outer barcode": the next code is looked up as the unit barcode. */
+    startLink() {
+        if (! this.unknown) {
+            return;
+        }
+
+        this.unknown.linking = true;
+        this.unknown.candidate = null;
+        this.unknown.error = null;
+        this.editing = null;
+        // Clears "Product not found" under the field and hands focus back to it,
+        // so a hand scanner or a typed unit barcode lands there.
+        this.announceDone();
+    },
+
+    dismissUnknown() {
+        // The camera was left paused while a candidate was showing (the item
+        // was still under the lens); closing the card is the moment to give it
+        // back. In the other states it is already running.
+        const paused = !! this.unknown?.candidate;
+
+        this.unknown = null;
+        this.announceDone();
+
+        if (paused) {
+            this.announceSaved();
+        }
+    },
+
+    /**
+     * The scan half of linking: look the code up with a zero quantity (records
+     * nothing) and show the product it names, so that a tap saves the link. A
+     * scan alone never saves. Revision 1 saved on the scan, and the owner's
+     * browser check found that someone who tapped Link by accident, or forgot
+     * they had, would silently link the next delivery item as the unit of this
+     * outer code.
+     */
+    async findUnit(code) {
+        const outer = this.unknown?.code;
+
+        if (! outer || this.busy) {
+            return;
+        }
+
+        if (code === outer) {
+            this.backToLinking('That is the outer barcode again. Scan the barcode on one item from the case.');
+
+            return;
+        }
+
+        this.busy = true;
+
+        try {
+            const data = await this.post(this.scanUrl, {
+                delID: this.delId,
+                barcode: code,
+                quantity: 0,
+                supplierID: this.supplierId,
+            });
+
+            // Dismissed while the lookup was in flight.
+            if (! this.unknown) {
+                return;
+            }
+
+            if (! data.success || ! data.product) {
+                this.backToLinking(`No product has barcode ${code}. Scan the barcode on one item from the case.`);
+
+                return;
+            }
+
+            if (data.scanType === 'case') {
+                this.backToLinking(`${code} is already the case barcode of ${data.product.name}. Scan the barcode on one item.`);
+
+                return;
+            }
+
+            this.unknown.candidate = { code: data.product.barcode, product: data.product };
+            this.unknown.error = null;
+            // No announceSaved() here: the item is still under the lens, the
+            // same rule as the quantity prompt.
+            this.announceDone();
+            this.$nextTick(() => this.$refs.unknown?.scrollIntoView({ block: 'nearest' }));
+        } catch (e) {
+            this.backToLinking('Could not look that up, try again');
+        } finally {
+            this.busy = false;
+        }
+    },
+
+    /**
+     * "Yes, link it": save through the office page's own endpoint. On success
+     * the outer code now resolves, so it is looked up again and opens a case
+     * prompt — the scan the person made a moment ago, completed. A refusal
+     * (already another product's case barcode, or a unit barcode the supplier
+     * does not carry) goes back to waiting with the server's message.
+     */
+    async confirmLink() {
+        const outer = this.unknown?.code;
+        const candidate = this.unknown?.candidate;
+
+        if (! outer || ! candidate || this.busy) {
+            return;
+        }
+
+        this.busy = true;
+        let data = null;
+
+        try {
+            data = await this.post(this.outerUrl, {
+                unitBarcode: candidate.code,
+                supplierID: this.supplierId,
+                outerCode: outer,
+            });
+        } catch (e) {
+            data = null;
+        } finally {
+            this.busy = false;
+        }
+
+        if (! data?.success) {
+            this.backToLinking(data?.message || 'Could not link, try again');
+
+            return;
+        }
+
+        this.showToast('ok', `Linked to ${data.productName}`);
+        this.unknown = null;
+
+        if (this.manual) {
+            this.resetManual();
+        }
+
+        // Opens the case prompt itself; lookup() never resumes the camera there.
+        await this.lookup(outer, false);
+    },
+
+    /** "Not this one": back to waiting for the unit barcode. */
+    rejectCandidate() {
+        this.backToLinking(null);
+    },
+
+    /**
+     * Back to the waiting state, with a message or none. The one camera resume
+     * of the link flow: whatever brought us here (a refused or failed link, a
+     * lookup that found nothing, Not this one), the person needs to scan again.
+     */
+    backToLinking(message) {
+        if (this.unknown) {
+            this.unknown.candidate = null;
+            this.unknown.linking = true;
+            this.unknown.error = message;
+        }
+
+        this.announceSaved();
+    },
+
     // ---- Find by name -------------------------------------------------------
 
     /** The supplier's stocked products by default; every product when asked. */
@@ -487,6 +684,10 @@ export default () => mix(productImages(), productTypeahead(), {
      * picking records nothing until the amount is typed and added.
      */
     pickResult(p) {
+        if (this.unknown?.linking) {
+            return this.findUnit(p.code);
+        }
+
         return this.lookup(p.code, true);
     },
 

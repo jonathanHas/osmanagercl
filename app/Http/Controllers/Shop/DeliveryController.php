@@ -13,8 +13,10 @@ use Illuminate\View\View;
  * Both sit on the legacy scan sessions staff already use (`deliveriesScan` /
  * `deliveriesScanItems` on the POS connection) and on the legacy endpoints for
  * scanning and correcting quantities. Everything else about a delivery —
- * financials, case units, outer barcodes, translations, completion — stays on
- * the office match page.
+ * financials, case units, translations, completion — stays on the office match
+ * page. The scan screen can link an unknown code as a product's outer barcode
+ * through the office page's `saveOuterBarcode()` (deliveries cycle 1,
+ * 2026-10-08).
  */
 class DeliveryController extends Controller
 {

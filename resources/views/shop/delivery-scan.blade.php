@@ -12,6 +12,7 @@
           data-items-url="{{ route('delivery-legacy.items') }}"
           data-scan-url="{{ route('delivery-legacy.scan-increment') }}"
           data-update-url="{{ route('delivery-legacy.update-quantity') }}"
+          data-outer-url="{{ route('delivery-legacy.save-outer-barcode') }}"
           data-del-id="{{ $session['id'] }}"
           data-supplier-id="{{ $session['supplierId'] }}"
           data-search-url="{{ route('api.products.search') }}"
@@ -81,13 +82,72 @@
                     </button>
                 </section>
 
+                {{-- A code no product has, and the step that links it to a product as its
+                     outer (case) barcode, as the office match page offers. Above the scan
+                     field for the same reason the prompt is: on a phone the camera block
+                     pushes anything under the field off screen. --}}
+                <section class="shop-card" x-show="unknown" x-cloak x-ref="unknown" :class="{ 'shop-card--linking': unknown?.linking }">
+                    <div class="shop-between">
+                        <div class="shop-stack shop-stack--tight">
+                            <h2 class="shop-subtitle" x-text="! unknown?.linking ? 'Not found' : (unknown?.candidate ? 'Link to this product?' : 'Link outer barcode')"></h2>
+                            <span class="shop-row__meta shop-code" x-text="unknown?.code"></span>
+                        </div>
+                        <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Dismiss" @click="dismissUnknown()">
+                            <x-shop.icon name="x" />
+                        </button>
+                    </div>
+
+                    {{-- Not found: offer the link. --}}
+                    <p class="shop-meta" x-show="! unknown?.linking">
+                        No {{ $session['supplier'] ?? 'supplier' }} product has this barcode. If it is the barcode on a case, link it to the product inside.
+                    </p>
+
+                    {{-- Waiting for the unit barcode. Amber (shop-card--linking), and the
+                         scan field with it, so a scan here cannot be mistaken for
+                         counting the next item. --}}
+                    <p class="shop-meta" x-show="unknown?.linking && ! unknown?.candidate" x-cloak>
+                        Scan the barcode on one item from the case — not the next delivery item. Nothing is counted until you confirm.{{ $canSearch ? ' Or find it by name.' : '' }}
+                    </p>
+
+                    {{-- The product the scan found: nothing is saved until "Yes, link it". --}}
+                    <div class="shop-inline" x-show="unknown?.candidate" x-cloak>
+                        <x-shop.product-thumb expr="candidateProduct" />
+                        <div class="shop-stack shop-stack--tight">
+                            <span class="shop-row__title" x-text="candidateProduct?.name"></span>
+                            <span class="shop-row__meta shop-code" x-text="candidateProduct?.barcode"></span>
+                        </div>
+                    </div>
+                    <p class="shop-meta" x-show="unknown?.candidate" x-cloak x-text="unknown ? unknown.code + ' becomes the case barcode of this product.' : ''"></p>
+
+                    <p class="shop-notice" x-show="unknown?.error" x-cloak>
+                        <x-shop.icon name="alert" size="sm" /><span x-text="unknown?.error"></span>
+                    </p>
+
+                    <button class="shop-btn shop-btn--primary shop-btn--block" type="button" x-show="! unknown?.linking" :disabled="busy" @click="startLink()">
+                        <x-shop.icon name="package" />Link as outer barcode
+                    </button>
+                    <button class="shop-btn shop-btn--ghost shop-btn--block" type="button" x-show="unknown?.linking && ! unknown?.candidate" x-cloak @click="dismissUnknown()">
+                        <x-shop.icon name="x" size="sm" />Cancel linking
+                    </button>
+                    <button class="shop-btn shop-btn--primary shop-btn--block" type="button" x-show="unknown?.candidate" x-cloak :disabled="busy" @click="confirmLink()">
+                        <x-shop.icon name="check" />Yes, link it
+                    </button>
+                    <button class="shop-btn shop-btn--ghost shop-btn--block" type="button" x-show="unknown?.candidate" x-cloak :disabled="busy" @click="rejectCandidate()">
+                        Not this one
+                    </button>
+                </section>
+
                 @if ($session['completed'])
                     <section class="shop-card shop-card--flat">
                         <h2 class="shop-label">Completed</h2>
                         <p class="shop-meta">This delivery is completed. Corrections are made on the office page.</p>
                     </section>
                 @else
-                    <x-shop.scan-input inline placeholder="Scan item" hint="Ready — scan the next item" />
+                    {{-- display: contents (Shop rule 7): the wrapper only scopes the amber
+                         styling of the field while an unknown code waits for its unit barcode. --}}
+                    <div class="shop-contents" :class="{ 'is-linking': unknown?.linking }">
+                        <x-shop.scan-input inline placeholder="Scan item" hint="Ready — scan the next item" />
+                    </div>
 
                     @if ($canSearch)
                         {{-- Items without a barcode (the weekly cheese): pick by name,

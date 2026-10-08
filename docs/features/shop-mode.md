@@ -144,6 +144,30 @@ number of at most 4 whole digits and 3 decimals (a decimal comma is accepted):
 a barcode typed or wedge-scanned into the field is 8–14 digits, so it can never
 be saved as a quantity — Add simply stays disabled.
 
+### Deliveries: unknown barcodes and outer codes
+
+A scan that no product has (not a unit barcode, not an outer code the supplier
+link knows) opens a **Not found** card above the scan field showing the code,
+with **Link as outer barcode**. Tapping it turns the card and the scan field
+amber and asks for the barcode on one item from the case (or a pick from Find
+by name). The product found is shown with its picture and **Yes, link it** /
+**Not this one**, and nothing is saved until Yes is tapped: a scan of a code
+that is already a case barcode, or that no product has, is refused with a
+message and the card keeps waiting. **Cancel linking** or Dismiss leaves
+without saving. The link is
+saved on `supplier_link.OuterCode` through the office page's own
+`delivery-legacy.save-outer-barcode`, so the legacy match page and the Shop
+screen share one write path. A GS1-128 code is stored as the GTIN-14 in AI
+(01). An outer code already on another product of the same supplier, or a unit
+barcode the supplier does not carry, is refused and the server's message shows
+on the card, which stays open for another try; Dismiss closes it.
+
+On success the outer code is looked up again and opens a case prompt ("Outer ·
+Case of N", "Add 1 case · N units"), completing the scan the person made a
+moment ago. Case units are not editable from the Shop screen: a link whose
+`CaseUnits` is 0 or 1 gives a "Case of 1" prompt, and the office page's case
+units control is the place to fix it.
+
 ### Orders: list and order review
 
 A Home tile **Orders** (permission `orders.review`) opens `/shop/orders`: the

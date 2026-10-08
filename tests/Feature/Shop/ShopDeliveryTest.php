@@ -883,9 +883,11 @@ class ShopDeliveryTest extends TestCase
 
         $this->assertStringContainsString("'shop-scan-saved'", $js);
 
-        // Three restarts: a committed add, a cancelled prompt, a code that is
-        // not in the delivery.
-        $this->assertSame(3, substr_count($js, 'this.announceSaved();'));
+        // Five restarts: a committed add, a cancelled prompt, a code that is
+        // not in the delivery, a return to waiting for the unit barcode
+        // (backToLinking: a refused or failed link, a lookup that found nothing,
+        // or Not this one), and Dismiss while a candidate was showing.
+        $this->assertSame(5, substr_count($js, 'this.announceSaved();'));
 
         // ...and none of them between the prompt being built and its own
         // announceDone(), which is the lookup that opens the prompt.
@@ -982,5 +984,198 @@ class ShopDeliveryTest extends TestCase
 
         // One open session is seeded, so the tile carries a badge of 1.
         $response->assertSee('<span class="shop-tile__badge" aria-label="1 waiting">1</span>', false);
+    }
+
+    // --- deliveries cycle 1: link an outer barcode from the scan screen ---
+
+    /**
+     * A scan no product has opens a "Not found" card above the scan field (the
+     * same position as the prompt, for the same phone reason) with a button that
+     * makes the next scan the unit barcode to link it to.
+     */
+    public function test_scan_screen_offers_to_link_an_unknown_outer_barcode(): void
+    {
+        $response = $this->actingAs($this->employee())->get($this->scanUrl())->assertOk();
+        $html = $response->getContent();
+
+        $response->assertSee('data-outer-url="'.e(route('delivery-legacy.save-outer-barcode')).'"', false);
+        $response->assertSee('Link as outer barcode');
+        $response->assertSee('startLink()', false);
+        $response->assertSee('dismissUnknown()', false);
+
+        $cardAt = strpos($html, 'x-ref="unknown"');
+        $fieldAt = strpos($html, 'shop-scan__input');
+        $this->assertNotFalse($cardAt);
+        $this->assertNotFalse($fieldAt);
+        $this->assertLessThan(
+            $fieldAt,
+            $cardAt,
+            'The Not found card must render above the scan field, or its button falls below the fold on a phone.'
+        );
+
+        // Revision 2: the three states and the confirmation.
+        $response->assertSee('confirmLink()', false);
+        $response->assertSee('rejectCandidate()', false);
+        $response->assertSee('Yes, link it');
+        $response->assertSee('Not this one');
+        $response->assertSee('Cancel linking');
+        $response->assertSee('shop-card--linking', false);
+        $response->assertSee('is-linking', false);
+
+        $js = $this->scanJs();
+        $this->assertStringContainsString('outer barcode again', $js);
+        $this->assertSame(1, substr_count($js, 'this.post(this.outerUrl'));
+        $this->assertLessThan(
+            strpos($js, 'this.post(this.outerUrl'),
+            strpos($js, 'confirmLink()'),
+            'Only the confirmation may save a link: a scan alone must never post to save-outer-barcode.'
+        );
+    }
+
+    /**
+     * Revision 2, from the owner's browser check: after tapping Link, a scan of
+     * the next delivery item used to link it silently. The scan now only looks
+     * the code up and shows the product; the save waits for "Yes, link it".
+     */
+    public function test_linking_waits_for_a_tap(): void
+    {
+        $js = $this->scanJs();
+
+        $this->assertStringContainsString('backToLinking(null)', $js);
+        $this->assertStringContainsString('candidate = { code: data.product.barcode', $js);
+
+        $findAt = strpos($js, 'async findUnit(');
+        $confirmAt = strpos($js, 'async confirmLink(');
+        $this->assertNotFalse($findAt);
+        $this->assertNotFalse($confirmAt);
+        $this->assertLessThan($confirmAt, $findAt);
+        $this->assertStringNotContainsString(
+            'this.post(this.outerUrl',
+            substr($js, $findAt, $confirmAt - $findAt),
+            'findUnit() looks the unit barcode up and must not save the link itself.'
+        );
+    }
+
+    /**
+     * The client refuses an outer code scanned as the unit ("already the case
+     * barcode of"); this pins the server backstop: no supplier_link.Barcode
+     * equals an outer code, so the save 404s.
+     */
+    public function test_an_outer_code_cannot_be_linked_as_a_unit_barcode(): void
+    {
+        $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.save-outer-barcode'), [
+                'unitBarcode' => '15000000000014',
+                'supplierID' => '999',
+                'outerCode' => '15000000000021',
+            ])
+            ->assertStatus(404)
+            ->assertJsonPath('success', false);
+
+        $this->assertSame(
+            '15000000000014',
+            DB::connection('pos')->table('supplier_link')->where('Barcode', '5000000000017')->value('OuterCode')
+        );
+    }
+
+    /**
+     * The link is saved through the office page's own endpoint, and the outer
+     * code then resolves as a case of the linked product. The lookup with a zero
+     * quantity records nothing.
+     */
+    public function test_linking_an_outer_barcode_makes_the_next_scan_a_case(): void
+    {
+        DB::connection('pos')->table('supplier_link')
+            ->where('Barcode', '5000000000024')
+            ->update(['CaseUnits' => 4]);
+
+        $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.save-outer-barcode'), [
+                'unitBarcode' => '5000000000024',
+                'supplierID' => '999',
+                'outerCode' => '15000000000021',
+            ])
+            ->assertOk()
+            ->assertJson([
+                'success' => true,
+                'productName' => 'Leeks',
+                'unitBarcode' => '5000000000024',
+            ]);
+
+        $this->assertSame(
+            '15000000000021',
+            DB::connection('pos')->table('supplier_link')->where('Barcode', '5000000000024')->value('OuterCode')
+        );
+
+        $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.scan-increment'), [
+                'delID' => 'd-1',
+                'barcode' => '15000000000021',
+                'quantity' => 0,
+                'supplierID' => '999',
+            ])
+            ->assertOk()
+            ->assertJsonPath('product.name', 'Leeks')
+            ->assertJsonPath('product.barcode', '5000000000024')
+            ->assertJsonPath('scanType', 'case')
+            ->assertJsonPath('caseUnits', 4);
+
+        $this->assertSame(3, DB::connection('pos')->table('deliveriesScanItems')->where('delID', 'd-1')->count());
+    }
+
+    public function test_an_outer_barcode_already_on_another_product_is_refused(): void
+    {
+        $response = $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.save-outer-barcode'), [
+                'unitBarcode' => '5000000000024',
+                'supplierID' => '999',
+                'outerCode' => '15000000000014',
+            ]);
+
+        $response->assertStatus(409)->assertJsonPath('success', false);
+        $this->assertStringContainsString('Oat drink 1 L', $response->json('message'));
+
+        $links = DB::connection('pos')->table('supplier_link')->where('SupplierID', '999')->pluck('OuterCode', 'Barcode');
+        $this->assertNull($links['5000000000024']);
+        $this->assertSame('15000000000014', $links['5000000000017']);
+    }
+
+    public function test_a_unit_barcode_the_supplier_does_not_have_is_refused(): void
+    {
+        $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.save-outer-barcode'), [
+                'unitBarcode' => '4260009912200',
+                'supplierID' => '999',
+                'outerCode' => '15000000000021',
+            ])
+            ->assertStatus(404)
+            ->assertJsonPath('success', false);
+    }
+
+    public function test_a_gs1_outer_code_is_stored_as_its_gtin(): void
+    {
+        $this->actingAs($this->employee())
+            ->postJson(route('delivery-legacy.save-outer-barcode'), [
+                'unitBarcode' => '5000000000024',
+                'supplierID' => '999',
+                'outerCode' => "]C10115000000000021\x1D10LOT42",
+            ])
+            ->assertOk();
+
+        $this->assertSame(
+            '15000000000021',
+            DB::connection('pos')->table('supplier_link')->where('Barcode', '5000000000024')->value('OuterCode')
+        );
+    }
+
+    public function test_a_barista_cannot_link_an_outer_barcode(): void
+    {
+        $this->actingAs($this->userWith('barista', ['kds.access']))
+            ->postJson(route('delivery-legacy.save-outer-barcode'), [
+                'unitBarcode' => '5000000000024',
+                'supplierID' => '999',
+                'outerCode' => '15000000000021',
+            ])
+            ->assertForbidden();
     }
 }
