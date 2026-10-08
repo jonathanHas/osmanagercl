@@ -1,300 +1,226 @@
-# Cycle 2 — Correction card + / − respond instantly; the scanned-not-on-invoice query stops scanning every supplier link — implementation
+# Cycle 3 — Correct quantities from the delivery summary — implementation
 
-Status: BLOCKED
+Status: DONE
 Plan revision: 1
 Implementer: Fable 5.1 (this session was started as the Implementer; the protocol names Opus)
 Date: 2026-10-08
 
-**Where it stands in one line:** steps 1–6 are done and every automated check
-passes (59 delivery tests, 328 Shop tests, full suite at the baseline 15 failed
-/ 1042 passed, pint clean on my PHP files, build clean). On dev MySQL the
-rewritten query went from **~2,170 ms to ~27 ms** for the 598-scan session
-with the same 457 barcodes and no field differences. The one thing not done
-is the **browser check in step 7**: the Chrome extension connected this time,
-but the dev host showed the login page (signed out in that Chrome profile),
-and signing in is not something this session may do. The seven observations
-are written below as the owner's checklist, with an open dev session and a
-row picked for it, and the status is BLOCKED on that alone, as step 7 directs.
-The same flow was driven through the real `delivery-scan.js` in a Node
-harness with real timers (under step 7). No POS data was written.
+**Where it stands in one line:** all seven steps done, including the browser
+check (the Chrome extension was connected and the owner had signed the tab in
+as `katelyn`, an employee). 63 delivery tests, 333 Shop tests, full suite at
+the baseline 15 failed / 1047 passed, build clean, pint clean. The card is one
+JS part and one Blade partial used by both screens; the scan page lost 264
+lines and gained an import. Dev data put back (honey row at 27).
 
 ## Baseline
-HEAD: 90000850
+HEAD: 4d023aa8
 Pre-existing dirty files:
 ```
  M docs/deliveries/README.md
-R  docs/deliveries/implemented.md -> docs/deliveries/archive/2026-10-08-link-outer-barcode/implemented.md
-RM docs/deliveries/plan.md -> docs/deliveries/archive/2026-10-08-link-outer-barcode/plan.md
+R  docs/deliveries/implemented.md -> docs/deliveries/archive/2026-10-08-correction-card-speed/implemented.md
+RM docs/deliveries/plan.md -> docs/deliveries/archive/2026-10-08-correction-card-speed/plan.md
 ?? docs/deliveries/plan.md
 ```
-(the cycle 1 archive move, staged by the owner; this file is new)
-
-**Appeared during the cycle, not mine, untouched** (another session is
-editing the product create form in parallel; mtime 12:32 today):
-```
- M app/Http/Controllers/ProductController.php      (+12)
- M app/Http/Requests/StoreProductRequest.php        (+2)
- M resources/views/products/create.blade.php        (+14)
-```
+(the cycle 2 archive move, staged by the owner; this file is new). The three
+product-form files another session had open during cycle 2 were no longer
+dirty. `resources/js/shop/delivery-correction.js` and
+`resources/views/shop/partials/delivery-correction.blade.php` did not exist.
 
 ## Steps
 
-### 1. `getScannedNotOnInvoice()` without the cross-collation join — done
-Changed: `app/Http/Controllers/DeliveryLegacyController.php` (the method body
-and docblock; nothing else in the file for this step)
-- Four steps as the plan: scanned totals keyed by `(string)` barcode; the
-  invoice's barcodes via `delivery ⋈ supplier_link` (latin1 both sides),
-  `distinct()->pluck()`; `array_diff` as strings; two `whereIn` queries
-  (`PRODUCTS` left-joined to `CATEGORIES`/`TAXES`/`STOCKCURRENT`, first row
-  per `CODE` wins; `supplier_link` for the supplier) keyed by code; one
-  `(object)` per extra with exactly the ten keys; `usort` nulls first then
-  name, **case-insensitive** (`strcasecmp`, see Deviation 3). Empty inputs
-  return `[]` early.
-Check output — tests:
-```
-$ php artisan test tests/Feature/Shop/ShopDeliveryTest.php
-  Tests:    59 passed            (including completion / undo through the extras)
-```
-Check output — dev MySQL timing, session with the most scan rows, bound
-closure as the plan's snippet, warm, three runs each:
-```
-session 685c8d19-bba4-11ef-b648-10c37b4d894e scans 598 (supplier 5; status 1 = completed, read-only here)
-before: run 1: 457 rows 2180 ms | run 2: 457 rows 2177 ms | run 3: 457 rows 2153 ms
-after:  run 1: 457 rows   28 ms | run 2: 457 rows   24 ms | run 3: 457 rows   30 ms
-same Barcode set as before (sorted): true
-field differences over NAME, PRICESELL, RATE, SupplierCode, CaseUnits, productID, UNITS, categoryName, scanned: 0
-same name order as before: false — one difference, at index 443 of 457:
-  now 'Zonnemaire Baguete white 2pc' before 'ZÃ¼ger Cottage Cheese 200g'
-  (a mojibake name: utf8_general_ci folds Ã to A so MySQL sorted it before "Zo…";
-   PHP's byte order puts it after. Cosmetic; see Deviation 3.)
-keys: Barcode,scanned,NAME,PRICESELL,RATE,SupplierCode,CaseUnits,productID,UNITS,categoryName
-```
-Dev was only read. The "before" row set was saved to the session scratchpad
-before the edit and compared against after it.
-
-### 2. A test with a product-backed extra row — done
-Changed: `tests/Feature/Shop/ShopDeliveryTest.php` —
-`test_an_extra_product_with_a_supplier_link_keeps_its_details` as specified
-(p3 "Hazelnuts 500 g" `5000000000031`, stock 4, link S3 case 10, scan ×2;
-asserts status/code/name/stock/scanned/stockable, the no-product row's
-fields, `progress` `total 2, checked 2, issues 3`, and the null-name extra
-before Hazelnuts).
-Check output: passes; the file is at 56 after this step (59 at the end).
-
-### 3. The PATCH skips financials when asked — done
-Changed: `app/Http/Controllers/DeliveryLegacyController.php`
-(`updateScannedQuantity()`: `'financials' => 'sometimes|boolean'`, the three
-queries and `calculateFinancials()` only when
-`$request->boolean('financials', true)`, response built as an array),
-`resources/js/shop/delivery-scan.js` (`financials: false` in the PATCH body,
-in the new `quantityBody()` helper).
+### 1. The shared card logic — done
+Changed: `resources/js/shop/delivery-correction.js` (new, 286 lines),
+`resources/js/shop/delivery-scan.js` (−264 lines)
+- The part was built by cutting the blocks out of the scan JS with a script
+  and writing them verbatim into the new file: state `editing`, `editTyped`,
+  `editValue`, `flushTimer`, `flushPending`, `busy`, `toast`, `toastTimer`;
+  `TOAST_MS`; getters `updateUrl`, `delId`, `supplierId`, `csrf`,
+  `editingRow`; `focusField()` (with its docblock), `edit()`, `adjust()`,
+  `flushNow()`, `typeCorrection()`, `setCorrection()`, `quantityBody()`,
+  `saveQuantity()`, `requestInit()`, `post()`, `stockText()`, `showToast()`.
+  New: `initCorrection()` (the `editing` watch and the `pagehide` listener,
+  the exact text from the scan page's `init()`), `closeCardIfRowGone()` (the
+  two lines from `load()`). Header comment states what the page must provide
+  and why the part exists. `export default () => ({...})`.
+- Scan page: `import deliveryCorrection`, composed as
+  `mix(productImages(), productTypeahead(), deliveryCorrection(), {...})`
+  before the page object; the moved members deleted (none commented out);
+  `init()` is `this.initCorrection(); this.load();`; `load()` calls
+  `this.closeCardIfRowGone()`; `lookup()` keeps `await this.flushNow()`;
+  `parseQuantity` / `quantityText` imports stay (used by the prompt).
+  Header comment: the card is the shared part.
 Check output:
 ```
-test_the_shop_page_can_skip_financials_on_a_correction: passes
-  (financials:false → 200, success true, quantity 7, no `financials` key, 7 stored;
-   no flag → financials.totalItems = 2)
-$ grep -n "financials: false" resources/js/shop/delivery-scan.js
-<one line>  (grep -c → 1)
+$ npm run build                                   ✓ built in 9.77s
+$ grep -c "async flushNow(" resources/js/shop/delivery-scan.js         0
+$ grep -c "async flushNow(" resources/js/shop/delivery-correction.js   1
+$ grep -n 'editing: null\|busy: false\|toast: null\|get delId\|get csrf\|showToast(tone\|focusField(ref)\|TOAST_MS' resources/js/shop/delivery-scan.js
+(no matches: nothing left behind)
 ```
+The delivery tests were run after steps 1–3 together with the step 5
+retargeting already applied (one script), so no intermediate failure list;
+see step 5.
 
-### 4. The correction card steps locally and saves once taps stop — done
-Changed: `resources/js/shop/delivery-scan.js`, `resources/views/shop/delivery-scan.blade.php`
-- State `editValue`, `flushTimer`, `flushPending` with a comment.
-- `edit(row)`: calls `flushNow()` first (leaving a row saves its taps), sets
-  `editValue = row.scanned ?? 0` on opening.
-- `$watch('editing', (value, old) => { this.flushNow(old); this.editTyped = null; })`
-  — the row just left is passed explicitly (Deviation 1).
-- `adjust(row, delta)`: local step, `flushPending = true`, timer
-  `setTimeout(() => this.flushNow(), 400)`. No request. The two stepper
-  buttons lost `:disabled="busy"`; the value shows `stockText(editValue)`.
-- `flushNow(barcode = this.editing)`: returns false when nothing is pending;
-  when `busy`, re-arms the timer with the same barcode and returns; else
-  clears the timer, takes `row` and `value` before the first await, awaits
-  `saveQuantity()`; on failure re-arms `flushPending` while the card is still
-  on that row ("Could not save" toast comes from `saveQuantity()`).
-- `typeCorrection()` starts from `editValue`; `setCorrection()` sets
-  `editValue`, `flushPending`, and awaits `flushNow()` (immediate).
-- `lookup()`: `await this.flushNow()` before `this.editing = null`.
-- `pagehide` listener in `init()`: with a pending tap, `fetch(updateUrl,
-  { ...requestInit(quantityBody(editing, editValue), 'PATCH'), keepalive: true })`,
-  no reload. `quantityBody()` is shared with `saveQuantity()`; `requestInit()`
-  is shared with `post()`.
-- Header comment: the sentence on local stepping and the 400 ms save, with
-  the owner's 2026-10-08 report as the reason.
-- `README.md` rule wording: left to the Planner (the README is Planner-owned).
+### 2. The shared card markup — done
+Changed: `resources/views/shop/partials/delivery-correction.blade.php` (new,
+47 lines), `resources/views/shop/delivery-scan.blade.php`
+- The `x-ref="correct"` section with its leading comment moved verbatim
+  (re-indented to the partial's top level), `x-show="{{ $show ?? 'editing' }}"`,
+  input id `delivery-edit-qty` kept; a header comment on the partial.
+- Scan view line 221:
+  `@include('shop.partials.delivery-correction', ['show' => 'editing && ! pending'])`.
+Check output: in the 99-test run below, the scan-page rendering tests
+(`Correct quantity`, `adjust(editingRow, 1)`, `stockText(editValue)`, the Done
+button's `:class`) all pass.
+
+### 3. The summary opens the card — done
+Changed: `resources/views/shop/delivery-summary.blade.php`, `resources/js/shop/delivery-summary.js`
+- JS: import, `mix(productImages(), deliveryCorrection(), {...})`, `init()`
+  = `initCorrection(); load();`, `load()` calls `closeCardIfRowGone()` after
+  `rows`; header sentence. Nothing else (its own `delId` / `supplierId`
+  getters stay; see Notes).
+- View: `data-update-url` on `<main>`; after the Discrepancies `<h2>`, the
+  include inside `@unless ($session['completed'])` with the comment; inside
+  the `x-for` template an `@if ($session['completed'])` keeping today's
+  `<div class="shop-row">` and an `@else` with
+  `<button class="shop-row shop-item shop-item--pic" type="button" :aria-pressed="editing === row.barcode" @click="edit(row)">`
+  and `<span>` children; the `.shop-toasts` block before `</main>`.
 Check output:
 ```
-$ php artisan test tests/Feature/Shop/ShopDeliveryTest.php tests/Feature/Shop/ShopViewContractTest.php
-  Tests:    86 passed (625 assertions)       (59 + 27)
-$ npm run build
-✓ built in 9.01s
+$ php artisan test tests/Feature/Shop/ShopDeliveryTest.php tests/Feature/Shop/ShopViewContractTest.php tests/Feature/Shop/ConfinePinSessionTest.php
+  Tests:    99 passed (749 assertions)
+$ npm run build                                   ✓ built in 9.77s
 ```
 
-### 5. Tests for the card — done
-Changed: `tests/Feature/Shop/ShopDeliveryTest.php`
-- `test_the_correction_card_steps_locally_and_saves_once` (view shows
-  `stockText(editValue)`, both stepper buttons without `:disabled`, JS has
-  `flushNow()`, the 400 ms `setTimeout`, `keepalive: true`, and `adjust()`'s
-  body has no `saveQuantity(`).
-- `test_a_scan_flushes_a_pending_correction_first` (`await this.flushNow();`
-  before `this.editing = null;` inside `lookup`).
-- `test_the_correction_card_has_one_primary_button_while_typing`: its
-  `setCorrection()` assertion now expects `if (await this.flushNow()) {` and
-  bounds the body at `quantityBody(` (Deviation 2).
-Check output: `ShopDeliveryTest` → **59 passed**.
+### 4. Tests for the summary — done
+Changed: `tests/Feature/Shop/ShopDeliveryTest.php` — the four tests under
+`// --- deliveries cycle 3: corrections from the summary ---`, as named and
+specified (the card-before-list `strpos`, the completed page's `assertDontSee`s,
+the shared-files assertions reading both JS files, both views and the
+partial, and the PATCH-then-items totals check).
+Check output: `ShopDeliveryTest` → **63 passed** (347 assertions).
+
+### 5. Retarget the moved source assertions — done
+Changed: `tests/Feature/Shop/ShopDeliveryTest.php` — `correctionJs()` helper
+after `scanJs()`; the `setCorrection()` body test, the `financials: false`
+count and the `flushNow` / 400 ms / `keepalive` / `adjust()` body assertions
+now read `correctionJs()`; the steps-locally test also asserts the scan JS
+does not contain `setTimeout(() => this.flushNow(), 400)`. The scan-flush,
+camera and prompt-order tests stay on `scanJs()`.
+Check output: 63 passed (above).
 
 ### 6. Docs — done
-Changed: `docs/features/shop-mode.md` ("### Deliveries: correcting a
-quantity", two paragraphs, after the outer-codes section),
-`docs/development/known-issues.md` (a "Second instance" sub-heading inside the
-POS collation section, naming the two columns and the fix).
+Changed: `docs/features/shop-mode.md` (a third paragraph in "Deliveries:
+correcting a quantity"), `docs/shop_new/README.md` ("Where the code is",
+Alpine modules row).
 Check output:
 ```
-$ grep -c "correcting a quantity" docs/features/shop-mode.md
-1
-$ grep -c "deliveriesScanItems" docs/development/known-issues.md
-2
+$ grep -c "delivery-correction" docs/features/shop-mode.md docs/shop_new/README.md
+docs/features/shop-mode.md:2
+docs/shop_new/README.md:1
 ```
 
-### 7. Format, build, browser check — partly done (browser check not run)
-- Pint applied to the two PHP files I changed; `--test` on them passes.
-  `npm run build` clean.
-- **Browser check: not run.** The Chrome extension connected this time
-  (unlike cycle 1); the dev host answered with the login page, with
-  credentials autofilled in the Chrome profile. Signing in is outside what
-  this session may do, so the tab was left on the login page.
-- **Node harness** (`scratchpad/harness3.mjs`, not in the repo): real module,
-  Alpine's `$watch` emulated with a setter on `editing`, `fetch` scripted
-  (`items` returns two rows from a mock server that the PATCH updates), real
-  timers. Output, trimmed:
-  ```
-  1. open the card on A (scanned 6)                       editValue 6, 0 PATCHes
-  2. tap + five times quickly                              editValue 11 at once, row still 6, pending, 0 PATCHes
-  2b. 150 ms later                                         still 0 PATCHes
-  2c. 550 ms after the last tap                            1 PATCH {barcode A, quantity 11, financials false}, 1 reload, row 11
-  3. tap − five times, wait                                1 more PATCH (6), row 6
-  4. type 9 and Set                                        immediate PATCH (9), editTyped null afterwards
-  5. tap +, then × within 400 ms                           the watch flushed: PATCH (10), row 10
-  6. tap + then scan B within 400 ms                       order: PATCH /update → GET /items → POST /scan
-  7. tap + on A then open B within 400 ms                  A saved (12); card shows B's own figure
-  8. slow server (300 ms PATCH), taps during the save      final editValue 15 = server 15 (last value wins; 4 PATCHes)
-  9. tap + then pagehide                                   one PATCH with keepalive=true, qty 16, no reload
-  ```
-  Not covered: the rendered DOM, `scan-input.js` focus handling, real
-  network timing.
-- **Owner's checklist (step 7, dev host, signed in as `test`).** The session
-  used for the timing is completed, so use the open one with the most scans:
-  `/shop/deliveries/scan?delID=9e5c52db-9b1b-4641-95e3-4e5b33cd8a24&supplierID=13`
-  (3 scan rows). Row to use: **Coolfin Raw Honey 340g**, barcode
-  `5391209002625`, **quantity 27 before the check** (note it again on screen).
-  1. [ ] Tap the row → the card opens showing 27.
-  2. [ ] Tap + five times quickly → the number climbs at once to 32; in the
-         network log exactly one PATCH `update-quantity` (body has
-         `"financials":false`) and one GET `items` appear about 400 ms after
-         the last tap; the row then shows 32.
-  3. [ ] Tap − five times → 27 again; one PATCH, one GET.
-  4. [ ] Tap the number, type `30`, Set → saved at once; row shows 30.
-  5. [ ] Tap + once, then within 400 ms type a barcode into the scan field and
-         Enter → in the network log the PATCH lands before the GET `items`,
-         and the scan lookup follows; cancel the prompt.
-  6. [ ] Put the row back: tap the number, type `27`, Set (or
-         `php artisan tinker --execute="…update-quantity…"` is not needed:
-         confirm with
-         `php artisan tinker --execute="echo DB::connection('pos')->table('deliveriesScanItems')->where('delID','9e5c52db-9b1b-4641-95e3-4e5b33cd8a24')->where('barcode','5391209002625')->sum('quantity');"`
-         → `27`).
-  7. [ ] Console clean of errors throughout.
-- **Dev state:** nothing written this session (all tinker calls were reads;
-  the harness mocked `fetch`). The checklist row's quantity is 27 and must
-  read 27 again after the owner's check.
+### 7. Format, build, browser check — done
+- `./vendor/bin/pint --test $(git diff --name-only -- '*.php')` → PASS (3
+  files: the test file plus two unrelated PHP files the owner's README /
+  archive diff does not include — all PASS). `npm run build` clean.
+- Browser, dev host, Chrome extension connected, tab signed in as `katelyn`
+  (employee, `deliveries.process`), in a tab of my own so the owner's open
+  scan-screen tab was not disturbed. Session
+  `9e5c52db-9b1b-4641-95e3-4e5b33cd8a24` (Coolfin, supplier 13, open, no
+  invoice lines; three unexpected rows). Honey row **27 before** (screen and
+  tinker).
+  1. Tap the Coolfin Raw Honey row → the card opened above the list showing
+     **27**, "Stock 93"; JS probe: one `button[aria-pressed="true"]`, its
+     title "Coolfin Raw Honey 340g". Console: no errors.
+  2. Tap + three times quickly → the number read **30** in a screenshot
+     taken immediately after the taps, before any request; after 2 s the
+     network log showed exactly **one PATCH `scan-item` (200) and one GET
+     `items` (200)**; the row's meta read "scanned 30". Totals stayed 3 / 3
+     unexpected (no invoice, so the status cannot change; the pill is
+     "Unexpected" either way).
+  3. Tap the number → the "Quantity or weight" field opened with 30. My
+     first attempt to type into it did not land (see Notes: the extension's
+     keystrokes went to the button, `document.activeElement` was `BUTTON`);
+     a click into the field, select-all, type `27`, Enter → JS probe
+     `editTyped "27"`, then **one PATCH and one GET**, `editTyped null`,
+     `editValue 27`, row "scanned 27".
+  4. Tap Done → JS probe `editing null`, card `display: none`, no pressed
+     rows. Console clean.
+  5. Summary of the completed session `685c8d19-…` (Udea, 457 rows) → JS
+     probe: `button.shop-row` 0, `div.shop-row` 457, `[x-ref="correct"]` 0,
+     "This delivery is completed" shown.
+- **Dev state:** honey row back at **27** (typed in step 3; tinker:
+  `honey qty: 27`, session rows 3). Nothing else written.
 
 ## Deviations
-1. **`flushNow()` takes the barcode of the row to save.** The plan's
-   `if (! flushPending || ! editingRow) return` can never flush on close: by
-   the time the `editing` watch runs, `editing` is already null (or the next
-   row), so `editingRow` is null. The watch now passes its `old` value, and
-   `flushNow()` finds the row in `rows` by that barcode, taking `value` before
-   the first await. Same behaviour the plan asks for; the guard is on the
-   passed barcode instead.
-2. **`setCorrection()` saves through `flushNow()`** rather than
-   `saveQuantity()` directly, so Set and the stepper share one path; the
-   existing test's assertion was updated to the new shape (the plan allows
-   extending that test). Still immediate; still keeps the field open on
-   failure.
-3. **Name order is case-insensitive** (`strcasecmp`) rather than the plan's
-   raw `<=>`, because MySQL's `ORDER BY PRODUCTS.NAME` under utf8_general_ci
-   is case-insensitive. It is not accent-folding, hence the one cosmetic order
-   difference on dev (a mojibake "ZÃ¼ger" name). Nulls first as specified.
-4. **A `requestInit()` helper** was split out of `post()` so the keepalive
-   PATCH on `pagehide` uses the same headers and credentials; the plan asked
-   only for the body helper (`quantityBody()`), which is also there.
-5. **Browser check not run** (signed out on dev); checklist written and
-   BLOCKED on that alone, as step 7 directs.
-6. **README rule wording** not added: the README is Planner-owned.
+1. **Steps 1–5 were applied in one script**, so the plan's "run the
+   delivery tests after step 1, note which fail, fix in step 5" produced no
+   intermediate failure list. The retargeting in step 5 is exactly the four
+   assertions the plan named; with them the file passes at 63.
+2. **The partial is re-indented** to top level (the scan view had it four
+   levels deep); the markup is otherwise the moved text. The `$show`
+   expression is the one difference the plan asked for.
+3. **`delivery-summary.js` keeps its own `delId` / `supplierId` getters**,
+   which now duplicate the part's (identical bodies; the page object comes
+   later in `mix()` and wins). The plan said nothing else changes in that
+   file, so they were left; the Planner may want them removed.
+4. The owner's checklist was not needed: the browser check ran.
 
 ## Verification
-1. `./vendor/bin/pint --test app/Http/Controllers/DeliveryLegacyController.php tests/Feature/Shop/ShopDeliveryTest.php` → PASS.
-   (`git diff --name-only -- '*.php'` now also lists `ProductController.php`
-   and `StoreProductRequest.php`, which are another session's and were not
-   formatted or checked here.)
-2. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → **59 passed**.
-3. `php artisan test tests/Feature/Shop` → **328 passed** (1675 assertions).
-4. `php artisan test` → **15 failed, 1042 passed** (4796 assertions). The 15 by
+1. `./vendor/bin/pint --test $(git diff --name-only -- '*.php')` → PASS (3 files).
+2. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → **63 passed**.
+3. `php artisan test tests/Feature/Shop` → **333 passed** (1710 assertions).
+4. `php artisan test` → **15 failed, 1047 passed** (4831 assertions). The 15 by
    class: `Tests\Unit\UdeaScrapingServiceTest` ×7,
    `Tests\Feature\CashReconciliationTest` ×3,
    `Tests\Feature\FruitVegLabelPrintingTest` ×2, `Tests\Feature\ProductTest` ×2,
    `Tests\Feature\TestScraperControllerTest` ×1 — the baseline set, nothing
-   else. (Run while the other session's product-form edits were on disk.)
-5. `npm run build` → `✓ built in 9.01s`.
-6. Dev MySQL timing before / after: **2,170 ms → 27 ms** (step 1), same 457
-   barcodes, 0 field differences, one cosmetic order difference.
-7. Browser check → **not run**; owner's checklist under step 7.
+   else. (Passed is 1047, one more than the plan's 1046: 1042 + 4 new = 1046,
+   so one test elsewhere was added since the README baseline, presumably
+   with the product-form commit; not from this cycle.)
+5. `npm run build` → `✓ built in 9.77s`.
+6. Browser check: done, step 7 above.
 
 ## Files changed
 Mine:
 ```
- M app/Http/Controllers/DeliveryLegacyController.php
- M docs/development/known-issues.md
  M docs/features/shop-mode.md
+ M docs/shop_new/README.md
  M resources/js/shop/delivery-scan.js
+ M resources/js/shop/delivery-summary.js
  M resources/views/shop/delivery-scan.blade.php
+ M resources/views/shop/delivery-summary.blade.php
  M tests/Feature/Shop/ShopDeliveryTest.php
+?? resources/js/shop/delivery-correction.js
+?? resources/views/shop/partials/delivery-correction.blade.php
 ?? docs/deliveries/implemented.md
 ```
 Pre-existing (owner): `docs/deliveries/README.md`, the staged archive
-renames, `?? docs/deliveries/plan.md`. Another session's, untouched:
-`app/Http/Controllers/ProductController.php`,
-`app/Http/Requests/StoreProductRequest.php`,
-`resources/views/products/create.blade.php`.
-`git diff --stat` over everything: 11 files, 507 insertions, 77 deletions
-(28 of the insertions are the other session's).
-Nothing committed.
+renames, `?? docs/deliveries/plan.md`.
+`git diff --stat` (tracked files): 9 files, 213 insertions, 317 deletions;
+plus the two new untracked files (286 + 47 lines). Nothing committed. The
+two new files must be `git add`ed with the rest.
 
 ## Notes for Planner
-- **Another session is editing in this working tree** (product create form).
-  The owner should be aware when committing cycle 2 that `git add -A` would
-  sweep those in.
-- **`php artisan tinker <file>` hangs** after running the file (it drops into
-  the REPL and waits on stdin); `--execute="include '…';"` with a `timeout`
-  does not. Worth a line in the README's "Checking a change".
-- **The timing session is completed** (`status 1`). The method is read-only,
-  so the timing stands; the browser checklist uses an open session instead.
-  The scratch timing script's "second session" line re-ran the first (an
-  arrow function captured `$delID` by value), so only session `685c8d19-…`
-  timings are claimed.
-- **Edge left as the plan has it:** a flush deferred because `busy` keeps the
-  barcode but reads `editValue` when it finally runs; if the card has moved
-  to another row *and* that row was tapped in the meantime, the earlier
-  row's taps are lost (the new row's `adjust()` clears the shared timer).
-  Needs a scan in flight plus a row switch plus a tap inside ~400 ms. A
-  per-row pending map would close it; not done.
-- **`pagehide` with bfcache:** `flushPending` is set false before the
-  keepalive fetch; if the page is restored from the back/forward cache and
-  the fetch had failed, the tap is lost silently. Acceptable for a phone tab
-  going to the background; mentioned for completeness.
-- **`getOnInvoiceNotScanned()` (95 ms)** is now the slowest query in the
-  Shop page's path only through the office financials, which the Shop PATCH
-  no longer asks for. Out of scope as the plan says.
-- The one order difference in step 1 could be removed by sorting with
-  `Collator` (intl) in `en_US` with primary strength, which does fold accents
-  like MySQL; not done because the plan specified a plain `usort` and the
-  difference is cosmetic.
+- **Focus after "tap the number" on the typed field.** On the summary (and
+  so, same code, on the scan page) `focusField('editQty')` ran but the
+  extension's next keystrokes went to the button and
+  `document.activeElement` was `BUTTON`, even though the field showed a focus
+  ring. It may be the automation (synthetic clicks do not always move focus
+  the way a finger does) rather than the page; a real tablet check of "tap
+  the number, type, Set" on either screen would settle it. If real, the fix
+  is in the shared part, once.
+- **The summary's totals do not change for a no-invoice session** (every row
+  is "unexpected" whatever its quantity). The owner's check in step 7 of the
+  plan expected "the totals and the row's pill update"; on a session with
+  invoice lines a short row corrected to its expected figure does change
+  both (`test_a_summary_correction_changes_the_totals` pins it server-side).
+- **Duplicate getters** in `delivery-summary.js` (Deviation 3): removing
+  `delId` / `supplierId` there would leave one definition; trivial follow-up.
+- **The correction card on the summary has no "scanned so far / invoice"
+  facts** the scan prompt shows; the row's meta line ("Expected · scanned")
+  is below it. Fine for discrepancies; mentioned in case the owner wants the
+  expected figure on the card itself.
+- **Chrome tab**: I closed the tab I opened; the owner's own tab (on a scan
+  screen for supplier 37) was left as it was.

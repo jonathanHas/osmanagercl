@@ -6,12 +6,17 @@
  * form to `delivery-legacy.complete`, so the irreversible step is a real form
  * submission rather than a fetch this file could fire by accident; all this
  * object does is gate the confirmation.
+ *
+ * A discrepancy row opens the shared correction card (delivery-correction.js,
+ * cycle 3), on an open session only: the totals and the list are getters over
+ * `rows`, so the reload after a save updates them.
  */
 import mix from './mix.js';
 import productImages from './product-images.js';
+import deliveryCorrection from './delivery-correction.js';
 import { quantityText } from './quantity.js';
 
-export default () => mix(productImages(), {
+export default () => mix(productImages(), deliveryCorrection(), {
     session: null,
     rows: [],
     progress: null,
@@ -20,6 +25,7 @@ export default () => mix(productImages(), {
     confirming: false,
 
     init() {
+        this.initCorrection();
         this.load();
     },
 
@@ -50,6 +56,7 @@ export default () => mix(productImages(), {
             this.rows = data.rows;
             this.progress = data.progress;
             this.error = null;
+            this.closeCardIfRowGone();
         } catch (e) {
             this.error = 'Could not load the delivery';
         } finally {

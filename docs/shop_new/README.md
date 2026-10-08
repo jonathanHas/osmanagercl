@@ -26,7 +26,7 @@ changing it. Feature documentation: `docs/features/shop-mode.md`.
 |---|---|
 | Screens | `resources/views/shop/*.blade.php` (+ `partials/`) |
 | Components | `resources/views/components/shop/` (`topbar`, `scan-input`, `tile`, `icon`, `product-thumb`, `photo`, `help-button`), layout `<x-shop-layout>` |
-| Alpine modules | `resources/js/shop/*.js` (shared parts composed with `mix()` from `mix.js`; `scan-input.js`, `product-images.js`, `product-typeahead.js` are shared) |
+| Alpine modules | `resources/js/shop/*.js` (shared parts composed with `mix()` from `mix.js`; `scan-input.js`, `product-images.js`, `product-typeahead.js`, `delivery-correction.js` (the correction card, scan + summary) are shared) |
 | Styles | `resources/css/shop.css` |
 | Icons | `public/images/shop-icons.svg` |
 | Controllers | `app/Http/Controllers/Shop/` (thin; most screens call existing office JSON endpoints) |

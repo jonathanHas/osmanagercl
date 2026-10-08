@@ -29,10 +29,9 @@
  *
  * Screen 05 v2: a row is a button. Tapping it opens a correction card beside the
  * list, because a button cannot hold the stepper's own buttons. Sort is a single
- * toggle whose label names the order in force. The card's + / − step a local
- * number and the save goes 400 ms after the last tap (or when the card closes,
- * a scan follows, or the page is left): each tap used to wait on a PATCH and a
- * reload, about a second per tap on a 163-line delivery (owner, 2026-10-08).
+ * toggle whose label names the order in force. The card itself (local stepper,
+ * typed value, the save 400 ms after the last tap) is the shared part
+ * delivery-correction.js, which the summary page uses too (cycle 3).
  *
  * After every write the whole list is refetched: the server owns the expected
  * quantities and the statuses, and re-deriving them here would be a second
@@ -41,11 +40,10 @@
 import mix from './mix.js';
 import productImages from './product-images.js';
 import productTypeahead from './product-typeahead.js';
+import deliveryCorrection from './delivery-correction.js';
 import { parseQuantity, quantityText } from './quantity.js';
 
-const TOAST_MS = 3000;
-
-export default () => mix(productImages(), productTypeahead(), {
+export default () => mix(productImages(), productTypeahead(), deliveryCorrection(), {
     session: null,
     rows: [],
     progress: { total: 0, checked: 0, issues: 0 },
@@ -57,24 +55,12 @@ export default () => mix(productImages(), productTypeahead(), {
     // recorded while this is set. `pending.typed` is null while the stepper is
     // in charge, or the text of a typed quantity or weight.
     pending: null,
-    busy: false,
     // An unknown code as { code, linking, candidate, error }. `linking` is true
     // once "Link as outer barcode" was tapped, and then the next code scanned
     // (or product picked by name) is looked up as the unit barcode; `candidate`
     // is null or { code, product } for the product that lookup found, waiting
     // for "Yes, link it". Nothing is saved until that tap.
     unknown: null,
-    editing: null,
-    // The correction card's typed quantity: null while its stepper is in charge.
-    editTyped: null,
-    // The card's number while it is open: stepped locally, saved once taps stop.
-    // `flushPending` is true while the server has not yet been told; `flushTimer`
-    // is the pending save. See flushNow().
-    editValue: null,
-    flushTimer: null,
-    flushPending: false,
-    toast: null,
-    toastTimer: null,
     flag: null,
     error: null,
     // The "Find by name" list is open, and whether it searches every product
@@ -84,26 +70,7 @@ export default () => mix(productImages(), productTypeahead(), {
     searchWhenEmpty: true,
 
     init() {
-        // Closing the card by any route (Done, ×, another row, a scan) saves what
-        // was tapped on the row just left — `editing` has already moved on, so the
-        // old value names it. A typed correction belongs to the row it was typed for.
-        this.$watch('editing', (value, old) => {
-            this.flushNow(old);
-            this.editTyped = null;
-        });
-
-        // Leaving the page (a phone backgrounding the tab fires this too) with a
-        // tap not yet saved: send the PATCH with keepalive and no reload.
-        window.addEventListener('pagehide', () => {
-            if (! this.flushPending || this.editing === null) {
-                return;
-            }
-
-            this.flushPending = false;
-            clearTimeout(this.flushTimer);
-            fetch(this.updateUrl, { ...this.requestInit(this.quantityBody(this.editing, this.editValue), 'PATCH'), keepalive: true });
-        });
-
+        this.initCorrection();
         this.load();
     },
 
@@ -115,24 +82,8 @@ export default () => mix(productImages(), productTypeahead(), {
         return this.$root.dataset.scanUrl;
     },
 
-    get updateUrl() {
-        return this.$root.dataset.updateUrl;
-    },
-
     get outerUrl() {
         return this.$root.dataset.outerUrl;
-    },
-
-    get delId() {
-        return this.$root.dataset.delId;
-    },
-
-    get supplierId() {
-        return this.$root.dataset.supplierId;
-    },
-
-    get csrf() {
-        return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
     },
 
     /**
@@ -218,11 +169,6 @@ export default () => mix(productImages(), productTypeahead(), {
         return this.unknown?.candidate?.product ?? null;
     },
 
-    /** The row the correction card is editing, or null. */
-    get editingRow() {
-        return this.rows.find((r) => r.barcode === this.editing) ?? null;
-    },
-
     /**
      * "New first" puts the items just scanned at the top, then everything still
      * unscanned, then the rest by name. "Scanned first" is the reverse emphasis:
@@ -268,11 +214,7 @@ export default () => mix(productImages(), productTypeahead(), {
             this.progress = data.progress;
             this.error = null;
 
-            // Correcting an unexpected row to 0 deletes it server-side, so the
-            // card would otherwise sit there with nothing in it.
-            if (this.editing !== null && this.editingRow === null) {
-                this.editing = null;
-            }
+            this.closeCardIfRowGone();
         } catch (e) {
             this.error = 'Could not load the invoice lines';
         }
@@ -408,18 +350,6 @@ export default () => mix(productImages(), productTypeahead(), {
 
         this.pending.typed = String(this.pending.qty);
         this.focusField('qty');
-    },
-
-    /**
-     * Focus and select a typed-quantity field once it is visible. x-show reveals
-     * it after $nextTick has run (measured: still display:none there), and a
-     * hidden element ignores focus(), so wait a frame as scan-input.js does.
-     */
-    focusField(ref) {
-        this.$nextTick(() => requestAnimationFrame(() => {
-            this.$refs[ref]?.focus();
-            this.$refs[ref]?.select();
-        }));
     },
 
     /**
@@ -769,180 +699,6 @@ export default () => mix(productImages(), productTypeahead(), {
         this.sort = this.sort === 'new' ? 'scanned' : 'new';
     },
 
-    edit(row) {
-        const opening = this.editing !== row.barcode;
-
-        // Leaving a row (for none, or for another) saves what was tapped on it,
-        // before editValue is reused.
-        this.flushNow();
-
-        this.editing = opening ? row.barcode : null;
-
-        // On a phone the card is below the fold; bring it into view as the
-        // scan prompt does.
-        if (opening) {
-            this.editValue = row.scanned ?? 0;
-            this.$nextTick(() => this.$refs.correct?.scrollIntoView({ block: 'nearest' }));
-        }
-    },
-
-    /**
-     * A tap steps the card's number at once; the save follows once taps stop.
-     * No request here, and the buttons are never disabled: a tap must never be
-     * swallowed.
-     */
-    adjust(row, delta) {
-        this.editValue = Math.max(0, Number(((this.editValue ?? row.scanned ?? 0) + delta).toFixed(3)));
-        this.flushPending = true;
-        clearTimeout(this.flushTimer);
-        this.flushTimer = setTimeout(() => this.flushNow(), 400);
-    },
-
-    /**
-     * Save the card's number if taps have changed it: PATCH, then reload the
-     * list so the row and its pill come from the server. Called 400 ms after
-     * the last tap, when the card closes (the `editing` watch passes the row
-     * just left), before a scan, and by Set. True when the save went through.
-     *
-     * The barcode and value are taken before the first await, so the card can
-     * move to another row meanwhile. While another save or a scan is in flight
-     * (`busy`) the save is simply due again 400 ms later; the PATCH is absolute,
-     * so the last value always wins.
-     */
-    async flushNow(barcode = this.editing) {
-        if (! this.flushPending || barcode === null || barcode === undefined) {
-            return false;
-        }
-
-        if (this.busy) {
-            clearTimeout(this.flushTimer);
-            this.flushTimer = setTimeout(() => this.flushNow(barcode), 400);
-
-            return false;
-        }
-
-        clearTimeout(this.flushTimer);
-        this.flushPending = false;
-
-        const row = this.rows.find((r) => r.barcode === barcode);
-        const value = this.editValue;
-
-        if (! row || value === null) {
-            return false;
-        }
-
-        if (await this.saveQuantity(row, value)) {
-            return true;
-        }
-
-        // Not saved ("Could not save" has shown): the next tap or close retries,
-        // while the card is still on this row.
-        if (this.editing === barcode) {
-            this.flushPending = true;
-        }
-
-        return false;
-    },
-
-    /** Swap the correction card's stepper for a field. */
-    typeCorrection() {
-        if (! this.editingRow) {
-            return;
-        }
-
-        this.editTyped = this.stockText(this.editValue ?? this.editingRow.scanned ?? 0);
-        this.focusField('editQty');
-    },
-
-    /**
-     * Set the typed correction, saved at once. 0 is allowed, as on the stepper:
-     * it deletes an unexpected row, and load() then closes the card.
-     */
-    async setCorrection() {
-        const value = parseQuantity(this.editTyped, { allowZero: true });
-
-        if (value === null || ! this.editingRow || this.busy) {
-            return;
-        }
-
-        this.editValue = value;
-        this.flushPending = true;
-
-        // A failed save keeps the field open with what was typed, so it can be
-        // retried rather than looking as if it had worked.
-        if (await this.flushNow()) {
-            this.editTyped = null;
-        }
-    },
-
-    /** The PATCH body for a correction; one place, so the keepalive path cannot drift. */
-    quantityBody(barcode, quantity) {
-        return {
-            delID: this.delId,
-            barcode,
-            quantity,
-            supplierID: this.supplierId,
-            // The office financials are never read here; items is reloaded instead.
-            financials: false,
-        };
-    },
-
-    /**
-     * PATCH an absolute quantity for a row, then refetch the list. True when the
-     * save went through.
-     */
-    async saveQuantity(row, target) {
-        this.busy = true;
-
-        try {
-            const data = await this.post(this.updateUrl, this.quantityBody(row.barcode, target), 'PATCH');
-
-            if (! data.success) {
-                this.showToast('bad', 'Could not save');
-
-                return false;
-            }
-
-            await this.load();
-
-            return true;
-        } catch (e) {
-            this.showToast('bad', 'Could not save');
-
-            return false;
-        } finally {
-            this.busy = false;
-        }
-    },
-
-    requestInit(body, method) {
-        return {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-                'X-CSRF-TOKEN': this.csrf,
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify(body),
-        };
-    },
-
-    async post(url, body, method = 'POST') {
-        const response = await fetch(url, this.requestInit(body, method));
-
-        return await response.json();
-    },
-
-    /**
-     * A stock figure or a quantity as a person would read it (see quantity.js).
-     * Takes the number rather than the row, because the scan prompt has the figure
-     * on `pending.product.currentStock` while rows have it on `row.stock`.
-     */
-    stockText(value) {
-        return quantityText(value);
-    },
-
     expectedLabel(row) {
         return `/ ${row.expected ?? '—'}`;
     },
@@ -965,12 +721,6 @@ export default () => mix(productImages(), productTypeahead(), {
             default:
                 return { text: 'Not scanned', tone: 'shop-pill--muted' };
         }
-    },
-
-    showToast(tone, text) {
-        this.toast = { tone, text };
-        clearTimeout(this.toastTimer);
-        this.toastTimer = setTimeout(() => { this.toast = null; }, TOAST_MS);
     },
 
     announceDone() {

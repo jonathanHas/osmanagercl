@@ -30,10 +30,10 @@ find by name), `docs/features/delivery-system.md` (the `/deliveries` flow),
 
 | | |
 |---|---|
-| Current task | **Cycle 2** — correction card + / − respond at once and the scanned-not-on-invoice query stops scanning every supplier link (`plan.md`, READY 2026-10-08; from the owner's production report). **Cycle 1** (link an unknown outer barcode from the Shop scan screen, two revisions; rev 2 added the "Link to this product?" confirmation and the amber linking state) was accepted 2026-10-08 and is in `archive/2026-10-08-link-outer-barcode/`; the owner committed it as `90000850` |
-| HEAD | `90000850` on `feature/modularization-phase1` (cycle 1 committed) |
-| Working tree | clean apart from this folder (the cycle 1 archive move is staged). The Implementer records the baseline `git status --short` all the same |
-| Test baseline | `php artisan test` → **15 failed, 1038 passed** (2026-10-08, after cycle 1). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → 55 passed |
+| Current task | **Cycle 3** — correct quantities from the delivery summary, with the correction card shared between the scan and summary screens (`plan.md`, READY 2026-10-08; owner's request). Accepted and committed: **cycle 1** (outer barcode link with confirmation, `90000850`, `archive/2026-10-08-link-outer-barcode/`), **cycle 2** (instant correction card, Shop PATCH without financials, `getScannedNotOnInvoice()` rewritten around the POS collation trap, `4d023aa8`, `archive/2026-10-08-correction-card-speed/`) |
+| HEAD | `4d023aa8` on `feature/modularization-phase1` (cycles 1 and 2 committed; `4d023aa8` also carries another session's product-form edits, which the owner swept in) |
+| Working tree | clean apart from this folder (the cycle 2 archive move is staged). The Implementer records the baseline `git status --short` all the same |
+| Test baseline | `php artisan test` → **15 failed, 1042 passed** (2026-10-08, after cycle 2). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → 59 passed |
 
 ### Production timings (2026-10-08, read-only SSH, session `6717664c-…`, supplier 37, 172 invoice lines, 163 scans)
 
@@ -45,6 +45,8 @@ find by name), `docs/features/delivery-system.md` (the `/deliveries` flow),
 | `getOnInvoiceNotScanned()` (no index on `delivery.supCode`) | 95 |
 | `ProductImageUrls::byCode()` for 181 codes (thumbnail versions 43 + URLs 77) | 105 |
 | One correction tap before cycle 2 (PATCH + reload, sequential) | ≈ 1,070 |
+| **After cycle 2 (deployed, re-timed 2026-10-08):** `getScannedNotOnInvoice()` on the same session | **20** |
+| … on the largest session (598 scans, 457 extras; was ~2,170 on dev) | 89 |
 
 Column collations on the POS: `deliveriesScanItems.barcode` and `PRODUCTS.CODE` are `utf8_general_ci`; `supplier_link.Barcode` / `SupplierCode` / `SupplierID`, `delivery.supCode`, `deliveriesScan.supID` are `latin1_swedish_ci`. A comparison across that line cannot use an index. Production MySQL is 5.7.33.
 
@@ -117,9 +119,23 @@ Column collations on the POS: `deliveriesScanItems.barcode` and `PRODUCTS.CODE` 
   in the report.
 - Production is read-only from here:
   `ssh -n -o BatchMode=yes jon@lilThink2 'cd /var/www/html/osmanager && php artisan tinker --execute=…'`.
+  For a longer script, send it over stdin and run it with
+  `php artisan tinker --execute="include '/tmp/x.php';"` under `timeout`:
+  `php artisan tinker /tmp/x.php` runs the file and then waits on the REPL
+  forever.
+- Chrome on this machine cannot open `https://lilthink2/` in the
+  Claude-in-Chrome tab group (certificate page), so production is checked
+  by the owner in their own tab or measured over SSH.
 
 ## Open items
 
+- Correction card edge cases left by cycle 2: a flush deferred behind a scan
+  in flight reads the card's current value, so a row switch plus a tap
+  inside ~400 ms can lose the earlier row's taps (a per-row pending map
+  would close it); a `pagehide` keepalive PATCH that fails is not retried if
+  the page comes back from the back/forward cache.
+- `getOnInvoiceNotScanned()` is 95 ms (no index on `delivery.supCode`);
+  only the office financials use it now.
 - The thumbnail version lookup (`ProductThumbnailService::versions()`) MD5s
   every product photo blob on every `items` call (43 ms for 172 codes on
   production). A cached version per product would take it to nothing; not

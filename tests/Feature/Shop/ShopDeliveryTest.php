@@ -907,6 +907,12 @@ class ShopDeliveryTest extends TestCase
         return file_get_contents(resource_path('js/shop/delivery-scan.js'));
     }
 
+    /** The correction card's logic, shared by the scan and summary pages (cycle 3). */
+    private function correctionJs(): string
+    {
+        return file_get_contents(resource_path('js/shop/delivery-correction.js'));
+    }
+
     /**
      * Without invoice lines every row is "unexpected", so the old warning showed
      * on every item. The no-invoice guard must come before either warning.
@@ -940,7 +946,7 @@ class ShopDeliveryTest extends TestCase
 
         // A failed save keeps the typed field open: editTyped is cleared only
         // when saveQuantity() reports success.
-        $js = $this->scanJs();
+        $js = $this->correctionJs();
         $setAt = strpos($js, 'async setCorrection() {');
         $this->assertNotFalse($setAt);
         $body = substr($js, $setAt, strpos($js, 'quantityBody(barcode, quantity) {', $setAt) - $setAt);
@@ -1266,7 +1272,7 @@ class ShopDeliveryTest extends TestCase
             ->assertOk()
             ->assertJsonPath('financials.totalItems', 2);
 
-        $this->assertSame(1, substr_count($this->scanJs(), 'financials: false'));
+        $this->assertSame(1, substr_count($this->correctionJs(), 'financials: false'));
     }
 
     /**
@@ -1283,10 +1289,13 @@ class ShopDeliveryTest extends TestCase
         $response->assertSee('aria-label="One more" @click="adjust(editingRow, 1)"', false);
         $response->assertDontSee(':disabled="busy" @click="adjust(', false);
 
-        $js = $this->scanJs();
+        $js = $this->correctionJs();
         $this->assertStringContainsString('flushNow()', $js);
         $this->assertStringContainsString('setTimeout(() => this.flushNow(), 400)', $js);
         $this->assertStringContainsString('keepalive: true', $js);
+
+        // One implementation: a copy of the stepper must not creep back into the page.
+        $this->assertStringNotContainsString('setTimeout(() => this.flushNow(), 400)', $this->scanJs());
 
         $adjustAt = strpos($js, 'adjust(row, delta) {');
         $this->assertNotFalse($adjustAt);
@@ -1306,5 +1315,84 @@ class ShopDeliveryTest extends TestCase
         $this->assertNotFalse($flushAt);
         $this->assertNotFalse($closeAt);
         $this->assertLessThan($closeAt, $flushAt, 'lookup() must flush the correction card before closing it.');
+    }
+
+    // --- deliveries cycle 3: corrections from the summary ---
+
+    /** A discrepancy row on the summary opens the same correction card, above the list. */
+    public function test_summary_rows_open_the_correction_card(): void
+    {
+        $response = $this->actingAs($this->employee())->get($this->summaryUrl())->assertOk();
+        $html = $response->getContent();
+
+        $response->assertSee('data-update-url="'.e(route('delivery-legacy.update-quantity')).'"', false);
+        $response->assertSee('@click="edit(row)"', false);
+        $response->assertSee(':aria-pressed="editing === row.barcode"', false);
+        $response->assertSee('x-ref="correct"', false);
+        $response->assertSee('Correct quantity');
+        $response->assertSee('x-text="stockText(editValue)"', false);
+        $response->assertSee('shop-toasts', false);
+
+        $cardAt = strpos($html, 'x-ref="correct"');
+        $listAt = strpos($html, 'x-for="row in discrepancies"');
+        $this->assertNotFalse($cardAt);
+        $this->assertNotFalse($listAt);
+        $this->assertLessThan($listAt, $cardAt, 'The card sits above the discrepancy list (Shop rule 6: nothing pops over neighbouring rows).');
+    }
+
+    /** Completion has already added stock, so a completed summary is read-only. */
+    public function test_completed_summary_offers_no_correction(): void
+    {
+        DB::connection('pos')->table('deliveriesScan')->where('ID', 'd-1')->update(['status' => 1]);
+
+        $response = $this->actingAs($this->employee())->get($this->summaryUrl())->assertOk();
+
+        $response->assertSee('This delivery is completed');
+        $response->assertDontSee('edit(row)', false);
+        $response->assertDontSee('x-ref="correct"', false);
+    }
+
+    /** One card: a shared JS part and a shared partial, used by both screens. */
+    public function test_both_delivery_screens_share_the_correction_card(): void
+    {
+        $summaryJs = file_get_contents(resource_path('js/shop/delivery-summary.js'));
+        $this->assertStringContainsString("from './delivery-correction.js'", $this->scanJs());
+        $this->assertStringContainsString("from './delivery-correction.js'", $summaryJs);
+        $this->assertStringNotContainsString('async flushNow(', $this->scanJs());
+        $this->assertStringContainsString('async flushNow(', $this->correctionJs());
+
+        $scanView = file_get_contents(resource_path('views/shop/delivery-scan.blade.php'));
+        $summaryView = file_get_contents(resource_path('views/shop/delivery-summary.blade.php'));
+        $partial = file_get_contents(resource_path('views/shop/partials/delivery-correction.blade.php'));
+        $this->assertStringContainsString("@include('shop.partials.delivery-correction'", $scanView);
+        $this->assertStringContainsString("@include('shop.partials.delivery-correction'", $summaryView);
+        $this->assertSame(1, substr_count($partial, 'x-ref="correct"'));
+    }
+
+    /**
+     * The summary derives its totals and its list from the items JSON, so a
+     * correction's reload is what updates them: short leeks corrected to 8 are
+     * "ok" and only the unexpected row is left as an issue.
+     */
+    public function test_a_summary_correction_changes_the_totals(): void
+    {
+        $this->actingAs($this->employee())
+            ->patchJson(route('delivery-legacy.update-quantity'), [
+                'delID' => 'd-1',
+                'barcode' => '5000000000024',
+                'quantity' => 8,
+                'supplierID' => '999',
+                'financials' => false,
+            ])
+            ->assertOk();
+
+        $json = $this->actingAs($this->employee())
+            ->getJson(route('delivery-legacy.items', ['delID' => 'd-1', 'supplierID' => '999']))
+            ->assertOk()
+            ->json();
+
+        $rows = collect($json['rows'])->keyBy('barcode');
+        $this->assertSame('ok', $rows['5000000000024']['status']);
+        $this->assertSame(1, $json['progress']['issues']);
     }
 }

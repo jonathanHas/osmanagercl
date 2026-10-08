@@ -189,6 +189,15 @@ collation rules in `docs/features/product-search.md` (about 25 ms), which
 also speeds up the scan prompt's Add, the summary, completion, undo and the
 office page.
 
+The same card opens from a discrepancy row on the summary screen, where the
+mistakes are found (cycle 3): tap the row, step or type, and the totals and
+the list follow the save. A corrected row that now matches leaves the list
+while the card stays open on it, which is the confirmation. Not on a
+completed delivery, whose stock has already been added: its rows are plain
+and there is no card. The card is one implementation on both screens, the
+Alpine part `resources/js/shop/delivery-correction.js` and the partial
+`resources/views/shop/partials/delivery-correction.blade.php`.
+
 ### Orders: list and order review
 
 A Home tile **Orders** (permission `orders.review`) opens `/shop/orders`: the

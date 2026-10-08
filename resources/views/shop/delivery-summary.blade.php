@@ -2,6 +2,7 @@
 <x-shop-layout title="Delivery summary" :back="$scanUrl">
     <main class="shop-page shop-page--narrow" x-data="shopDeliverySummary()"
           data-items-url="{{ route('delivery-legacy.items') }}"
+          data-update-url="{{ route('delivery-legacy.update-quantity') }}"
           data-del-id="{{ $session['id'] }}"
           data-supplier-id="{{ $session['supplierId'] }}">
         <div class="shop-stack shop-stack--tight">
@@ -49,18 +50,40 @@
         <section class="shop-stack shop-stack--tight">
             <h2 class="shop-label">Discrepancies</h2>
 
+            @unless ($session['completed'])
+                {{-- The card sits above the list and is scrolled into view by edit().
+                     A corrected row that now matches leaves the list while the card
+                     stays open on it: that is the confirmation. Not on a completed
+                     delivery, whose stock has already been added. --}}
+                @include('shop.partials.delivery-correction')
+            @endunless
+
             <div class="shop-list" x-show="discrepancies.length" x-cloak>
                 <template x-for="row in discrepancies" :key="row.barcode">
-                    <div class="shop-row">
-                        <x-shop.product-thumb expr="row" />
-                        <div class="shop-row__main">
-                            <span class="shop-row__title" x-text="row.name"></span>
-                            <span class="shop-row__meta shop-code" x-text="meta(row)"></span>
+                    @if ($session['completed'])
+                        <div class="shop-row">
+                            <x-shop.product-thumb expr="row" />
+                            <div class="shop-row__main">
+                                <span class="shop-row__title" x-text="row.name"></span>
+                                <span class="shop-row__meta shop-code" x-text="meta(row)"></span>
+                            </div>
+                            <div class="shop-row__aside">
+                                <span class="shop-pill" :class="tone(row)" x-text="label(row)"></span>
+                            </div>
                         </div>
-                        <div class="shop-row__aside">
-                            <span class="shop-pill" :class="tone(row)" x-text="label(row)"></span>
-                        </div>
-                    </div>
+                    @else
+                        {{-- A row is a button (as on the scan screen), so spans inside. --}}
+                        <button class="shop-row shop-item shop-item--pic" type="button" :aria-pressed="editing === row.barcode" @click="edit(row)">
+                            <x-shop.product-thumb expr="row" />
+                            <span class="shop-row__main">
+                                <span class="shop-row__title" x-text="row.name"></span>
+                                <span class="shop-row__meta shop-code" x-text="meta(row)"></span>
+                            </span>
+                            <span class="shop-row__aside">
+                                <span class="shop-pill" :class="tone(row)" x-text="label(row)"></span>
+                            </span>
+                        </button>
+                    @endif
                 </template>
             </div>
 
@@ -119,6 +142,15 @@
                 <x-shop.icon name="check" />
                 Complete delivery
             </button>
+        </div>
+
+        <div class="shop-toasts" role="status" x-show="toast" x-cloak>
+            <div class="shop-toast" :class="toast && 'shop-toast--' + toast.tone">
+                {{-- x-shop.icon does not merge $attributes, so the directive goes on the styled span. --}}
+                <span class="shop-toast__icon" x-show="! toast || toast.tone === 'ok'"><x-shop.icon name="check" size="sm" /></span>
+                <span class="shop-toast__icon" x-show="toast && toast.tone !== 'ok'" x-cloak><x-shop.icon name="alert" size="sm" /></span>
+                <span class="shop-toast__text" x-text="toast?.text"></span>
+            </div>
         </div>
     </main>
 </x-shop-layout>
