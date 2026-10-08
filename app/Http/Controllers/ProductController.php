@@ -1402,6 +1402,18 @@ class ProductController extends Controller
 
             app(ProductSearchVocabulary::class)->forget();
 
+            // Mark as a kitchen product if requested (Laravel DB, so after the POS transaction commits)
+            if ($request->boolean('kitchen_product')) {
+                try {
+                    \App\Models\KitchenProduct::firstOrCreate(['product_id' => $productId]);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to mark new product as kitchen product', [
+                        'product_id' => $productId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Determine redirect route with context
             if ($request->delivery_item_id) {
                 $deliveryItem = \App\Models\DeliveryItem::findOrFail($request->delivery_item_id);

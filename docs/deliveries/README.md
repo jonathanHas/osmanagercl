@@ -30,10 +30,23 @@ find by name), `docs/features/delivery-system.md` (the `/deliveries` flow),
 
 | | |
 |---|---|
-| Current task | **Cycle 1** — link an unknown outer barcode to a product from the Shop scan screen, as the legacy match page allows (from the owner's `todo.txt`). Revision 1 implemented and reviewed 2026-10-08 (uncommitted, six files); **revision 2 READY**: the owner's browser check found that the linking state looks like ordinary scanning, so a stray scan linked silently. Rev 2 adds a "Link to this product?" confirmation and turns the card and scan field amber while linking. Track opened 2026-10-08 |
-| HEAD | `f29c5369` on `feature/modularization-phase1` |
-| Working tree | clean apart from this folder. The Implementer records the baseline `git status --short` all the same |
-| Test baseline | `php artisan test` → **15 failed, 1030 passed** (2026-10-08, about 60 s). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → 47 passed |
+| Current task | **Cycle 2** — correction card + / − respond at once and the scanned-not-on-invoice query stops scanning every supplier link (`plan.md`, READY 2026-10-08; from the owner's production report). **Cycle 1** (link an unknown outer barcode from the Shop scan screen, two revisions; rev 2 added the "Link to this product?" confirmation and the amber linking state) was accepted 2026-10-08 and is in `archive/2026-10-08-link-outer-barcode/`; the owner committed it as `90000850` |
+| HEAD | `90000850` on `feature/modularization-phase1` (cycle 1 committed) |
+| Working tree | clean apart from this folder (the cycle 1 archive move is staged). The Implementer records the baseline `git status --short` all the same |
+| Test baseline | `php artisan test` → **15 failed, 1038 passed** (2026-10-08, after cycle 1). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → 55 passed |
+
+### Production timings (2026-10-08, read-only SSH, session `6717664c-…`, supplier 37, 172 invoice lines, 163 scans)
+
+| Query / step | ms |
+|---|---|
+| `getMatchedItems()` | 28 |
+| `getScannedNotOnInvoice()` as committed (utf8 vs latin1 join, full scan of 9,905 supplier links per scanned row) | 409 |
+| the same comparison made in the link table's collation (proof of cause; not the fix shipped) | 25 |
+| `getOnInvoiceNotScanned()` (no index on `delivery.supCode`) | 95 |
+| `ProductImageUrls::byCode()` for 181 codes (thumbnail versions 43 + URLs 77) | 105 |
+| One correction tap before cycle 2 (PATCH + reload, sequential) | ≈ 1,070 |
+
+Column collations on the POS: `deliveriesScanItems.barcode` and `PRODUCTS.CODE` are `utf8_general_ci`; `supplier_link.Barcode` / `SupplierCode` / `SupplierID`, `delivery.supCode`, `deliveriesScan.supID` are `latin1_swedish_ci`. A comparison across that line cannot use an index. Production MySQL is 5.7.33.
 
 ## Where the delivery code is
 
@@ -107,6 +120,17 @@ find by name), `docs/features/delivery-system.md` (the `/deliveries` flow),
 
 ## Open items
 
+- The thumbnail version lookup (`ProductThumbnailService::versions()`) MD5s
+  every product photo blob on every `items` call (43 ms for 172 codes on
+  production). A cached version per product would take it to nothing; not
+  planned.
+- Camera after Dismiss during an in-flight unit lookup on the outer-barcode
+  card stays paused until the camera button is tapped (cycle 1 rev 2 note,
+  rare, recoverable). A one-line widening of the resume condition if the
+  owner meets it.
+- No JS test runner in the project; the Implementer checked the scan flow
+  with a throwaway Node harness in cycle 1. Adding Vitest is an owner
+  decision.
 - `supplier_link.CaseUnits` can be 0 or 1 for a product that really comes in
   cases (Mossfield links are 0). A newly linked outer barcode then opens a
   "Case of 1" prompt. Editing case units from the Shop screen is not planned;

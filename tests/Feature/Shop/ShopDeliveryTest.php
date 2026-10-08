@@ -943,8 +943,9 @@ class ShopDeliveryTest extends TestCase
         $js = $this->scanJs();
         $setAt = strpos($js, 'async setCorrection() {');
         $this->assertNotFalse($setAt);
-        $body = substr($js, $setAt, strpos($js, 'async saveQuantity(', $setAt) - $setAt);
-        $this->assertStringContainsString("if (await this.saveQuantity(this.editingRow, value)) {\n            this.editTyped = null;", $body);
+        $body = substr($js, $setAt, strpos($js, 'quantityBody(barcode, quantity) {', $setAt) - $setAt);
+        // Cycle 2: Set goes through flushNow() (the same save the stepper makes).
+        $this->assertStringContainsString("if (await this.flushNow()) {\n            this.editTyped = null;", $body);
         $this->assertSame(1, substr_count($body, 'this.editTyped = null'));
     }
 
@@ -1177,5 +1178,133 @@ class ShopDeliveryTest extends TestCase
                 'outerCode' => '15000000000021',
             ])
             ->assertForbidden();
+    }
+
+    // --- deliveries cycle 2: instant correction card + the extras query ---
+
+    /**
+     * getScannedNotOnInvoice() was rewritten without its cross-collation join.
+     * An extra row that has a product and a supplier link keeps every detail the
+     * old SQL gave it (code, name, stock, stockable), beside the no-product row.
+     */
+    public function test_an_extra_product_with_a_supplier_link_keeps_its_details(): void
+    {
+        $pos = DB::connection('pos');
+        $pos->table('PRODUCTS')->insert([
+            'ID' => 'p3', 'NAME' => 'Hazelnuts 500 g', 'CODE' => '5000000000031', 'CATEGORY' => 'c2', 'TAXCAT' => '001',
+            'PRICEBUY' => 3.0, 'PRICESELL' => 5.5, 'IMAGE' => null,
+        ]);
+        $pos->table('STOCKCURRENT')->insert(['PRODUCT' => 'p3', 'UNITS' => 4]);
+        $pos->table('supplier_link')->insert([
+            'Barcode' => '5000000000031', 'SupplierCode' => 'S3', 'SupplierID' => '999', 'CaseUnits' => 10, 'OuterCode' => null,
+        ]);
+        $pos->table('deliveriesScanItems')->insert([
+            'ID' => 'i4', 'delID' => 'd-1', 'barcode' => '5000000000031', 'quantity' => 2, 'dateScan' => now(),
+        ]);
+
+        $json = $this->actingAs($this->employee())
+            ->getJson(route('delivery-legacy.items', ['delID' => 'd-1', 'supplierID' => '999']))
+            ->assertOk()
+            ->json();
+
+        $rows = collect($json['rows'])->keyBy('barcode');
+
+        $this->assertSame('unexpected', $rows['5000000000031']['status']);
+        $this->assertSame('S3', $rows['5000000000031']['code']);
+        $this->assertSame('Hazelnuts 500 g', $rows['5000000000031']['name']);
+        $this->assertEquals(4, $rows['5000000000031']['stock']);
+        $this->assertEquals(2, $rows['5000000000031']['scanned']);
+        $this->assertTrue($rows['5000000000031']['stockable']);
+
+        $this->assertNull($rows['4260009912200']['code']);
+        $this->assertSame('4260009912200', $rows['4260009912200']['name']);
+        $this->assertFalse($rows['4260009912200']['stockable']);
+
+        // Extras are not invoice lines; both are issues beside the short leeks.
+        $this->assertSame(['total' => 2, 'checked' => 2, 'issues' => 3], $json['progress']);
+
+        // Name order among the extras, nulls first, as MySQL ordered them.
+        $order = array_column($json['rows'], 'barcode');
+        $this->assertLessThan(
+            array_search('5000000000031', $order, true),
+            array_search('4260009912200', $order, true)
+        );
+    }
+
+    /**
+     * The Shop page reloads `items` after every correction and never reads the
+     * office financials (three queries); it asks the PATCH to skip them. The
+     * office page sends no flag and keeps getting them.
+     */
+    public function test_the_shop_page_can_skip_financials_on_a_correction(): void
+    {
+        $this->actingAs($this->employee())
+            ->patchJson(route('delivery-legacy.update-quantity'), [
+                'delID' => 'd-1',
+                'barcode' => '5000000000024',
+                'quantity' => 7,
+                'supplierID' => '999',
+                'financials' => false,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('quantity', 7)
+            ->assertJsonMissingPath('financials');
+
+        $this->assertEquals(
+            7,
+            DB::connection('pos')->table('deliveriesScanItems')->where('delID', 'd-1')->where('barcode', '5000000000024')->sum('quantity')
+        );
+
+        $this->actingAs($this->employee())
+            ->patchJson(route('delivery-legacy.update-quantity'), [
+                'delID' => 'd-1',
+                'barcode' => '5000000000024',
+                'quantity' => 8,
+                'supplierID' => '999',
+            ])
+            ->assertOk()
+            ->assertJsonPath('financials.totalItems', 2);
+
+        $this->assertSame(1, substr_count($this->scanJs(), 'financials: false'));
+    }
+
+    /**
+     * From the owner's 2026-10-08 delivery: each + / − waited about a second on
+     * a PATCH and a reload. The number now steps locally and one save follows
+     * 400 ms after the last tap; a tap never posts and is never disabled.
+     */
+    public function test_the_correction_card_steps_locally_and_saves_once(): void
+    {
+        $response = $this->actingAs($this->employee())->get($this->scanUrl())->assertOk();
+
+        $response->assertSee('x-text="stockText(editValue)"', false);
+        $response->assertSee('aria-label="One fewer" @click="adjust(editingRow, -1)"', false);
+        $response->assertSee('aria-label="One more" @click="adjust(editingRow, 1)"', false);
+        $response->assertDontSee(':disabled="busy" @click="adjust(', false);
+
+        $js = $this->scanJs();
+        $this->assertStringContainsString('flushNow()', $js);
+        $this->assertStringContainsString('setTimeout(() => this.flushNow(), 400)', $js);
+        $this->assertStringContainsString('keepalive: true', $js);
+
+        $adjustAt = strpos($js, 'adjust(row, delta) {');
+        $this->assertNotFalse($adjustAt);
+        $body = substr($js, $adjustAt, strpos($js, '},', $adjustAt) - $adjustAt);
+        $this->assertStringNotContainsString('saveQuantity(', $body, 'A tap steps the number; it must not post.');
+    }
+
+    /** A scan closes the card; its unsaved taps must land before the reload. */
+    public function test_a_scan_flushes_a_pending_correction_first(): void
+    {
+        $js = $this->scanJs();
+
+        $lookupAt = strpos($js, 'async lookup(');
+        $this->assertNotFalse($lookupAt);
+        $flushAt = strpos($js, 'await this.flushNow();', $lookupAt);
+        $closeAt = strpos($js, 'this.editing = null;', $lookupAt);
+        $this->assertNotFalse($flushAt);
+        $this->assertNotFalse($closeAt);
+        $this->assertLessThan($closeAt, $flushAt, 'lookup() must flush the correction card before closing it.');
     }
 }

@@ -425,6 +425,20 @@
                                         </span>
                                     </label>
                                 </div>
+                                <div class="flex items-start mt-4">
+                                    <input type="checkbox"
+                                           id="kitchen_product"
+                                           name="kitchen_product"
+                                           value="1"
+                                           {{ old('kitchen_product') ? 'checked' : '' }}
+                                           class="mt-1 rounded border-gray-300 text-orange-600 focus:ring-orange-500">
+                                    <label for="kitchen_product" class="ml-3 block text-sm text-gray-700 dark:text-gray-300">
+                                        <span class="font-medium">Kitchen Product</span>
+                                        <span class="block text-xs text-gray-500 mt-1">
+                                            Mark this product as used by the kitchen (adds it to the kitchen products list).
+                                        </span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 

@@ -471,6 +471,17 @@ unfiltered forms take 51 ms and 2 ms.
 - Do not "fix" this with `COLLATE`: it breaks the SQLite test connection and errors on the utf8 column.
 - Reference implementation: `app/Services/ProductSearch/ProductSearchService.php` (see [Product Search](../features/product-search.md)).
 
+#### Second instance: delivery scans vs supplier links (fixed 2026-10-08)
+`deliveriesScanItems.barcode` is `utf8_general_ci` too, and
+`DeliveryLegacyController::getScannedNotOnInvoice()` left-joined `supplier_link`
+on it and ran a `NOT IN (SELECT supplier_link.Barcode …)` against it: `EXPLAIN`
+showed `type=ALL rows=9905, Block Nested Loop` plus a dependent subquery per
+scanned row — 409 ms for 163 scans on production, 2.2 s for 598 scans on dev,
+paid twice per correction tap on the Shop scan screen. Fixed by pre-plucking
+the invoice's barcodes (`delivery` ⋈ `supplier_link`, both latin1) and two
+`whereIn` queries on `PRODUCTS.CODE` / `supplier_link.Barcode` (deliveries
+cycle 2). Same trap, same rule: never compare these columns in one query.
+
 ---
 
 ## File Upload & Permissions Issues

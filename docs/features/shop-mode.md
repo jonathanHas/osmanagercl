@@ -168,6 +168,27 @@ moment ago. Case units are not editable from the Shop screen: a link whose
 `CaseUnits` is 0 or 1 gives a "Case of 1" prompt, and the office page's case
 units control is the place to fix it.
 
+### Deliveries: correcting a quantity
+
+Tapping a row opens the correction card. Its + / − step a number held on the
+page, so each tap registers at once; one save (a PATCH of the absolute
+quantity, then a reload of the list) goes 400 ms after the last tap, or sooner
+when the card closes, another row is opened, a scan follows, or the page is
+left (a `keepalive` PATCH on `pagehide`). **Set** on a typed value saves
+immediately as before. Rows and pills still come from the server after the
+save. The Shop page's PATCH sends `financials: false`, so the endpoint skips
+the three office-page financial queries it never reads; the office match page
+sends no flag and is unchanged.
+
+The measured cause (production, 2026-10-08, 163 scans): each tap waited about
+a second, of which 409 ms twice was `getScannedNotOnInvoice()`, whose SQL
+compared the utf8 `deliveriesScanItems.barcode` with the latin1
+`supplier_link.Barcode` and so scanned every supplier link per scanned row.
+It now pre-plucks the invoice's barcodes and uses `whereIn`, per the POS
+collation rules in `docs/features/product-search.md` (about 25 ms), which
+also speeds up the scan prompt's Add, the summary, completion, undo and the
+office page.
+
 ### Orders: list and order review
 
 A Home tile **Orders** (permission `orders.review`) opens `/shop/orders`: the

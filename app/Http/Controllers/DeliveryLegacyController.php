@@ -979,46 +979,128 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
-     * Get items that were scanned but NOT on the invoice.
-     * These are barcodes scanned that don't match any supplier_link record for this supplier.
-     * Also includes the supplier code from supplier_link if one exists for this supplier.
+     * Items that were scanned but are not on the invoice: barcodes scanned in this
+     * session that no invoice line of this supplier resolves to, with the product's
+     * details and the supplier link (code, case units) where one exists.
+     *
+     * Three indexed steps rather than one join. The original SQL compared
+     * `deliveriesScanItems.barcode` (utf8_general_ci) with `supplier_link.Barcode`
+     * (latin1_swedish_ci), which MySQL cannot do through an index, so it scanned
+     * every supplier link (9,905) for every scanned row and ran its NOT IN as a
+     * dependent subquery per row: 409 ms for 163 scans on production on 2026-10-08,
+     * 2.2 s for 598 scans on dev. The product-search rules
+     * (docs/features/product-search.md, "POS collation performance rules") say to
+     * pre-pluck and whereIn, which uses the index on both sides and is
+     * driver-neutral (the tests run the POS connection on SQLite).
+     *
+     * Same return shape as before: stdClass rows with Barcode, scanned, NAME,
+     * PRICESELL, RATE, SupplierCode, CaseUnits, productID, UNITS, categoryName,
+     * ordered by NAME with nulls first, as MySQL ordered them. One deliberate
+     * change: a product with several STOCKCURRENT rows gives one row, not one per
+     * location.
      */
     private function getScannedNotOnInvoice(string $deliveryId, string $supplierId): array
     {
-        $sql = 'SELECT
-                    deliveriesScanItems.barcode as Barcode,
-                    SUM(deliveriesScanItems.quantity) as scanned,
-                    PRODUCTS.NAME,
-                    PRODUCTS.PRICESELL,
-                    TAXES.RATE,
-                    sl.SupplierCode,
-                    sl.CaseUnits,
-                    PRODUCTS.ID as productID,
-                    STOCKCURRENT.UNITS,
-                    CATEGORIES.NAME as categoryName
-                FROM deliveriesScanItems
-                LEFT JOIN PRODUCTS ON PRODUCTS.CODE = deliveriesScanItems.barcode
-                LEFT JOIN CATEGORIES ON PRODUCTS.CATEGORY = CATEGORIES.ID
-                LEFT JOIN TAXES ON PRODUCTS.TAXCAT = TAXES.ID
-                LEFT JOIN STOCKCURRENT ON PRODUCTS.ID = STOCKCURRENT.PRODUCT
-                LEFT JOIN supplier_link sl ON sl.Barcode = deliveriesScanItems.barcode
-                    AND sl.SupplierID = ?
-                WHERE deliveriesScanItems.delID = ?
-                AND deliveriesScanItems.barcode NOT IN (
-                    SELECT COALESCE(supplier_link.Barcode, \'\')
-                    FROM delivery
-                    LEFT JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
-                        AND supplier_link.SupplierID = ?
-                    WHERE supplier_link.SupplierID = ?
-                    AND supplier_link.Barcode IS NOT NULL
-                    GROUP BY supplier_link.Barcode
-                )
-                GROUP BY deliveriesScanItems.barcode, PRODUCTS.NAME, PRODUCTS.PRICESELL, TAXES.RATE, sl.SupplierCode, sl.CaseUnits, PRODUCTS.ID, STOCKCURRENT.UNITS, CATEGORIES.NAME
-                ORDER BY PRODUCTS.NAME';
+        $pos = DB::connection('pos');
 
-        $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId, $supplierId]);
+        // 1. Scanned totals for the session. Keys are cast to string when read
+        //    back: a numeric-looking barcode becomes an integer array key in PHP.
+        $scanned = [];
 
-        return $results;
+        $totals = $pos->table('deliveriesScanItems')
+            ->select('barcode', DB::raw('SUM(quantity) as scanned'))
+            ->where('delID', $deliveryId)
+            ->groupBy('barcode')
+            ->get();
+
+        foreach ($totals as $row) {
+            $scanned[(string) $row->barcode] = (float) $row->scanned;
+        }
+
+        if ($scanned === []) {
+            return [];
+        }
+
+        // 2. Barcodes the invoice covers for this supplier (both columns latin1;
+        //    the join getOnInvoiceNotScanned() already makes).
+        $onInvoice = $pos->table('delivery')
+            ->join('supplier_link', function ($join) use ($supplierId) {
+                $join->on('delivery.supCode', '=', 'supplier_link.SupplierCode')
+                    ->where('supplier_link.SupplierID', '=', $supplierId);
+            })
+            ->whereNotNull('supplier_link.Barcode')
+            ->distinct()
+            ->pluck('supplier_link.Barcode')
+            ->map(fn ($barcode) => (string) $barcode)
+            ->all();
+
+        $extras = array_values(array_diff(array_map('strval', array_keys($scanned)), $onInvoice));
+
+        if ($extras === []) {
+            return [];
+        }
+
+        // 3. Details for the extras: two whereIn queries with literal values, so
+        //    the index is used on both. First row wins where a product has several
+        //    STOCKCURRENT rows.
+        $products = [];
+
+        $productRows = $pos->table('PRODUCTS')
+            ->leftJoin('CATEGORIES', 'PRODUCTS.CATEGORY', '=', 'CATEGORIES.ID')
+            ->leftJoin('TAXES', 'PRODUCTS.TAXCAT', '=', 'TAXES.ID')
+            ->leftJoin('STOCKCURRENT', 'PRODUCTS.ID', '=', 'STOCKCURRENT.PRODUCT')
+            ->whereIn('PRODUCTS.CODE', $extras)
+            ->get([
+                'PRODUCTS.CODE', 'PRODUCTS.NAME', 'PRODUCTS.PRICESELL', 'TAXES.RATE',
+                'PRODUCTS.ID', 'STOCKCURRENT.UNITS', 'CATEGORIES.NAME as categoryName',
+            ]);
+
+        foreach ($productRows as $product) {
+            $products[(string) $product->CODE] ??= $product;
+        }
+
+        $links = [];
+
+        $linkRows = $pos->table('supplier_link')
+            ->where('SupplierID', $supplierId)
+            ->whereIn('Barcode', $extras)
+            ->get(['Barcode', 'SupplierCode', 'CaseUnits']);
+
+        foreach ($linkRows as $link) {
+            $links[(string) $link->Barcode] ??= $link;
+        }
+
+        // 4. One row per extra barcode, exactly the keys the old SQL produced.
+        $rows = [];
+
+        foreach ($extras as $barcode) {
+            $product = $products[$barcode] ?? null;
+            $link = $links[$barcode] ?? null;
+
+            $rows[] = (object) [
+                'Barcode' => $barcode,
+                'scanned' => $scanned[$barcode],
+                'NAME' => $product?->NAME,
+                'PRICESELL' => $product?->PRICESELL,
+                'RATE' => $product?->RATE,
+                'SupplierCode' => $link?->SupplierCode,
+                'CaseUnits' => $link?->CaseUnits,
+                'productID' => $product?->ID,
+                'UNITS' => $product?->UNITS,
+                'categoryName' => $product?->categoryName,
+            ];
+        }
+
+        // Name order, nulls first; case-insensitive as the utf8_general_ci ORDER BY was.
+        usort($rows, function ($a, $b) {
+            if (($a->NAME === null) !== ($b->NAME === null)) {
+                return $a->NAME === null ? -1 : 1;
+            }
+
+            return strcasecmp((string) $a->NAME, (string) $b->NAME);
+        });
+
+        return $rows;
     }
 
     /**
@@ -1282,6 +1364,10 @@ class DeliveryLegacyController extends Controller
             // 9999. min:0 stays — a correction to nothing is legitimate.
             'quantity' => 'required|numeric|min:0|max:9999',
             'supplierID' => 'required|string',
+            // The Shop scan page reloads `items` after every write and never reads
+            // the financials; the office match page does. Absent means true, so
+            // the office page's response is unchanged (deliveries cycle 2).
+            'financials' => 'sometimes|boolean',
         ]);
 
         $delID = $validated['delID'];
@@ -1302,21 +1388,24 @@ class DeliveryLegacyController extends Controller
             ]);
         }
 
-        // Recalculate financials
-        $matchedItems = $this->getMatchedItems($delID, $supplierID);
-        $scannedNotOnInvoice = $this->getScannedNotOnInvoice($delID, $supplierID);
-        $onInvoiceNotScanned = $this->getOnInvoiceNotScanned($delID, $supplierID);
-
-        $udeaIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
-        $isUdea = in_array((int) $supplierID, $udeaIds) || in_array($supplierID, array_map('strval', $udeaIds));
-
-        $financials = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
-
-        return response()->json([
+        $response = [
             'success' => true,
             'quantity' => $quantity,
-            'financials' => $financials,
-        ]);
+        ];
+
+        if ($request->boolean('financials', true)) {
+            // Recalculate financials for the office page
+            $matchedItems = $this->getMatchedItems($delID, $supplierID);
+            $scannedNotOnInvoice = $this->getScannedNotOnInvoice($delID, $supplierID);
+            $onInvoiceNotScanned = $this->getOnInvoiceNotScanned($delID, $supplierID);
+
+            $udeaIds = config('suppliers.external_links.udea.supplier_ids', [5, 44, 85]);
+            $isUdea = in_array((int) $supplierID, $udeaIds) || in_array($supplierID, array_map('strval', $udeaIds));
+
+            $response['financials'] = $this->calculateFinancials($matchedItems, $scannedNotOnInvoice, $onInvoiceNotScanned, $isUdea);
+        }
+
+        return response()->json($response);
     }
 
     /**

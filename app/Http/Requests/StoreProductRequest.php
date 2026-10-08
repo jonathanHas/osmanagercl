@@ -58,6 +58,7 @@ class StoreProductRequest extends FormRequest
 
             // Stock Management
             'include_in_stocking' => 'boolean',
+            'kitchen_product' => 'boolean',
 
             // Display Settings
             'display_name' => 'nullable|string|max:255',
@@ -115,6 +116,7 @@ class StoreProductRequest extends FormRequest
             'send_status' => $this->boolean('send_status'),
             'is_com' => $this->boolean('is_com'),
             'include_in_stocking' => $this->boolean('include_in_stocking'),
+            'kitchen_product' => $this->boolean('kitchen_product'),
             'show_on_till' => $this->boolean('show_on_till'),
         ]);
 

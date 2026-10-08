@@ -237,10 +237,13 @@
                         </div>
                     </div>
 
+                    {{-- The number is local and steps at once; the save follows 400 ms
+                         after the last tap (deliveries cycle 2). Never disabled: a tap
+                         must not be swallowed while a save is in flight. --}}
                     <div class="shop-stepper" x-show="editTyped === null">
-                        <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One fewer" :disabled="busy" @click="adjust(editingRow, -1)"><x-shop.icon name="minus" size="lg" /></button>
-                        <button class="shop-stepper__value" type="button" aria-label="Type the quantity" x-on:click="typeCorrection()" x-text="stockText(editingRow?.scanned)"></button>
-                        <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One more" :disabled="busy" @click="adjust(editingRow, 1)"><x-shop.icon name="plus" size="lg" /></button>
+                        <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One fewer" @click="adjust(editingRow, -1)"><x-shop.icon name="minus" size="lg" /></button>
+                        <button class="shop-stepper__value" type="button" aria-label="Type the quantity" x-on:click="typeCorrection()" x-text="stockText(editValue)"></button>
+                        <button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One more" @click="adjust(editingRow, 1)"><x-shop.icon name="plus" size="lg" /></button>
                     </div>
 
                     <div class="shop-field" x-show="editTyped !== null" x-cloak>
