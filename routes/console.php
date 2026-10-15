@@ -87,3 +87,27 @@ Schedule::command('vouchers:sync-till --scheduled')
     ->everyMinute()
     ->onOneServer()
     ->withoutOverlapping(5);
+
+// Nightly backup (spatie/laravel-backup, config/backup.php) of the mysql
+// database and the application files to the `backups` disk. Prune first so
+// tonight's archive is not the one that trips the storage ceiling; monitor
+// last so a missing or oversized backup is noticed (and mailed) the same night.
+// Output goes to storage/logs/backup.log so there is a record on the server
+// that does not depend on mail working. See docs/development/backups.md.
+Schedule::command('backup:clean')
+    ->dailyAt('01:00')
+    ->onOneServer()
+    ->withoutOverlapping(30)
+    ->appendOutputTo(storage_path('logs/backup.log'));
+
+Schedule::command('backup:run')
+    ->dailyAt('01:30')
+    ->onOneServer()
+    ->withoutOverlapping(120)
+    ->appendOutputTo(storage_path('logs/backup.log'));
+
+Schedule::command('backup:monitor')
+    ->dailyAt('02:30')
+    ->onOneServer()
+    ->withoutOverlapping(10)
+    ->appendOutputTo(storage_path('logs/backup.log'));

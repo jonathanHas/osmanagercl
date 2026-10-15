@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **💾 Nightly backups on production** (2026-10-15)
+  - There was no backup of this app at all; timekeeper had one. Added `spatie/laravel-backup` in the same shape: `backup:clean` 01:00 → `backup:run` 01:30 → `backup:monitor` 02:30 from the existing scheduler, writing to the `backups` disk (`BACKUP_PATH`, default `/var/backups/osmanager`, outside the project) and logging to `storage/logs/backup.log`
+  - Archives hold a gzipped `mysqldump --single-transaction` of the `mysql` connection plus the project files including `.env` and `storage/app`; `vendor/`, `node_modules/`, `.git/`, the parser venv, logs and framework caches are excluded as reproducible. The POS and OSAccounts databases are deliberately not included — on production they live on other machines and the POS one is the live till
+  - Only problems are mailed (`BACKUP_NOTIFICATION_EMAIL`, comma-separated, empty = silent). The package validates that key at boot and a malformed address would break every artisan command including `schedule:run`, so the config filters it rather than passing `env()` straight through
+  - Retention: all for 7 days, dailies 30 days, weeklies 8 weeks, monthlies 6 months, then oldest-first past `BACKUP_MAX_STORAGE_MB` (30 GB). Dev run: 537 MB in 47 s
+  - Production still needs the one-time setup in the doc (create `/var/backups/osmanager` as `www-data`, add the two `.env` keys, run once by hand)
+  - **Added**: `config/backup.php`, `docs/development/backups.md`, `tests/Feature/BackupConfigurationTest.php`
+  - **Modified**: `config/filesystems.php` (`backups` disk), `config/database.php` (`dump` options on `mysql`), `routes/console.php`, `tests/Feature/ScheduleTest.php`, `.env.example`, `composer.json`, `CLAUDE.md`, `docs/README.md`, `docs/development/fresh-install-guide.md`
+
 ### Fixed
 
 - **💬 Flash messages on the order pages went nowhere, and always had** (2026-09-09)

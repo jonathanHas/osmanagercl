@@ -263,6 +263,7 @@ php artisan optimize:clear     # Clear caches
 - **Udea Pallet Space**: [Udea Pallet Volumes](./docs/features/udea-pallet-volumes.md) - Basket-only data source, sync page, order-page pallet fill
 - **Features**: [Features Index](./docs/FEATURES_INDEX.md)
 - **Troubleshooting**: [Known Issues](./docs/development/known-issues.md)
+- **Backups**: [Backups](./docs/development/backups.md) - Nightly spatie/laravel-backup on production (`backup:clean` 01:00, `backup:run` 01:30, `backup:monitor` 02:30), `BACKUP_PATH` outside the project, restore steps
 - **Development**: [Quick Start Guide](./docs/development/quick-start-guide.md)
 
 For complete guidelines, see **[AI Assistant Guide](./docs/development/ai-assistant-guide.md)**.

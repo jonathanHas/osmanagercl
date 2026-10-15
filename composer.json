@@ -18,6 +18,7 @@
         "picqer/php-barcode-generator": "^3.2",
         "setasign/fpdf": "^1.9",
         "setasign/fpdi": "^2.6",
+        "spatie/laravel-backup": "^9.3",
         "symfony/html-sanitizer": "^7.3"
     },
     "require-dev": {

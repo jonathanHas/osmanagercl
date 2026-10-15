@@ -52,6 +52,10 @@ class ScheduleTest extends TestCase
             'customers:send-statements' => '0 7 1 * *',
             // Cycle 28: till-driven gift voucher redemption.
             'vouchers:sync-till --scheduled' => '* * * * *',
+            // Nightly backup (docs/development/backups.md): prune, archive, verify.
+            'backup:clean' => '0 1 * * *',
+            'backup:run' => '30 1 * * *',
+            'backup:monitor' => '30 2 * * *',
         ];
 
         $actual = $this->scheduled();
@@ -67,7 +71,7 @@ class ScheduleTest extends TestCase
         // A new entry is fine, but it should be added here deliberately rather than
         // appearing by accident — the point of this file is that the schedule is
         // something someone has looked at.
-        $this->assertCount(9, $this->scheduled());
+        $this->assertCount(12, $this->scheduled());
     }
 
     public function test_the_kds_monitor_is_not_scheduled(): void

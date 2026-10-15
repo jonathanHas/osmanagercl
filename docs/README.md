@@ -81,6 +81,7 @@ Detailed documentation for each major feature. See **[Features Index](./FEATURES
 Guides for developers working on the project.
 
 - **[Fresh Install Guide](./development/fresh-install-guide.md)** - Complete development environment setup on a new machine
+- **[Backups](./development/backups.md)** - Nightly database + files backup on production (spatie/laravel-backup), restore steps, production setup
 - **[Quick Start Guide](./development/quick-start-guide.md)** - Get started quickly
 - **[System Requirements](./development/system-requirements.md)** - Versions and dependencies
 - **[Coding Standards](../CONTRIBUTING.md)** - Code style and best practices

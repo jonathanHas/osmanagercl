@@ -67,6 +67,16 @@ return [
             ],
         ],
 
+        // Destination for spatie/laravel-backup archives (config/backup.php).
+        // Deliberately outside base_path() so an archive is neither swept into
+        // the next file backup nor reachable from the web root. On production
+        // the directory must exist and be writable by www-data.
+        'backups' => [
+            'driver' => 'local',
+            'root' => env('BACKUP_PATH', '/var/backups/osmanager'),
+            'throw' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

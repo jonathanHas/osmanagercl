@@ -60,6 +60,16 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+
+            // Read by spatie/laravel-backup (via spatie/db-dumper) when dumping
+            // this connection. A single transaction gives a consistent snapshot
+            // without locking tables while the shop is trading.
+            'dump' => [
+                'dumpBinaryPath' => env('DB_DUMP_BINARY_PATH', '/usr/bin'),
+                'useSingleTransaction' => true,
+                'timeout' => 60 * 10,
+                'addExtraOption' => '--routines --triggers',
+            ],
         ],
 
         'mariadb' => [

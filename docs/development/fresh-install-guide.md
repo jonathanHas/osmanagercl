@@ -313,6 +313,7 @@ Supply these by hand only if you need the feature:
 | `GEMINI_API_KEY`, `MISTRAL_API_KEY` | AI invoice parsing, bank reconciliation |
 | `UDEA_USERNAME`, `UDEA_PASSWORD` | Udea supplier price scraping |
 | `MAIL_*` | Supplier sales emails, notifications |
+| `BACKUP_PATH`, `BACKUP_NOTIFICATION_EMAIL` | Nightly backups — see [Backups](./backups.md). `BACKUP_PATH` must be outside the repo (e.g. `/home/<you>/backups/osmanager`); leave the email empty on dev |
 | `ZEBRA_PRINTER_HOST`, `ZEBRA_PRINTER_PORT`, `ZEBRA_PRINTER_NAME`, `ZEBRA_PRINTER_TIMEOUT` | Label printing (LAN printer). The CUPS spool lives on `ZEBRA_PRINTER_HOST`, not on this machine — check it via the Printer Queue card on `/labels/zebra` or `lpstat -h {host}:631 -o` |
 
 ---
