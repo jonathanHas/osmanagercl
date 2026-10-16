@@ -373,7 +373,13 @@ main() {
 
     # Step 5: Install production dependencies
     log "📦 Installing production dependencies..."
-    composer install --no-dev --optimize-autoloader --no-interaction
+    # --ignore-platform-req=php: the dev machine runs PHP 8.5 and nette/schema + nette/utils cap at
+    # 8.4. This build only feeds the rsync — production re-runs composer install on its own PHP (8.3)
+    # below, which regenerates the autoloader and platform check for the real runtime.
+    if ! composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-req=php; then
+        error "composer install failed in $DEPLOY_DIR. Aborting before anything reaches production."
+        exit 1
+    fi
 
     success "Dependencies installed."
 

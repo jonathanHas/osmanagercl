@@ -1,0 +1,35 @@
+Invoice
+Bill to Ship to
+BreaDelicious Organic Bakery
+Organic Store Organic Store
+24 Radharc an Mhuilinn
+MAIN STREET MAIN STREET
+Rathwire
+CO. OFFALY CO. OFFALY
+Co. Westmeath
+Birr Co. Offaly R42 TY29 Birr Co. Offaly R42 TY29
+N91E970
+accounts@organicstore.ie IRELAND
+Registration number: IE3757130PH
+contact@breadelicious.ie
+353 857338092
+Amount due Due date Issue date Invoice number
+€171.40 18 Oct 2026 11 Oct 2026 INV0467
+View online
+Description Quantity Price Tax Amount
+Organic Multigrain Sourdough Bread 600g 12 4.80 0% 57.60
+Organic Rye Sourdough Bread 600g 2 4.80 0% 9.60
+Organic Spelt Sourdough Bread 580g 4 4.80 0% 19.20
+Organic White Sourdough Bread 600g 1 4.80 0% 4.80
+Organic Poppy Seeds Sourdough Bread 600g 2 4.80 0% 9.60
+Organic Pumpkin Seeds Sourdough Bread 600g 2 4.80 0% 9.60
+Organic Brioche Loaf 480g 8 5.20 13.5% 41.60
+Organic Brioche Buns 180g 3 2.80 13.5% 8.40
+Organic Keto Bread 820g 1 11.00 0% 11.00
+Subtotal 171.40
+Includes tax 13.5% of 5.95
+Total 171.40
+View online Amount due €171.40
+Bank Account:
+AIB
+IE00XXXX00000000000000

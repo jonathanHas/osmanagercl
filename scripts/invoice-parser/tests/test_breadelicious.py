@@ -43,6 +43,13 @@ def xero_zero_qty():
 
 
 @pytest.fixture(scope='module')
+def xero_new_template():
+    """INV-0467, 2026-10-11. Xero's newer template: bare quantities, "0%" tax labels,
+    "Includes tax 13.5% of", and an icon-font glyph in place of the invoice-number hyphen."""
+    return parse('2026-10-11_xero_new_template.txt')
+
+
+@pytest.fixture(scope='module')
 def fakturownia():
     """2025/1760, 2025-12-28. Legacy layout with an explicit VAT summary table."""
     return parse('2025-12-28_fakturownia.txt')
@@ -97,6 +104,26 @@ def test_xero_handles_zero_quantity_lines_with_no_tax_column(xero_zero_qty):
     assert 'Parse_Warnings' not in xero_zero_qty
 
 
+def test_xero_new_template_header(xero_new_template):
+    # pdfplumber returns "INV\ue0880467"; the glyph must be read as the hyphen
+    assert xero_new_template['Invoice Number'] == 'INV-0467'
+    # Header row reads due date 18 Oct 2026 then issue date 11 Oct 2026
+    assert xero_new_template['Invoice Date'] == '11/10/2026'
+    assert xero_new_template['Credit Note'] is False
+
+
+def test_xero_new_template_buckets(xero_new_template):
+    # Seven 0% lines with bare integer quantities, including the 11.00 keto loaf
+    assert xero_new_template['VAT 0%'] == '121.40'
+    # Brioche 41.60 + 8.40 = 50.00 gross, less the stated 5.95
+    assert xero_new_template['VAT 13.5%'] == '44.05'
+    assert xero_new_template['VAT Amounts']['13.5'] == 5.95
+    assert xero_new_template['Total_VAT'] == 5.95
+    # "Total 171.40", not "Subtotal 171.40" or "Amount due"
+    assert xero_new_template['Total'] == '171.40'
+    assert 'Parse_Warnings' not in xero_new_template
+
+
 def test_fakturownia_layout_still_parses(fakturownia):
     assert fakturownia['Invoice Number'] == '2025/1760'
     assert fakturownia['Invoice Date'] == '28/12/2025'
@@ -112,6 +139,7 @@ def test_fakturownia_layout_still_parses(fakturownia):
     '2026-08-09_xero.txt',
     '2026-07-12_xero_credit_line.txt',
     '2026-08-03_xero_zero_qty.txt',
+    '2026-10-11_xero_new_template.txt',
     '2025-12-28_fakturownia.txt',
 ])
 def test_every_fixture_reconciles_net_plus_vat_to_total(fixture):

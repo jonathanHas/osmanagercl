@@ -698,17 +698,21 @@ See [Delivery System Documentation](./delivery-system.md) for details.
 
 ### BreaDelicious Invoice Parser
 
-`scripts/invoice-parser/parsers/breadelicious.py` handles **two layouts**, because BreaDelicious
-changed invoicing software between 2026-06-28 and 2026-07-06. Both remain in the archive, so the
-parser dispatches on the text: `Issue date:` means the legacy layout, otherwise the current one.
+`scripts/invoice-parser/parsers/breadelicious.py` handles **three layouts**. BreaDelicious
+changed invoicing software between 2026-06-28 and 2026-07-06, and Xero changed its invoice
+template again by 2026-10-11 (INV-0467). All remain in the archive, so the parser dispatches on the
+text: `Issue date:` (with the colon) means Fakturownia, otherwise one shared Xero code path whose
+regexes accept both Xero templates.
 
-| | Fakturownia (to 2026-06-28) | Xero (from 2026-07-06) |
-|---|---|---|
-| Date | `Issue date: 2025-12-28` | `InvoiceDate` with `9Aug2026` on the next line |
-| Invoice number | `2026/0829` | `INV-0180` |
-| Line amounts | net | **VAT-inclusive** |
-| VAT | explicit `Net / Rate / VAT / Gross` summary table | stated once as `INCLUDES SALES ON TAX 13.5%` |
-| Total | `Total gross price EUR` | `TOTAL EUR` |
+| | Fakturownia (to 2026-06-28) | Xero (2026-07-06 →) | Xero new template (2026-10-11 →) |
+|---|---|---|---|
+| Date | `Issue date: 2025-12-28` | `InvoiceDate` with `9Aug2026` on the next line | `Due date  Issue date` header row, `18 Oct 2026  11 Oct 2026` beneath |
+| Invoice number | `2026/0829` | `INV-0180` | `INV`+icon-font glyph+`0467` (U+E088 in place of the hyphen) |
+| Quantity | — | 2dp (`6.00`) | bare (`12`) |
+| Tax label | — | `13.5%` / `Taxon` | `13.5%` / `0%` |
+| Line amounts | net | **VAT-inclusive** | **VAT-inclusive** |
+| VAT | explicit `Net / Rate / VAT / Gross` summary table | stated once as `INCLUDES SALES ON TAX 13.5%` | stated once as `Includes tax 13.5% of 5.95` |
+| Total | `Total gross price EUR` | `TOTAL EUR` | `Total` (after `Subtotal`) |
 
 Points that matter when this layout changes again:
 
@@ -716,7 +720,9 @@ Points that matter when this layout changes again:
   zero-rated bread (which wraps, so only `Taxon` lands on the item line once pdfplumber strips
   intra-word spaces), and is **absent entirely** on zero-quantity lines.
 - Credit lines are parenthesised: `(4.80)` means −4.80.
-- Because every line amount is gross, the buckets must sum to `TOTAL EUR`. The parser asserts this
+- On the new template the issue date is taken as the last date before the invoice number (the
+  due date precedes it on the same row), falling back to the earliest date — same rule as Beechlawn.
+- Because every line amount is gross, the buckets must sum to `TOTAL EUR` / `Total`. The parser asserts this
   and, on a mismatch, assigns the difference to 0% and emits a `Parse_Warnings` entry, which drops
   confidence to 0.50 so the file lands in review rather than importing silently.
 

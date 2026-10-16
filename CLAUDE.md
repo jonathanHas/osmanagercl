@@ -268,3 +268,9 @@ php artisan optimize:clear     # Clear caches
 
 For complete guidelines, see **[AI Assistant Guide](./docs/development/ai-assistant-guide.md)**.
 
+
+
+## Project notes vault
+
+Local setup, gotchas and a dated history for this project live outside the repo, in Claude's Obsidian vault:
+`~/Documents/Obsidian/Claude/projects/osmanagercl.md`. Read it at the start of a session, and after substantive work add a dated Log entry there (see `~/Documents/Obsidian/Claude/Conventions.md`). Credentials are never stored in the vault.

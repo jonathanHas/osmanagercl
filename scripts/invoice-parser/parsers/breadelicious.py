@@ -5,24 +5,45 @@ import datetime
 # Amounts may be negative and are shown in parentheses on the Xero layout: (4.80)
 NUMBER = r'\(?-?[\d,]+\.\d{2}\)?'
 
+# Quantities are 2dp on the 2026-07 Xero template (6.00) but bare on the 2026-10 one (12)
+QUANTITY = r'\(?-?[\d,]+(?:\.\d+)?\)?'
+
 # <description> <qty> <unit price> [<tax>] <amount>
 # The tax column is absent on zero-quantity lines, and "Tax on Sales" wraps so that
 # only "Taxon" lands on the item line (pdfplumber strips intra-word spaces).
 LINE_ITEM_RE = re.compile(
     r'^(?P<desc>.*?)\s+'
-    r'(?P<qty>' + NUMBER + r')\s+'
+    r'(?P<qty>' + QUANTITY + r')\s+'
     r'(?P<price>' + NUMBER + r')\s+'
     r'(?:(?P<tax>\d+(?:\.\d+)?%|Taxon|ZeroRated|Exempt|NoVAT)\s+)?'
     r'(?P<amount>' + NUMBER + r')$'
 )
 
-# "INCLUDES SALES ON TAX 13.5%  2.86" — the VAT already contained in the line amounts
+# The VAT already contained in the line amounts, matched against space-stripped text:
+#   2026-07 template: "INCLUDES SALES ON TAX 13.5%  2.86"
+#   2026-10 template: "Includes tax 13.5% of 5.95"
 INCLUDES_TAX_RE = re.compile(
-    r'INCLUDES\s*SALES\s*ON\s*TAX\s*(\d+(?:\.\d+)?)%\s*(' + NUMBER + r')',
+    r'INCLUDES\s*(?:SALES\s*ON\s*)?TAX\s*(\d+(?:\.\d+)?)%\s*(?:OF\s*)?(' + NUMBER + r')',
     re.IGNORECASE
 )
 
-TOTAL_RE = re.compile(r'TOTAL\s*EUR\s*(' + NUMBER + r')', re.IGNORECASE)
+# "TOTAL EUR 96.00" (2026-07) or "Total 171.40" (2026-10), on a line of its own so that
+# "Subtotal" never matches. Matched against space-stripped text.
+TOTAL_RE = re.compile(r'^TOTAL(?:EUR)?(' + NUMBER + r')$', re.IGNORECASE | re.MULTILINE)
+
+# The 2026-10 template sets the hyphen in an icon font, so pdfplumber returns a
+# private-use character in its place: "INV\ue0880467"
+INVOICE_NUMBER_RE = re.compile(r'\bINV[^\w\s]?(\d+)')
+
+# "11 Oct 2026" on the 2026-10 template; month map rather than %b so "Sept" parses
+DATE_RE = re.compile(r'\b(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})\b')
+MONTHS = {
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+}
+
+# Zero-width characters that some extractors leave in front of the header values
+INVISIBLE_RE = re.compile('[\u200b-\u200d\ufeff]')
 
 # Map a rate as printed on the invoice onto the four buckets Laravel understands
 RATE_KEYS = {'0': '0', '9': '9', '13.5': '13.5', '23': '23'}
@@ -55,34 +76,60 @@ def _empty_buckets():
     return {'0': 0.0, '9': 0.0, '13.5': 0.0, '23': 0.0}
 
 
-def _parse_xero_date(text):
-    """Xero prints 'InvoiceDate' with the date on the following line: '9Aug2026'."""
+def _parse_xero_date(text, reference_match):
+    """
+    The 2026-07 template prints 'InvoiceDate' with the date on the following line:
+    '9Aug2026'. The 2026-10 one has an 'Amount due / Due date / Issue date / Invoice
+    number' header row with '18 Oct 2026  11 Oct 2026  INV-0467' beneath it, so the
+    issue date is the last date before the invoice number, falling back to the earliest
+    date in the document.
+    """
     match = re.search(r'InvoiceDate.*?\n(\d{1,2}[A-Za-z]{3}\d{4})', text, re.DOTALL)
     if not match:
         match = re.search(r'InvoiceDate\s*(\d{1,2}[A-Za-z]{3}\d{4})', text)
-    if not match:
+    if match:
+        raw = match.group(1)
+        try:
+            return datetime.datetime.strptime(raw, '%d%b%Y').strftime('%d/%m/%Y')
+        except ValueError:
+            return raw
+
+    dates = []
+    for date_match in DATE_RE.finditer(text):
+        key = date_match.group(2)[:3].lower()
+        if key not in MONTHS:
+            continue
+        try:
+            parsed = datetime.date(int(date_match.group(3)), MONTHS[key], int(date_match.group(1)))
+        except ValueError:
+            continue
+        dates.append((date_match.start(), parsed))
+
+    if not dates:
         return 'Not found'
-    raw = match.group(1)
-    try:
-        return datetime.datetime.strptime(raw, '%d%b%Y').strftime('%d/%m/%Y')
-    except ValueError:
-        return raw
+    if reference_match:
+        before = [date for position, date in dates if position < reference_match.start()]
+        if before:
+            return before[-1].strftime('%d/%m/%Y')
+    return min(date for _, date in dates).strftime('%d/%m/%Y')
 
 
 def _parse_xero(text, filename, warnings):
     """
-    Xero layout, in use since 2026-07-06.
+    Xero layouts: the original template from 2026-07-06, and Xero's newer one seen from
+    2026-10-11 (INV-0467). Both share the same column order and arithmetic.
 
     Line amounts are VAT-INCLUSIVE and the VAT contained in them is stated once per
-    rate as "INCLUDES SALES ON TAX 13.5%". That stated figure is rounded per line by
-    Xero, so it must be used verbatim rather than recomputed from the aggregate net.
+    rate as "INCLUDES SALES ON TAX 13.5%" / "Includes tax 13.5% of". That stated figure
+    is rounded per line by Xero, so it must be used verbatim rather than recomputed from
+    the aggregate net.
     """
-    invoice_date = _parse_xero_date(text)
-    print(f"[DEBUG] Invoice Date: {invoice_date}", file=sys.stderr)
-
-    inv_match = re.search(r'INV-(\d+)', text)
+    inv_match = INVOICE_NUMBER_RE.search(text)
     invoice_number = f"INV-{inv_match.group(1)}" if inv_match else 'Not found'
     print(f"[DEBUG] Invoice Number: {invoice_number}", file=sys.stderr)
+
+    invoice_date = _parse_xero_date(text, inv_match)
+    print(f"[DEBUG] Invoice Date: {invoice_date}", file=sys.stderr)
 
     total_match = TOTAL_RE.search(text.replace(' ', ''))
     total_amount = _amount(total_match.group(1)) if total_match else 0.0
@@ -102,7 +149,7 @@ def _parse_xero(text, filename, warnings):
         if not line:
             continue
         stripped = line.replace(' ', '')
-        if stripped.upper().startswith('INCLUDES') or stripped.upper().startswith('TOTALEUR'):
+        if stripped.upper().startswith(('INCLUDES', 'TOTAL', 'SUBTOTAL')):
             continue
         match = LINE_ITEM_RE.match(line)
         if not match:
@@ -207,12 +254,14 @@ def parse_invoice(text, filename):
     """
     Parser for BreaDelicious Organic Bakery invoices.
 
-    Two layouts are in circulation: Fakturownia up to 2026-06-28, and Xero from
-    2026-07-06 onwards. The Xero one prices everything VAT-inclusive.
+    Layouts in circulation: Fakturownia up to 2026-06-28, then Xero from 2026-07-06,
+    whose template changed again by 2026-10-11. Both Xero templates price everything
+    VAT-inclusive. Only Fakturownia prints "Issue date:" with a colon.
     """
     print(f"[DEBUG] Parsing BreaDelicious invoice: {filename}", file=sys.stderr)
 
     try:
+        text = INVISIBLE_RE.sub('', text)
         warnings = []
         if 'Issue date:' in text:
             print("[DEBUG] Layout: Fakturownia (legacy)", file=sys.stderr)
