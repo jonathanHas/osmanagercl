@@ -106,7 +106,7 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center space-x-4">
                                 <span id="selection-count" class="text-blue-100 font-medium">0 invoices selected</span>
-                                <span id="selection-total" class="text-blue-200 text-sm">Total: €0.00</span>
+                                <span id="selection-total" class="text-blue-200 text-3xl font-semibold">Total: €0.00</span>
                             </div>
                             <div class="flex space-x-2">
                                 <button id="mark-paid-btn" 
