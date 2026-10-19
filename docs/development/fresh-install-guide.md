@@ -502,6 +502,16 @@ pip install -r requirements.txt
 deactivate
 ```
 
+**Ubuntu 26.04 / Python 3.14 (dev machines):** the pinned numpy, pandas and pillow have no 3.14
+wheels and the distro ships no `venv`/`pip`. Use a uv-managed CPython 3.12 installed outside
+`/home` (Apache cannot read `/home/<user>`): install uv
+(`curl -LsSf https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh`), run
+`uv python install 3.12 --install-dir /var/www/html/uv-python`, then
+`/var/www/html/uv-python/cpython-3.12.*-linux-x86_64-gnu/bin/python3.12 -m venv venv` and
+`venv/bin/pip install -r requirements.txt` as above. `pypdfium2` is not pinned and resolves to 5.x;
+`venv/bin/pip install pypdfium2==4.30.0` matches production. Production stays on the distro
+Python 3.12.
+
 Requires `tesseract-ocr`, `poppler-utils` and `libreoffice` from section 1.
 
 ---

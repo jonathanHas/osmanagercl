@@ -6,16 +6,18 @@ see [`planimp.md`](./planimp.md) (a copy of `docs/planImp/planimp.md` with
 paths pointing here). The Planner keeps this file current; a fresh session
 reads it before touching deposit code.
 
-## Where things stand (2026-10-03)
+## Where things stand (2026-10-17)
 
 | | |
 |---|---|
-| Current task | none. **Cycle 3 (go live) ACCEPTED 2026-10-05**; to archive to `archive/2026-10-05-cycle-3-go-live/`. The production rollout is now the owner's runbook (`docs/features/barrel-deposit-tracking.md`, "Going live on production"). Next: cycle 4, the deposit float reconciliation |
+| Current task | **Side plan `plan-browser-mcp.md` READY** (the Implementer tests through the Playwright MCP; `mint.php --playwright`, README, first run of the tools). **Cycle 4 ACCEPTED 2026-10-17** after five revisions; to archive to `archive/2026-10-17-cycle-4-price-review/` and **commit**. `/deposits` is the owner's layout 2a in the Modernist design system with the one-step Confirm (Keep / −deposit / typed price), Undo, landed-cost markup, till-line price history, 93 deposit tests. Next: cycle 5, the float report |
+| Cycle 3 archive | `archive/2026-10-05-cycle-3-go-live/` (moved 2026-10-17). Open owner items from its review: SOP shelf-label sentence; dev till restart + juice scan (moot: the dev POS was rebuilt from production and has no till install) |
 | Cycle 3 | `deposits:install-till [--check|--rollback|--force]` (`DepositTillInstaller`, writes only `RESOURCES`); deployable scripts `resources/pos/deposit/`; `import_data.deposit_reconciliation` shown on the delivery page; `/deposits` add card shows the pick; runbook + SOP draft `docs/deposit/sop-bottle-deposits.md` |
 | Cycle 2 | Parsers emit `barrel_code` (country-code rule plus a fallback scoped to the docket's barrels section); `delivery_items.barrel_code`; `deposit_sightings`, `product_deposits`; `/deposits` screen; `DepositEvidenceService`, `DepositPosService`, `PosProductAttributes`; `deposits:backfill-delivery-items`, `deposits:refresh-suggestions`, `deposits:sync-pos [--dry-run|--check]`; delivery import hook. Dev state: 679 sightings, 56 mapped products (4 confirmed by the owner), tiers 313 / 315 / 9936 on, 4 till products carrying attributes |
 | Cycle 1 | Automatic deposit line on the test till: ACCEPTED 2026-10-03, uncommitted. Six `DEP-*` products (ids in the archived `implemented.md`), category `Bottle Deposits` `c8936170-…`, `script.Deposit.AddLine` / `script.Deposit.Change`, `Ticket.Buttons` wired; all left installed on the dev POS database |
-| HEAD | `36207bbf` on `feature/modularization-phase1` (cycles 1 and 2 uncommitted on top) |
-| Working tree | cycles 1 and 2 uncommitted: parsers, migrations, models, services, screen, tests, docs (see the archived `implemented.md`) plus unrelated pre-existing changes (glennon parser, `invoice_parser_laravel.py`) |
+| HEAD | `5775fbef` on `feature/modularization-phase1`; cycles 1–3 committed (commit `e8d79571`) |
+| Working tree | clean at the start of cycle 4 (plus the cycle 3 archive move) |
+| Production | deposit migrations applied; evidence commands, tier switches, `deposits:sync-pos` and `deposits:install-till` **not** run as of the 2026-10-15 backup. Runbook: `docs/features/barrel-deposit-tracking.md`, "Going live on production" |
 
 ## What already exists under the word "deposit"
 
@@ -190,7 +192,58 @@ charges them, to be confirmed with the accountant). Whether a standalone
 return ticket (negative total, cash out) is acceptable on this till is a
 till-test item.
 
-## Cycle 4 inputs (collected 2026-10-05)
+## Cycle 4 inputs (owner, 2026-10-17)
+
+- `/deposits` shows nothing under suggested or confirmed on this machine: the
+  database is production's and production never ran the evidence steps. The
+  Implementer runs them on dev (plan step 1); the owner runs them on production.
+- The owner is not sure which bottled products already had their shelf price
+  raised to cover unreturned bottles. Before the till adds the deposit on top,
+  each deposit product's price is reviewed on `/deposits`: current gross and
+  net, latest Udea docket cost and markup, the last lasting price step from
+  `sales_daily_summary` with the cost before it, Udea's advice price
+  (`delivery_items.sale_price`, dockets from 2026-04-16). Decision per row:
+  Keep, or Lower by the deposit (writes `PRICESELL` through the product-page
+  recipe and logs a `LabelLog` price update). Recorded on `product_deposits`.
+- Example found while planning: Your Organic Nature Lime juice 200ml, net
+  1.99 from 2024-01 to 2025-11, 2.70 since 2025-12-27 (+0.71) while Udea's
+  cost moved 1.31 → 1.36.
+- The redesign (2026-10-17): Claude Design project "Incomplete request", file
+  `Bottle Deposits Review.dc.html`, option **2a**, read through the design MCP
+  (`claude mcp add --scope user --transport http claude-design https://api.anthropic.com/v1/design/mcp`,
+  then `/design-login` and `/design-consent` in a new session). Planner
+  decisions on it are in `plan.md`, "Revision 3": Tailwind not the Modernist
+  stylesheet, default choice Keep, bulk confirms never change prices, Undo
+  restores the price, Last-price-change kept under the Price cell, status
+  filter kept, delivery % in `app_settings` (`deposits.delivery_pct`).
+- The owner prefers the Modernist look (Archivo, red accent #ec3013, zero
+  radius, 2px rules) to the app's Tailwind styling and may want it elsewhere
+  later; `/deposits` is the first page on it. Dark mode is not supported by
+  the system: the page keeps a light ground.
+- Hidden inputs positioned `absolute` (the system's `.seg-opt input`, Tailwind's
+  `sr-only`) need a positioned ancestor inside the admin shell: `<main>` scrolls,
+  not the document, so an unpositioned hidden radio sits against the viewport,
+  stretches the window, and focusing it on click scrolls the shell away.
+  `.ds-modernist` is `position: relative` for this reason. Scripted
+  `element.click()` does not move focus and will not show it; `clicks.mjs`
+  sends real pointer events.
+- Headless Google Chrome is at `/usr/bin/google-chrome` on this machine and
+  the Implementer can mint a logged-in session for user 1 and drive the real
+  page over the DevTools protocol (scripts kept from Revision 4 in
+  `docs/deposit/scripts/browser/`). Plans can now ask for real browser checks
+  with console output instead of leaving them to the owner.
+- Discounts at the till: a discounted line carries `product.name` ending
+  ` - 5%` / ` - 10%` in `TICKETLINES.ATTRIBUTES` and no `product.barcode`;
+  `TICKETLINES.PRICE` is the discounted net price. `sales_daily_summary.avg_price`
+  therefore mixes discounted and full-price sales; use the lines for price
+  history (Revision 2). Some products sell discounted almost every time
+  (Landpark Carbonated Lemon).
+- Ommelanden Buttermilk 1l is already on the till at net 2.50 while every
+  sale since June was at 2.80: lowering has started by hand somewhere.
+- New Udea deposit code since cycle 3: `322` "Fles groot statiegeld NL"
+  €0.25 (6 lines). Shown on the tiers card; left off until the owner decides.
+
+## Cycle 5 inputs (collected 2026-10-05; the float report)
 
 - The deposit float report: charged at the till (lines on `DEP-*` products,
   grouped by **tier**, not till product) vs refunded (`DEP-*-RET`) vs Udea's
@@ -260,6 +313,23 @@ from the project:
    (the voucher POS product service is the pattern), never by hand in the POS
    database, so the mapping between tier and till product stays in the app.
 
+## Browser checks
+
+Two ways, both dev only:
+
+1. **Playwright MCP** (preferred for an Implementer session): `.mcp.json` at the
+   repo root registers `playwright` (headless Chrome at `/usr/bin/google-chrome`,
+   isolated profile, logged in through the storage-state file
+   `~/.cache/osmanagercl/playwright-state.json` that `mint.php --playwright`
+   writes). A session in this repo approves the server once and gets the
+   `mcp__playwright__browser_*` tools. Screenshots: absolute paths under the
+   session scratchpad. Login page instead of the app → re-mint, `browser_close`.
+2. **DevTools scripts** in `docs/deposit/scripts/browser/` for measured checks
+   (row heights, computed styles, real-pointer clicks, flows).
+
+Plans should ask for the browser check explicitly (what to click, what to
+read back, console clean) and expect the tool output pasted into the report.
+
 ## Kickoff prompts
 
 Planner:
@@ -282,6 +352,7 @@ Read docs/deposit/planimp.md. You are the Planner. Review docs/deposit/implement
 - `planimp.md` — the protocol
 - `README.md` — this file, Planner-owned working notes
 - `plan.md` — Planner-owned
+- `plan-<slug>.md` / `implemented-<slug>.md` — side plans (currently `plan-browser-mcp.md`)
 - `implemented.md` — Implementer-owned
 - `archive/YYYY-MM-DD-<slug>/` — accepted cycles (created on first acceptance)
 - `findings/` — things found after a cycle is accepted (created when needed)

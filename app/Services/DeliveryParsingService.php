@@ -360,6 +360,8 @@ class DeliveryParsingService
                 'Tax' => $item['tax'] ?? 0,
                 'Value' => $item['line_total'] ?? 0,
                 'Price_Valid' => ($item['price_valid'] ?? true) ? '✓' : '✗',
+                'price_valid' => (bool) ($item['price_valid'] ?? true),
+                'price_note' => $item['price_note'] ?? null,
                 'is_weight_based' => $item['is_weight_based'] ?? false,
                 'weight_per_unit' => $item['weight_per_unit'] ?? null,
                 'weight_unit' => $item['weight_unit'] ?? null,

@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--executable-path",
+        "/usr/bin/google-chrome",
+        "--headless",
+        "--isolated",
+        "--storage-state",
+        "/home/jon/.cache/osmanagercl/playwright-state.json",
+        "--viewport-size",
+        "1600x1000",
+        "--console-level",
+        "warning",
+        "--output-dir",
+        "/tmp/claude-playwright"
+      ],
+      "env": {}
+    }
+  }
+}

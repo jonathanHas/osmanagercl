@@ -26,11 +26,13 @@ Feature docs: `docs/features/shop-mode.md` (Shop screens, camera scanning,
 find by name), `docs/features/delivery-system.md` (the `/deliveries` flow),
 `docs/features/delivery-scanning-enhancements-2025-08-05.md`.
 
-## Where things stand (2026-10-08)
+## Where things stand (2026-10-19, evening)
 
 | | |
 |---|---|
-| Current task | **Cycle 3** — correct quantities from the delivery summary, with the correction card shared between the scan and summary screens (`plan.md`, READY 2026-10-08; owner's request). Accepted and committed: **cycle 1** (outer barcode link with confirmation, `90000850`, `archive/2026-10-08-link-outer-barcode/`), **cycle 2** (instant correction card, Shop PATCH without financials, `getScannedNotOnInvoice()` rewritten around the POS collation trap, `4d023aa8`, `archive/2026-10-08-correction-card-speed/`) |
+| Side plan | **`plan-price-check.md` ACCEPTED 2026-10-19** (to archive to `archive/2026-10-19-price-check/` with the 4804899 finding file; 11 code files uncommitted, includes a migration): the Udea parser repairs a case size glued to the content by pdfplumber when the line total identifies it (`4012,50gram` → 40 × 12,50 gram; 10 of the 31 price-check failures in all 147 stored Udea dockets, 0 false repairs), and a line that still fails the check is stored on the item (`price_valid`, `price_note`), badged on the delivery page and listed with every parser warning in `import_data.parser_warnings`. Cause: dev delivery 166 imported Vivani `5004102` as 401 units at €0.0489; the preview listed the warning but nothing kept it. Done and verified: dev delivery 168 is the re-import (Vivani row 40 × €0.49). Also removed the three `x-collapse` directives on the delivery page (plugin not installed). Parser tests now 212 |
+| Earlier side plan | **`plan-dev-parser-venv.md` ACCEPTED 2026-10-19** (dev machine only, to archive to `archive/2026-10-19-dev-parser-venv/`): `scripts/invoice-parser/venv` now exists on dev, built from a uv-managed CPython 3.12.15 under `/var/www/html/uv-python`, pins matching production; the PDF import on `/deliveries/create` works again (delivery 165 is the proof run). Follow-up side plan worth writing: "parser environment checks" (make `invoice:test-parser` / `checkConfiguration()` test the venv interpreter, pin `pypdfium2==4.30.0` in `requirements.txt`). Parser warnings on that order are in `findings/2026-10-19-udea-order-4804899-parser-warnings.md` |
+| Current task | **Cycle 3** (`implemented.md` DONE 2026-10-08, committed in `e79531b7`, not yet reviewed by the Planner) — correct quantities from the delivery summary, with the correction card shared between the scan and summary screens (`plan.md`, READY 2026-10-08; owner's request). Accepted and committed: **cycle 1** (outer barcode link with confirmation, `90000850`, `archive/2026-10-08-link-outer-barcode/`), **cycle 2** (instant correction card, Shop PATCH without financials, `getScannedNotOnInvoice()` rewritten around the POS collation trap, `4d023aa8`, `archive/2026-10-08-correction-card-speed/`) |
 | HEAD | `4d023aa8` on `feature/modularization-phase1` (cycles 1 and 2 committed; `4d023aa8` also carries another session's product-form edits, which the owner swept in) |
 | Working tree | clean apart from this folder (the cycle 2 archive move is staged). The Implementer records the baseline `git status --short` all the same |
 | Test baseline | `php artisan test` → **15 failed, 1042 passed** (2026-10-08, after cycle 2). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → 59 passed |
@@ -128,6 +130,22 @@ Column collations on the POS: `deliveriesScanItems.barcode` and `PRODUCTS.CODE` 
   by the owner in their own tab or measured over SSH.
 
 ## Open items
+
+- Udea parser: a variable-weight line with the quantity glued to the weight
+  (`530144 1 1 122,70kilogramCashews …`, two dockets) parses with SKU 122.70 and
+  fails the price check; `_preprocess_line`'s weight rules do not cover it.
+  Found in the 2026-10-19 sweep, not in `plan-price-check.md`.
+- The `import_warnings` session flash set in `DeliveryController::storePdf()` is
+  read by no view (dead code; `unparsed_lines` is persisted instead).
+- Hardening for `_repair_glued_case_size()`: reject a repair whose leftover
+  digits start with `0` (cannot be the start of a content number except a
+  weight). No such line in the 13,129 checked on 2026-10-19; one-line change
+  plus a test when the parser is next touched.
+- `DeliveryController::destroy()` deletes the delivery's rows but not its
+  document files: `storage/app/private/deliveries/2026/10/166/` and `167/`
+  hold four orphaned PDFs each from the price-check re-imports on dev.
+- Deposit reconciliation is empty on every multi-PDF import (the owner's normal
+  Udea case): see `docs/deposit/findings/2026-10-19-multi-pdf-deposit-reconciliation.md`.
 
 - Correction card edge cases left by cycle 2: a flush deferred behind a scan
   in flight reads the card's current value, so a row switch plus a tap

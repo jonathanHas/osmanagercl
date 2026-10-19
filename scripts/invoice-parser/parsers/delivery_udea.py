@@ -361,6 +361,46 @@ class DeliveryUdeaParser:
 
         return False, calculated_total
 
+    def _repair_glued_case_size(self, parsed: Dict[str, str]) -> Optional[str]:
+        """Repair a case size glued to the content by pdfplumber.
+
+        "5004102 1 1 4012,50gram ..." reads SKU 401 and content "2,50"; the
+        line total (1 × 0.49 × 40 = 19.60) identifies the real case size 40.
+        Mutates parsed["SKU"] and parsed["Content"] and returns a note, or
+        returns None when the line passes the price check or the rule does
+        not apply.
+        """
+        if parsed.get("is_weight_based"):
+            return None
+        try:
+            qty = float(parsed["Qty"])
+            price = float(parsed["Price"]) if parsed.get("Price") else 0.0
+            total = float(parsed["Total"]) if parsed.get("Total") else 0.0
+            sku_str = (parsed.get("SKU") or "").strip()
+            sku = float(sku_str) if sku_str else 1.0
+        except (ValueError, KeyError):
+            return None
+
+        if self._validate_price(qty, price, sku, total)[0]:
+            return None
+        if qty <= 0 or price <= 0 or total <= 0 or not sku_str.isdigit():
+            return None
+
+        n = round(total / (qty * price))
+        if n < 1 or abs(qty * price * n - total) > self.calculation_tolerance:
+            return None
+        n_str = str(n)
+        if sku_str == n_str or not sku_str.startswith(n_str):
+            return None
+
+        leftover = sku_str[len(n_str):]
+        parsed["SKU"] = n_str
+        parsed["Content"] = leftover + (parsed.get("Content") or "")
+        return (
+            f"case size read as {sku_str}; {qty:g}×{price:g}×{n}={qty * price * n:.2f} "
+            f"matches the line total, using {n}"
+        )
+
     def _calculate_unit_cost(self, qty: float, sku: float, total: float) -> float:
         """
         Calculate unit cost from total.
@@ -706,6 +746,8 @@ class DeliveryUdeaParser:
                 if parsed:
                     try:
                         code = parsed["Code"]
+                        # Repair a glued case size before SKU and Content are read
+                        repair_note = self._repair_glued_case_size(parsed)
                         ordered = int(parsed["Ordered"])
                         qty = int(parsed["Qty"])
                         sku = float(parsed["SKU"]) if parsed["SKU"] else 1.0
@@ -737,6 +779,7 @@ class DeliveryUdeaParser:
                         # Validate price calculation
                         # For weight-based: total_weight × price = total
                         # For regular: qty × price × sku = total
+                        price_note = None
                         if is_weight_based and total_weight:
                             calculated_total = total_weight * price
                             is_valid = abs(calculated_total - total) < 0.10
@@ -745,17 +788,22 @@ class DeliveryUdeaParser:
                                 result["warnings"].append(
                                     f"Price mismatch for {code}: {total_weight:.3f}kg×{price}={calculated_total:.2f}, actual={total:.2f}"
                                 )
+                                price_note = f"{total_weight:.3f}kg×{price}={calculated_total:.2f}, line total {total:.2f}"
                             else:
                                 self.stats['price_validations_passed'] += 1
                         else:
                             is_valid, calculated_total = self._validate_price(qty, price, sku, total)
                             if is_valid:
                                 self.stats['price_validations_passed'] += 1
+                                if repair_note:
+                                    price_note = repair_note
+                                    result["warnings"].append(f"Case size repaired for {code}: {repair_note}")
                             else:
                                 self.stats['price_mismatches'] += 1
                                 result["warnings"].append(
                                     f"Price mismatch for {code}: {qty}×{price}×{sku}={calculated_total:.2f}, actual={total:.2f}"
                                 )
+                                price_note = f"{qty}×{price:g}×{sku:g}={calculated_total:.2f}, line total {total:.2f}"
 
                         # Calculate unit cost
                         # For weight-based: unit_cost = price per kg (already in 'price')
@@ -787,6 +835,8 @@ class DeliveryUdeaParser:
                             "rsp": sale,
                             "line_total": total,
                             "price_valid": is_valid,
+                            "price_note": price_note,
+                            "case_size_repaired": bool(repair_note) and is_valid,
                             "is_weight_based": is_weight_based,
                             "weight_per_unit": weight_per_unit,
                             "weight_unit": weight_unit,

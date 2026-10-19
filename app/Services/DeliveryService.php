@@ -10,6 +10,7 @@ use App\Models\Supplier;
 use App\Models\SupplierLink;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use League\Csv\Reader;
 
 class DeliveryService
@@ -163,6 +164,10 @@ class DeliveryService
 
                     // Total cost is the line value
                     'total_cost' => $lineTotal,
+
+                    // Parser price check (Qty × Price × SKU = line total)
+                    'price_valid' => array_key_exists('price_valid', $record) ? (bool) $record['price_valid'] : null,
+                    'price_note' => isset($record['price_note']) ? Str::limit((string) $record['price_note'], 250) : null,
 
                     // Product linking
                     'product_id' => $product?->ID,
@@ -1007,6 +1012,24 @@ class DeliveryService
                 'warnings' => array_values(array_filter($warnings, fn ($w) => is_string($w) && str_starts_with($w, 'Deposit code'))),
                 'checked_at' => now()->toDateTimeString(),
             ],
+        ]);
+        $delivery->save();
+    }
+
+    /**
+     * Keep every parser warning on the delivery (import_data.parser_warnings),
+     * so the delivery page can list them after the preview is gone.
+     */
+    public function recordParserWarnings(Delivery $delivery, array $warnings): void
+    {
+        $warnings = array_values(array_filter($warnings, 'is_string'));
+
+        if ($warnings === []) {
+            return;
+        }
+
+        $delivery->import_data = array_merge($delivery->import_data ?? [], [
+            'parser_warnings' => $warnings,
         ]);
         $delivery->save();
     }

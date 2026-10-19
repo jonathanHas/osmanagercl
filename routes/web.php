@@ -719,6 +719,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/deposits/products/confirm-all', [DepositController::class, 'confirmAll'])->name('deposits.products.confirm-all');
         Route::patch('/deposits/products/{productDeposit}', [DepositController::class, 'updateProduct'])->name('deposits.products.update');
         Route::delete('/deposits/products/{productDeposit}', [DepositController::class, 'destroyProduct'])->name('deposits.products.destroy');
+        Route::patch('/deposits/products/{productDeposit}/price', [DepositController::class, 'priceReview'])->name('deposits.products.price');
+        Route::patch('/deposits/settings', [DepositController::class, 'updateSettings'])->name('deposits.settings');
         Route::post('/deposits/refresh', [DepositController::class, 'refresh'])->name('deposits.refresh');
         Route::post('/deposits/sync', [DepositController::class, 'sync'])->name('deposits.sync');
     });

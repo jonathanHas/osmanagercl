@@ -464,6 +464,8 @@ The system supports direct parsing of supplier delivery invoice PDFs, eliminatin
   - Qty × Price × SKU price validation
   - High confidence scoring (typically 99-100%)
 
+**Price check and glued case sizes (2026-10-19).** pdfplumber sometimes drops the space between the case size and the content (`4012,50gram` for 40 × 12,50 gram), so the line reads as 401 units. When a non-weight line fails the price check, `_repair_glued_case_size()` takes `n = round(total / (qty × price))`; if `qty × price × n` matches the line total within 0.015 and the parsed case size is all digits, starts with `n` and is not `n`, the case size becomes `n` and the leftover digits go back on the front of the content. The repaired line passes the check and adds a `Case size repaired for <code>: …` warning. A line that still fails (usually a supplier discount) keeps `unit_cost = total / units` and is flagged, not corrected. Each item row stores the result in `delivery_items.price_valid` (true / false; `NULL` for CSV, XLSX and manually added items, which are not checked) and `delivery_items.price_note` (the arithmetic, or the repair note). Every parser warning of a PDF import is kept in `deliveries.import_data.parser_warnings`, and the delivery page lists them in a **Parser warnings** block (with counts of failed checks and repaired case sizes) and marks the items with a red `Price check` or blue `Case size repaired` badge in the Invoiced cell. Deposit-code warnings are left out of that block when the Barrels/Deposits block lists them. The import preview colours a failing row's Units red and marks a repaired one.
+
 ### Technical Implementation
 
 #### Service Layer

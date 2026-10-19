@@ -27,6 +27,14 @@ class ProductDeposit extends Model
 
     public const SOURCE_MANUAL = 'manual';
 
+    public const PRICE_KEPT = 'kept';
+
+    public const PRICE_LOWERED = 'lowered';
+
+    public const PRICE_SET = 'set';
+
+    public const PRICE_REVIEWS = [self::PRICE_KEPT, self::PRICE_LOWERED, self::PRICE_SET];
+
     protected $fillable = [
         'product_id',
         'product_code',
@@ -42,6 +50,10 @@ class ProductDeposit extends Model
         'pos_synced_at',
         'pos_sync_error',
         'notes',
+        'price_review',
+        'price_review_from',
+        'price_reviewed_at',
+        'price_reviewed_by',
     ];
 
     protected $casts = [
@@ -51,6 +63,8 @@ class ProductDeposit extends Model
         'last_seen_on' => 'date',
         'confirmed_at' => 'datetime',
         'pos_synced_at' => 'datetime',
+        'price_review_from' => 'decimal:4',
+        'price_reviewed_at' => 'datetime',
     ];
 
     public function barrelCode(): BelongsTo
@@ -67,6 +81,11 @@ class ProductDeposit extends Model
     public function confirmedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function priceReviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'price_reviewed_by');
     }
 
     public function scopeSuggested(Builder $query): Builder
@@ -89,6 +108,26 @@ class ProductDeposit extends Model
         $this->confirmed_at = $status === self::STATUS_CONFIRMED ? now() : null;
 
         return $this;
+    }
+
+    /**
+     * Record the owner's price review on this row (not saved). A null
+     * outcome clears the review; $from is the gross price before a lowering
+     * or a custom price.
+     */
+    public function reviewPrice(?string $outcome, ?User $by, ?float $from = null): self
+    {
+        $this->price_review = $outcome;
+        $this->price_review_from = $outcome === null ? null : $from;
+        $this->price_reviewed_at = $outcome === null ? null : now();
+        $this->price_reviewed_by = $outcome === null ? null : $by?->id;
+
+        return $this;
+    }
+
+    public function isPriceReviewed(): bool
+    {
+        return $this->price_review !== null;
     }
 
     public function isManual(): bool

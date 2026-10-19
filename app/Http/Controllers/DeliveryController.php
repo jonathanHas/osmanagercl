@@ -550,6 +550,19 @@ class DeliveryController extends Controller
                 ]);
             }
 
+            // Keep every parser warning for the delivery page (never fails the import).
+            try {
+                $this->deliveryService->recordParserWarnings(
+                    $delivery,
+                    $this->deliveryParsingService->getWarnings($result)
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Parser warnings not recorded', [
+                    'delivery_id' => $delivery->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             // For single-file parses, build a synthetic file_results entry
             // so the document save loop can store metadata consistently
             if (! isset($result['file_results']) && isset($result['data']['totals'])) {
@@ -632,7 +645,7 @@ class DeliveryController extends Controller
                           'Total value: '.number_format($totals['total_value'], 2);
 
             if (! empty($warnings)) {
-                $successMsg .= ' ('.count($warnings).' warnings - check items)';
+                $successMsg .= ' ('.count($warnings).' parser warnings, listed on this page)';
             }
 
             // Flash import summary with barrels and costs breakdown

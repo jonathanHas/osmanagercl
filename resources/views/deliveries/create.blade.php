@@ -749,7 +749,11 @@
                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
                     <td class="px-2 py-1 text-gray-900 dark:text-gray-100">${item.Code}</td>
                     <td class="px-2 py-1 text-gray-600 dark:text-gray-400 max-w-[200px] truncate" title="${item.Product}">${item.Product}</td>
-                    <td class="px-2 py-1 text-right text-gray-900 dark:text-gray-100">${item.Total_Delivered_Units}</td>
+                    ${item.price_valid === false
+                        ? `<td class="px-2 py-1 text-right text-red-700 dark:text-red-400 font-semibold" title="${String(item.price_note ?? '').replace(/"/g, '&quot;')}">${item.Total_Delivered_Units}</td>`
+                        : `<td class="px-2 py-1 text-right text-gray-900 dark:text-gray-100">${item.Total_Delivered_Units}${item.price_note
+                            ? ` <span class="text-xs text-blue-600 dark:text-blue-400" title="${String(item.price_note).replace(/"/g, '&quot;')}">repaired</span>`
+                            : ''}</td>`}
                     <td class="px-2 py-1 text-right text-gray-900 dark:text-gray-100">\u20AC${parseFloat(item.Unit_Cost).toFixed(2)}</td>
                     <td class="px-2 py-1 text-right text-gray-900 dark:text-gray-100">\u20AC${parseFloat(item.Value).toFixed(2)}</td>
                 </tr>

@@ -129,6 +129,19 @@ PUT    /barrel-codes/{id}               - Update barrel code
 GET    /barrel-codes/{id}/image         - Serve barrel image
 POST   /barrel-codes/{id}/image         - Upload barrel image
 DELETE /barrel-codes/{id}/image         - Remove barrel image
+
+// Customer bottle deposits (permission deliveries.manage), names deposits.*
+GET    /deposits                          - Screen (?status=…&group=tier|brand|none&sort=name|markup|sales)
+PATCH  /deposits/tiers/{id}               - Switch a tier on/off for customers
+POST   /deposits/products                 - Add a product by hand
+POST   /deposits/products/confirm-all     - Confirm all suggested (optional barrel_code_id or brand); prices unchanged
+PATCH  /deposits/products/{id}            - Confirm / reject / re-tier a row; a confirm may carry
+                                            price_action=keep|lower|custom (+ new_price, gross)
+PATCH  /deposits/products/{id}/price      - action=keep|lower|reset|undo (deposits.products.price)
+PATCH  /deposits/settings                 - Delivery charge % (deposits.settings)
+DELETE /deposits/products/{id}            - Remove a manual row
+POST   /deposits/refresh                  - Recompute suggestions
+POST   /deposits/sync                     - Sync the till
 ```
 
 ## Data Flow
@@ -190,6 +203,8 @@ The plan/implement history is in [`docs/deposit/`](../deposit/README.md).
 | `barrel_codes.charge_customer` | Tier switched on for customers; `pos_product_id` / `pos_refund_product_id` hold its till products |
 | `deposit_sightings` | Evidence: one row per delivery line seen with a code (`source_type` `delivery_item`) |
 | `product_deposits` | Till product → tier, `status` `suggested` / `confirmed` / `rejected`, `source` `invoice` / `manual`, evidence counts, till sync state |
+| `product_deposits.price_review` … | The owner's price review (cycle 4): `price_review` `kept` / `lowered` / `set` (null = not reviewed), `price_review_from` (gross price before a lowering or a typed price; Undo writes it back), `price_reviewed_at`, `price_reviewed_by` (user) |
+| `app_settings` key `deposits.delivery_pct` | Delivery charge on Udea cost in percent, default 15 (`App\Models\AppSetting`) |
 
 Models: `DepositSighting`, `ProductDeposit` (and the new columns on
 `DeliveryItem` and `BarrelCode`). `App\Support\PosProductAttributes` reads and
@@ -208,6 +223,22 @@ writes uniCenta's `PRODUCTS.ATTRIBUTES` (Java Properties XML), keeping other key
   refunds as catalogue buttons), writes `deposit.id` / `deposit.name` /
   `deposit.price` to confirmed products, clears them elsewhere, refuses
   weighed and variable-price products, and reports drift (`check()`).
+- `App\Services\Deposits\DepositPriceReviewService`: the price facts on
+  `/deposits` (two queries for the whole table: Udea delivery lines, and the
+  till's own ticket lines, read-only) and the price writes (Lower, a typed
+  price, Undo). Cost is the latest Udea docket `unit_cost` (> 0), else the
+  till's `PRICEBUY`; the **landed cost** is that cost × (1 + delivery charge),
+  and markup and profit are against it. Udea advice is the latest docket
+  `sale_price` (> 0; dockets from 2026-04-16 carry it). The last price change
+  comes from **full-price till lines since 2024-01-01, discounted lines
+  ignored** (a line whose `ATTRIBUTES` `product.name` ends ` - 5%` / ` - 10%`):
+  each day's full price is the price with the most full-price lines, ties to
+  the higher; a day at least 0.05 from the established price counts as a step
+  only when the next three selling days stay within 0.02 of it, so a change in
+  the last three selling days does not show yet. "Changed since last sale"
+  flags a till price 0.05 or more away from the last full-price sale. Sold in
+  12 months counts every line, discounted ones included. It never labels a
+  product "deposit included"; the owner decides.
 
 The accounting invoice parser (`invoice_udea.py`) also emits `barrel_code` on
 its lines, but nothing reads it: the delivery note drives the mapping.
@@ -226,9 +257,62 @@ None is scheduled; the delivery import hook keeps things current.
 ### Screen
 
 `/deposits` (permission `deliveries.manage`; links from `/barrel-codes` and
-`/deliveries`): switch tiers on or off, confirm, reject or re-tier suggested
-products (with their evidence), add a product by hand, confirm all, recompute,
-sync the till.
+`/deliveries`), layout "2a" from the owner's Claude Design mock-up (cycle 4),
+top to bottom:
+
+The page uses the Modernist design system from the owner's design project
+(Archivo, red accent, square corners, 2px rules), in
+`resources/css/modernist.css`, scoped to `.ds-modernist` so nothing reaches
+the admin shell, and loaded only by this view through the layout's
+`@stack('styles')`. Its ground is always light; it does not follow the
+shell's dark theme. The page's own classes are the `.dr-*` section at the end
+of that file. Rows are kept to two or three short lines (sales, price step
+and evidence each on one line; full product names in the tooltip).
+
+
+- **Bar** at the top of the page: "Till synced <ago>" (latest
+  `pos_synced_at`, or never), **Sync till now**, **Recompute suggestions**,
+  **Confirm all suggested (n)**.
+- **Deposit codes** strip: one cell per Udea deposit code with its price,
+  description, the **Charge customers** checkbox, the till products once
+  created (`DEP-025 / DEP-025-RET`, or "not in till yet") and the confirmed
+  count. It lists the codes charged to customers or seen on a delivery
+  line (`deposit_sightings`); crates, pallets and other unseen codes appear
+  only after **Show all n codes** (`?codes=all`).
+- **Price review** band: "n of m decided · n prices reviewed"; the
+  **Delivery charge** % (−, number, +; shop-wide, stored in `app_settings`);
+  **Status** (Suggested + confirmed, the default; Suggested; Confirmed;
+  Rejected; All); **Group by** Tier / Brand (first word of the till name) /
+  None; **Sort** Brand / name A–Z, Markup lowest first, Sales volume highest
+  first.
+- **Grid**, under group headers ("Tier 313 · €0.25 deposit · 12 products",
+  with **Confirm n** for the group's suggestions):
+  Product (name, barcode · Udea code, deposit tier select) · Sales (sold in
+  12 months, last sale, Udea delivery evidence, other codes seen) · Price
+  (gross; the last lasting price step, with the Udea cost before it in the
+  tooltip; "now x, was y (no sale since <date>)" when the till price changed
+  after the last sale) · Markup now (against landed cost, bar, landed and net) ·
+  Udea (advice price) · New price (Keep / −€deposit / a typed € price; a typed
+  price tints the cell) · New markup (recomputed in the browser as the choice
+  changes) · Decision (✓ Confirm and ✗ Reject while suggested; then the status,
+  any till sync error, and **Undo**). Decided rows are dimmed.
+- A footer with the markup formula, then **Add a product** (by hand).
+
+**The price choice and the deposit decision are one step.** A row's ✓ Confirm
+confirms the deposit and applies the row's price choice: Keep records `kept`;
+−deposit and a typed price write the till (a confirm dialog asks first) and
+record `lowered` / `set` with the gross price before. Writes use the product
+page's recipe: gross converted to net with the product's VAT rate, written to
+`PRODUCTS.PRICESELL`, then a `LabelLog` `price_update`, so the product appears
+in the label area under "Price changed". A refused write (price not above the
+deposit, product missing) leaves the deposit confirmed and shows an error.
+**Undo** takes the row back to suggested, clears its till deposit properties,
+and, when its confirm changed the price, writes the old price back (another
+label-log row). The bulk confirms (header and group) never change prices.
+
+Markups since this layout are against landed cost (Udea cost × (1 + delivery
+charge)), so they read lower than the bare-cost figures of the first price
+review.
 
 ### At the till
 
@@ -257,13 +341,20 @@ Who: the owner. Where: production (`lilThink2`), artisan as `www-data`
 (`sudo -u www-data php artisan …`). Nobody edits the POS database by hand.
 
 1. **Deploy.** Commit and deploy as usual; the deploy runs
-   `php artisan migrate --force` (the four deposit migrations).
+   `php artisan migrate --force` (the five deposit migrations).
 2. **Evidence.** `php artisan deposits:backfill-delivery-items --dry-run`,
    then the same without `--dry-run`; then
    `php artisan deposits:refresh-suggestions`.
 3. **Decide.** On `/deposits`: switch on tiers 313, 315 and 9936 (10046 is
    optional); confirm the products (per row, or "Confirm all suggested"),
    reject any that are wrong.
+3b. **Review prices.** On `/deposits`, set the delivery charge, then for each
+   row read the Price (last price change), Markup now and Udea columns
+   (sorting by markup helps). Pick Keep, −deposit or a price, then Confirm:
+   that confirms the deposit and writes the chosen price. A changed price
+   lands in the label area under "Price changed", ready for a new shelf label.
+   "Confirm all suggested" and a group's "Confirm n" confirm the deposit only
+   and keep every price.
 4. **Write the product properties.** `php artisan deposits:sync-pos --check`,
    then `php artisan deposits:sync-pos`. The tills ignore the properties
    until the scripts exist, so this is safe to do first.

@@ -236,7 +236,7 @@
                             </svg>
                         </button>
                     </div>
-                    <div x-show="expanded" x-collapse class="mt-3 space-y-2">
+                    <div x-show="expanded" class="mt-3 space-y-2">
                         @foreach($delivery->documents as $document)
                             <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
                                 <div class="flex items-center space-x-3">
@@ -317,7 +317,7 @@
                             </div>
 
                             {{-- Expanded: inline form --}}
-                            <div x-show="expandedIdx === idx" x-collapse class="border-t border-yellow-200 dark:border-yellow-700 px-3 py-3 bg-yellow-25 dark:bg-gray-750">
+                            <div x-show="expandedIdx === idx" class="border-t border-yellow-200 dark:border-yellow-700 px-3 py-3 bg-yellow-25 dark:bg-gray-750">
                                 {{-- Lookup status indicator --}}
                                 <div x-show="loading" class="text-xs text-blue-600 dark:text-blue-400 mb-2">
                                     Looking up supplier code...
@@ -541,6 +541,35 @@
                 </script>
             @endif
 
+            {{-- Parser warnings kept at import (price check, case size repairs); deposit ones only when the Barrels/Deposits block does not list them --}}
+            @php
+                $depositBlockListsWarnings = ! empty($delivery->import_data['deposit_reconciliation']['warnings'] ?? []);
+                $parserWarnings = array_values(array_filter(
+                    $delivery->import_data['parser_warnings'] ?? [],
+                    fn ($w) => is_string($w) && ! ($depositBlockListsWarnings && preg_match('/^(\[[^\]]*\]\s*)?Deposit code/', $w))
+                ));
+                $priceCheckFailed = $delivery->items->filter(fn ($i) => $i->price_valid === false)->count();
+                $caseSizesRepaired = $delivery->items->filter(fn ($i) => $i->price_valid === true && $i->price_note !== null)->count();
+            @endphp
+            @if(count($parserWarnings) > 0)
+                <div class="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span class="font-semibold text-amber-800 dark:text-amber-200">Parser warnings</span>
+                        @if($priceCheckFailed > 0)
+                            <span class="text-sm font-medium text-red-700 dark:text-red-400">{{ $priceCheckFailed }} {{ Str::plural('line', $priceCheckFailed) }} failed the price check</span>
+                        @endif
+                        @if($caseSizesRepaired > 0)
+                            <span class="text-sm text-blue-700 dark:text-blue-400">{{ $caseSizesRepaired }} case {{ Str::plural('size', $caseSizesRepaired) }} repaired</span>
+                        @endif
+                    </div>
+                    <ul class="mt-2 list-disc list-inside text-sm text-amber-900 dark:text-amber-100">
+                        @foreach($parserWarnings as $warning)
+                            <li>{{ $warning }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             {{-- Permanent Barrel Deposits Section (from database) - Collapsible --}}
             @php
                 // Deposit codes on product lines vs the barrels section, kept at import (deposit cycle 3).
@@ -586,7 +615,7 @@
                             @endforeach
                         </ul>
                     @endif
-                    <div x-show="expanded" x-collapse class="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
+                    <div x-show="expanded" class="mt-3 pt-3 border-t border-amber-200 dark:border-amber-700">
                         @if($depositReconRows->isNotEmpty())
                             <h4 class="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">Deposit codes on product lines</h4>
                             <div class="overflow-x-auto mb-4">
@@ -1042,6 +1071,11 @@
                                 <div>
                                     <span class="text-gray-500 dark:text-gray-400">Inv:</span>
                                     <span class="font-medium text-gray-900 dark:text-gray-100">{{ $item->invoice_delivered_quantity }}</span>
+                                    @if($item->price_valid === false)
+                                        <span class="ml-1 px-1 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="{{ $item->price_note }}">Price check</span>
+                                    @elseif($item->price_note)
+                                        <span class="ml-1 px-1 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" title="{{ $item->price_note }}">Case size repaired</span>
+                                    @endif
                                 </div>
                                 <div>
                                     <span class="text-gray-500 dark:text-gray-400">Rcv:</span>
@@ -1325,12 +1359,20 @@
                                         @if($item->is_weight_based && $item->total_weight)
                                             {{ number_format($item->total_weight, 3) }}
                                             <span class="block text-xs text-purple-600 dark:text-purple-400">{{ $item->weight_unit }}</span>
+                                            @if($item->price_valid === false)
+                                                <span class="inline-block mt-1 px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="{{ $item->price_note }}">Price check</span>
+                                            @endif
                                         @else
                                             {{ $item->invoice_delivered_quantity }}
                                             @if($item->ordered_quantity == 0 && $item->invoice_delivered_quantity == 0)
                                                 <span class="block text-xs text-amber-600 dark:text-amber-500">Not invoiced</span>
                                             @elseif($item->ordered_quantity > $item->invoice_delivered_quantity)
                                                 <span class="block text-xs text-orange-600 dark:text-orange-400">Ordered: {{ $item->ordered_quantity }}</span>
+                                            @endif
+                                            @if($item->price_valid === false)
+                                                <span class="inline-block mt-1 px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="{{ $item->price_note }}">Price check</span>
+                                            @elseif($item->price_note)
+                                                <span class="inline-block mt-1 px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" title="{{ $item->price_note }}">Case size repaired</span>
                                             @endif
                                             @if($item->invoice_delivered_quantity > 0 && $item->units_per_case > 1)
                                                 @php
