@@ -549,7 +549,8 @@
                     fn ($w) => is_string($w) && ! ($depositBlockListsWarnings && preg_match('/^(\[[^\]]*\]\s*)?Deposit code/', $w))
                 ));
                 $priceCheckFailed = $delivery->items->filter(fn ($i) => $i->price_valid === false)->count();
-                $caseSizesRepaired = $delivery->items->filter(fn ($i) => $i->price_valid === true && $i->price_note !== null)->count();
+                $caseSizesRepaired = $delivery->items->filter(fn ($i) => $i->price_valid === true && Str::startsWith((string) $i->price_note, 'case size'))->count();
+                $pricesRepaired = $delivery->items->filter(fn ($i) => $i->price_valid === true && Str::startsWith((string) $i->price_note, 'purchase price'))->count();
             @endphp
             @if(count($parserWarnings) > 0)
                 <div class="mb-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-3">
@@ -560,6 +561,9 @@
                         @endif
                         @if($caseSizesRepaired > 0)
                             <span class="text-sm text-blue-700 dark:text-blue-400">{{ $caseSizesRepaired }} case {{ Str::plural('size', $caseSizesRepaired) }} repaired</span>
+                        @endif
+                        @if($pricesRepaired > 0)
+                            <span class="text-sm text-blue-700 dark:text-blue-400">{{ $pricesRepaired }} purchase {{ Str::plural('price', $pricesRepaired) }} repaired</span>
                         @endif
                     </div>
                     <ul class="mt-2 list-disc list-inside text-sm text-amber-900 dark:text-amber-100">
@@ -1074,7 +1078,7 @@
                                     @if($item->price_valid === false)
                                         <span class="ml-1 px-1 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="{{ $item->price_note }}">Price check</span>
                                     @elseif($item->price_note)
-                                        <span class="ml-1 px-1 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" title="{{ $item->price_note }}">Case size repaired</span>
+                                        <span class="ml-1 px-1 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" title="{{ $item->price_note }}">{{ Str::startsWith($item->price_note, 'purchase price') ? 'Price repaired' : 'Case size repaired' }}</span>
                                     @endif
                                 </div>
                                 <div>
@@ -1372,7 +1376,7 @@
                                             @if($item->price_valid === false)
                                                 <span class="inline-block mt-1 px-1.5 py-0.5 text-xs font-medium rounded bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="{{ $item->price_note }}">Price check</span>
                                             @elseif($item->price_note)
-                                                <span class="inline-block mt-1 px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" title="{{ $item->price_note }}">Case size repaired</span>
+                                                <span class="inline-block mt-1 px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" title="{{ $item->price_note }}">{{ Str::startsWith($item->price_note, 'purchase price') ? 'Price repaired' : 'Case size repaired' }}</span>
                                             @endif
                                             @if($item->invoice_delivered_quantity > 0 && $item->units_per_case > 1)
                                                 @php

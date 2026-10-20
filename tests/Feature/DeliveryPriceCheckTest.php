@@ -175,6 +175,38 @@ class DeliveryPriceCheckTest extends TestCase
         $this->assertSame(1, substr_count($response->getContent(), e($deposit)));
     }
 
+    public function test_delivery_page_labels_a_repaired_purchase_price(): void
+    {
+        $warning = 'Purchase price repaired for 36489: purchase price 3.17 ran into the description; 6.39 (the sale price) was read in its place, 19.02÷(1×6)=3.17';
+        $delivery = $this->delivery([
+            'filename' => 'Order_1.pdf',
+            'parser_warnings' => [$warning],
+        ]);
+
+        DeliveryItem::create([
+            'delivery_id' => $delivery->id,
+            'supplier_code' => '36489',
+            'description' => 'Product 36489',
+            'units_per_case' => 6,
+            'unit_cost' => 3.17,
+            'ordered_quantity' => 6,
+            'invoice_delivered_quantity' => 6,
+            'total_cost' => 19.02,
+            'status' => 'pending',
+            'price_valid' => true,
+            'price_note' => 'purchase price 3.17 ran into the description; 6.39 (the sale price) was read in its place, 19.02÷(1×6)=3.17',
+        ]);
+
+        $this->actingAs($this->manager())
+            ->get(route('deliveries.show', $delivery))
+            ->assertOk()
+            ->assertSee($warning)
+            ->assertSee('1 purchase price repaired')
+            ->assertSee('Price repaired')
+            ->assertDontSee('Case size repaired')
+            ->assertDontSee('case size repaired');
+    }
+
     public function test_deposit_warnings_stay_in_the_deposit_block_when_it_lists_them(): void
     {
         $deposit = 'Deposit code 313: product lines total 24 units, barrels section says 36';

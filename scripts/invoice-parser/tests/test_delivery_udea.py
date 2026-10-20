@@ -10,6 +10,13 @@ delivery 132 (pdfplumber garbles included).
 Also covers the glued case size repair: pdfplumber sometimes drops the space
 between the SKU (case size) and the content ("4012,50gram"), and the line
 total identifies the real case size.
+
+And the prices that run into the description: a purchase price glued to the
+last word ("Jersey4,63 8,29 5 18,52") is split off in _preprocess_line(), and
+a purchase price interleaved with the description ("F3a,1c7tory 6,39 5 46%
+19,02") leaves an integer Sale; _repair_shifted_price() recovers it from the
+line total when its digits are in the description. An unparsed line with the
+"code ordered qty ... money" shape is always listed as unparsed.
 """
 import os
 import sys
@@ -185,3 +192,108 @@ def test_repair_leaves_a_passing_line_unchanged():
 
     assert parser._repair_glued_case_size(parsed) is None
     assert parsed == before
+
+
+JERSEY = '6003103 1 1 4 900millilitre Icecream raspberry & carameliBzeiodlo gailsmchonds, HappDyE Mrs. Jersey4,63 8,29 5 18,52'
+SOAP = "5007337 1 1 6 750millilitre All-purpose-cleaner sandalwood N&o cna-frodoadmom, MarceNl'Ls Green Soap2,00 3,99 4 39% 12,00"
+WALNUT = '36488 1 1 6 500millilitre Vegan-ice cream banana walnuBti otloofgfiesceh swirl, cashNeLw, Ice Cream3, 1F7actory6,39 5 46% 19,02'
+VANILLA = '36489 1 1 6 500millilitre Vegan-ice cream vanilla doughB ciohloogcisoclhate, cashewN,L Ice Cream F3a,1c7tory 6,39 5 46% 19,02'
+
+
+def _passes(parser, parsed):
+    return parser._validate_price(
+        float(parsed['Qty']), float(parsed['Price']), float(parsed['SKU']), float(parsed['Total'])
+    )[0]
+
+
+def test_unglue_price_from_description_jersey():
+    parser = DeliveryUdeaParser()
+    parsed = _parse(parser, JERSEY)
+
+    assert parsed['Price'] == '4.63'
+    assert parsed['Sale'] == '8.29'
+    assert parsed['SKU'] == '4'
+    assert parsed['Content'] == '900 millilitre'
+    assert _passes(parser, parsed)
+
+
+def test_unglue_price_marcels_soap():
+    parser = DeliveryUdeaParser()
+    parsed = _parse(parser, SOAP)
+
+    assert parsed['Price'] == '2.00'
+    assert parsed['Sale'] == '3.99'
+    assert _passes(parser, parsed)
+    assert parser._repair_shifted_price(parsed) is None
+
+
+def test_unglue_both_prices_then_repair_shift():
+    parser = DeliveryUdeaParser()
+    parsed = _parse(parser, WALNUT)
+    assert not _passes(parser, parsed)
+
+    note = parser._repair_shifted_price(parsed)
+
+    assert note is not None
+    assert parsed['Price'] == '3.17'
+    assert parsed['Sale'] == '6.39'
+    assert _passes(parser, parsed)
+
+
+def test_repair_shifted_price_interleaved():
+    parser = DeliveryUdeaParser()
+    parsed = _parse(parser, VANILLA)
+
+    note = parser._repair_shifted_price(parsed)
+
+    assert note is not None
+    assert '19.02÷(1×6)=3.17' in note
+    assert parsed['Price'] == '3.17'
+    assert parsed['Sale'] == '6.39'
+    assert _passes(parser, parsed)
+
+
+def test_repair_shifted_price_leaves_discount_alone():
+    parser = DeliveryUdeaParser()
+    parsed = _parse(parser, "5007341 1 1 6 500millilitre All-purpose-cleaner-spray lavender, Marcel's NL 3,99 7,29 5 45% 12,00")
+    before = dict(parsed)
+
+    assert parser._repair_shifted_price(parsed) is None
+    assert parsed == before
+
+
+def test_repair_shifted_price_needs_digits_in_description():
+    parser = DeliveryUdeaParser()
+    parsed = _parse(parser, '36489 1 1 6 500millilitre Vegan-ice cream vanilla, Ice Cream Factory 6,39 5 46% 19,02')
+    before = dict(parsed)
+
+    assert parser._repair_shifted_price(parsed) is None
+    assert parsed == before
+
+
+def test_repair_shifted_price_leaves_passing_line_alone():
+    parser = DeliveryUdeaParser()
+    parsed = _parse(parser, '92504 1 1 12 200millilitre Fruit-juice pineapple, Your OrganBicio Nlogaitsucrhe DE 313 1,18 2,39 5 46% 14,16')
+    before = dict(parsed)
+
+    assert parser._repair_shifted_price(parsed) is None
+    assert parsed == before
+
+
+def test_likely_product_line_guard():
+    parser = DeliveryUdeaParser()
+    # VAT token removed, so the glued price stays glued and every regex fails
+    no_vat = parser._preprocess_line(
+        '6003103 1 1 4 900millilitre Icecream raspberry & carameliBzeiodlo gailsmchonds, HappDyE Mrs. Jersey4,63 8,29 18,52'
+    )
+    assert parser._parse_line(no_vat) is None
+    assert parser._is_likely_product_line(no_vat)
+
+    unitless = parser._preprocess_line('6003103 1 1 4 Icecream Jersey 4,63 8,29 18,52')
+    assert parser._parse_line(unitless) is None
+    assert parser._is_likely_product_line(unitless)
+
+    assert not parser._is_likely_product_line('6001624 8 1 330ml Water Kefir Jasmine & Peach, Kult')
+    assert not parser._is_likely_product_line(
+        '3703 1 8 450gram Green-beans, Natural Cool NV / 28-10-2026 / Niet geleverd leverancier, geen'
+    )

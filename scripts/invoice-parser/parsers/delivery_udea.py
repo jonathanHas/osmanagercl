@@ -83,6 +83,18 @@ FALLBACK_REGEX: Final[Pattern[str]] = re.compile(rf"""
     $
 """, re.VERBOSE)
 
+# European money amount as Udea prints it: "2,27", "12,00", "1.234,56"
+MONEY: Final[str] = r"\d{1,3}(?:\.\d{3})*,\d{2}"
+
+# A price pdfplumber glued to the last word of the description, e.g.
+# "... Mrs. Jersey4,63 8,29 5 18,52" or "... 1F7actory6,39 5 46% 19,02".
+# Only fires when what follows is a complete money tail
+# (optional sale, VAT code, optional profit %, total), so a code glued to a
+# country ("NL10046") or a quantity inside a description is left alone.
+GLUED_PRICE_REGEX: Final[Pattern[str]] = re.compile(
+    rf"([^\s\d])({MONEY})(?=\s+(?:{MONEY}\s+)?\d+\s+(?:\d+%\s+)?{MONEY}$)"
+)
+
 # Detect lines that start with a code
 LINE_STARTS_WITH_CODE_REGEX: Final[Pattern[str]] = re.compile(r'^\d+')
 
@@ -200,6 +212,9 @@ class DeliveryUdeaParser:
                 fixed_line = f"{match.group(1)} 1 {actual_weight} {match.group(3)}{match.group(4)}{match.group(5)}"
                 remainder = line[match.end():]
                 line = fixed_line + remainder
+
+        # Un-glue a price pdfplumber ran into the last word of the description
+        line = GLUED_PRICE_REGEX.sub(r'\1 \2', line)
 
         return line
 
@@ -400,6 +415,66 @@ class DeliveryUdeaParser:
             f"case size read as {sku_str}; {qty:g}×{price:g}×{n}={qty * price * n:.2f} "
             f"matches the line total, using {n}"
         )
+
+    def _repair_shifted_price(self, parsed: Dict[str, str]) -> Optional[str]:
+        """Repair a purchase price that pdfplumber ran into the description.
+
+        "... Ice Cream F3a,1c7tory 6,39 5 46% 19,02": the purchase price 3,17 is
+        interleaved with "Factory", so the sale price is read as Price and the
+        VAT code as Sale. Udea prints every sale price with two decimals, so an
+        integer Sale is a shifted tail. The total gives the real price; its
+        digits must also be present in the description. Mutates parsed["Price"]
+        and parsed["Sale"] and returns a note, or returns None.
+        """
+        if parsed.get("is_weight_based"):
+            return None
+        sale_str = (parsed.get("Sale") or "").strip()
+        if not sale_str or "." in sale_str:
+            return None
+        try:
+            qty = float(parsed["Qty"])
+            price = float(parsed["Price"]) if parsed.get("Price") else 0.0
+            total = float(parsed["Total"]) if parsed.get("Total") else 0.0
+            sku = float(parsed["SKU"]) if parsed.get("SKU") else 1.0
+        except (ValueError, KeyError):
+            return None
+
+        if self._validate_price(qty, price, sku, total)[0]:
+            return None
+        if qty <= 0 or sku <= 0 or total <= 0:
+            return None
+
+        derived = round(total / (qty * sku), 2)
+        if abs(qty * sku * derived - total) > self.calculation_tolerance or derived >= price:
+            return None
+
+        digits = re.sub(r"[^\d,]", "", parsed.get("Description") or "")
+        if not digits.endswith(f"{derived:.2f}".replace(".", ",")):
+            return None
+
+        parsed["Sale"] = parsed["Price"]
+        parsed["Price"] = f"{derived:.2f}"
+        return (
+            f"purchase price {derived:.2f} ran into the description; {price:g} (the sale price) "
+            f"was read in its place, {total:.2f}÷({qty:g}×{sku:g})={derived:.2f}"
+        )
+
+    def _is_likely_product_line(self, line: str) -> bool:
+        """Whether an unparsed (preprocessed) line looks like a product line.
+
+        A line with the "code ordered qty ..." shape and a money tail always
+        counts, so a product line can never leave the parser unlisted.
+        """
+        tokens = line.split()
+        has_price_pattern = any(re.match(r'\d+[.,]\d{2}', token) for token in tokens)
+        has_unit_keywords = any(
+            token.lower() in ['kilogram', 'gram', 'litre', 'millilitre', 'kg', 'g', 'l', 'ml', 'pc', 'stuks']
+            for token in tokens
+        )
+        has_percentage = any('%' in token for token in tokens)
+        has_structure = re.match(r'^\d+\s+\d+\s+\d+\s+\S', line) is not None
+        has_money_tail = re.search(r'\d[.,]\d{2}$', line) is not None
+        return has_price_pattern and (has_unit_keywords or has_percentage or (has_structure and has_money_tail))
 
     def _calculate_unit_cost(self, qty: float, sku: float, total: float) -> float:
         """
@@ -746,8 +821,9 @@ class DeliveryUdeaParser:
                 if parsed:
                     try:
                         code = parsed["Code"]
-                        # Repair a glued case size before SKU and Content are read
+                        # Repair a glued case size or a shifted price before the fields are read
                         repair_note = self._repair_glued_case_size(parsed)
+                        price_repair_note = None if repair_note else self._repair_shifted_price(parsed)
                         ordered = int(parsed["Ordered"])
                         qty = int(parsed["Qty"])
                         sku = float(parsed["SKU"]) if parsed["SKU"] else 1.0
@@ -798,6 +874,9 @@ class DeliveryUdeaParser:
                                 if repair_note:
                                     price_note = repair_note
                                     result["warnings"].append(f"Case size repaired for {code}: {repair_note}")
+                                elif price_repair_note:
+                                    price_note = price_repair_note
+                                    result["warnings"].append(f"Purchase price repaired for {code}: {price_repair_note}")
                             else:
                                 self.stats['price_mismatches'] += 1
                                 result["warnings"].append(
@@ -837,6 +916,7 @@ class DeliveryUdeaParser:
                             "price_valid": is_valid,
                             "price_note": price_note,
                             "case_size_repaired": bool(repair_note) and is_valid,
+                            "price_repaired": bool(price_repair_note) and is_valid,
                             "is_weight_based": is_weight_based,
                             "weight_per_unit": weight_per_unit,
                             "weight_unit": weight_unit,
@@ -856,16 +936,7 @@ class DeliveryUdeaParser:
 
                 elif LINE_STARTS_WITH_CODE_REGEX.match(line):
                     # Line starts with a code but couldn't be parsed
-                    tokens = line.split()
-                    has_price_pattern = any(re.match(r'\d+[.,]\d{2}', token) for token in tokens)
-                    has_unit_keywords = any(
-                        token.lower() in ['kilogram', 'gram', 'litre', 'millilitre', 'kg', 'g', 'l', 'ml', 'pc', 'stuks']
-                        for token in tokens
-                    )
-                    has_percentage = any('%' in token for token in tokens)
-                    is_likely_product = has_price_pattern and (has_unit_keywords or has_percentage)
-
-                    if is_likely_product:
+                    if self._is_likely_product_line(preprocessed_line):
                         unmatched_product_lines.append({
                             "line_num": line_num,
                             "content": line[:100]

@@ -26,15 +26,16 @@ Feature docs: `docs/features/shop-mode.md` (Shop screens, camera scanning,
 find by name), `docs/features/delivery-system.md` (the `/deliveries` flow),
 `docs/features/delivery-scanning-enhancements-2025-08-05.md`.
 
-## Where things stand (2026-10-19, evening)
+## Where things stand (2026-10-20)
 
 | | |
 |---|---|
-| Side plan | **`plan-price-check.md` ACCEPTED 2026-10-19** (to archive to `archive/2026-10-19-price-check/` with the 4804899 finding file; 11 code files uncommitted, includes a migration): the Udea parser repairs a case size glued to the content by pdfplumber when the line total identifies it (`4012,50gram` → 40 × 12,50 gram; 10 of the 31 price-check failures in all 147 stored Udea dockets, 0 false repairs), and a line that still fails the check is stored on the item (`price_valid`, `price_note`), badged on the delivery page and listed with every parser warning in `import_data.parser_warnings`. Cause: dev delivery 166 imported Vivani `5004102` as 401 units at €0.0489; the preview listed the warning but nothing kept it. Done and verified: dev delivery 168 is the re-import (Vivani row 40 × €0.49). Also removed the three `x-collapse` directives on the delivery page (plugin not installed). Parser tests now 212 |
-| Earlier side plan | **`plan-dev-parser-venv.md` ACCEPTED 2026-10-19** (dev machine only, to archive to `archive/2026-10-19-dev-parser-venv/`): `scripts/invoice-parser/venv` now exists on dev, built from a uv-managed CPython 3.12.15 under `/var/www/html/uv-python`, pins matching production; the PDF import on `/deliveries/create` works again (delivery 165 is the proof run). Follow-up side plan worth writing: "parser environment checks" (make `invoice:test-parser` / `checkConfiguration()` test the venv interpreter, pin `pypdfium2==4.30.0` in `requirements.txt`). Parser warnings on that order are in `findings/2026-10-19-udea-order-4804899-parser-warnings.md` |
+| Side plan | **`plan-glued-price.md` READY 2026-10-20** (Implementer next; report in `implemented-glued-price.md`): pdfplumber runs a long description into the Purchase column, so the price glues to the last word (`Jersey4,63 8,29 5 18,52`) or its digits interleave with it (`F3a,1c7tory 6,39 5 46% 19,02`). Three outcomes today: the line is dropped with no Unparsed entry (`6003103` on order 4798553, production `DEL-20261020-120934`, only the €18.52 total mismatch showed), listed as unparsed for hand entry (`36488`), or parsed shifted so the sale price is read as cost and the row gets a false red `Price check` (`36489`, `36491`; the stored `unit_cost` is right because it is `total / units`). Plan: un-glue rule at the end of `_preprocess_line()`, `_repair_shifted_price()` (integer Sale + the derived price's digits in the description + the total), `Purchase price repaired` warning and `Price repaired` badge, and a structural guard so a `code ordered qty … money` line is always listed as unparsed. Sweep of 157 stored dockets + the 2 new ones, 12,845 lines: 12 un-glues (0 regressions), 28 shift repairs (0 rejected), silent drops 1 → 0, remaining price-check failures 2 (`530144`, open item) |
+| Accepted and committed | **`price-check`** (ACCEPTED 2026-10-19, archived in `archive/2026-10-19-price-check/` with the 4804899 finding, committed and deployed in `82b33968`; production has `delivery_items.price_valid` / `price_note`): glued case size repair (`4012,50gram` → 40 × 12,50 g), per-item price-check result, all parser warnings kept in `import_data.parser_warnings` and shown on the delivery page. Parser tests 212 |
+| Earlier side plan | **`plan-dev-parser-venv.md` ACCEPTED 2026-10-19** (dev machine only, committed in `82b33968` but still to archive to `archive/2026-10-19-dev-parser-venv/`): `scripts/invoice-parser/venv` now exists on dev, built from a uv-managed CPython 3.12.15 under `/var/www/html/uv-python`, pins matching production; the PDF import on `/deliveries/create` works again (delivery 165 is the proof run). Follow-up side plan worth writing: "parser environment checks" (make `invoice:test-parser` / `checkConfiguration()` test the venv interpreter, pin `pypdfium2==4.30.0` in `requirements.txt`) |
 | Current task | **Cycle 3** (`implemented.md` DONE 2026-10-08, committed in `e79531b7`, not yet reviewed by the Planner) — correct quantities from the delivery summary, with the correction card shared between the scan and summary screens (`plan.md`, READY 2026-10-08; owner's request). Accepted and committed: **cycle 1** (outer barcode link with confirmation, `90000850`, `archive/2026-10-08-link-outer-barcode/`), **cycle 2** (instant correction card, Shop PATCH without financials, `getScannedNotOnInvoice()` rewritten around the POS collation trap, `4d023aa8`, `archive/2026-10-08-correction-card-speed/`) |
-| HEAD | `4d023aa8` on `feature/modularization-phase1` (cycles 1 and 2 committed; `4d023aa8` also carries another session's product-form edits, which the owner swept in) |
-| Working tree | clean apart from this folder (the cycle 2 archive move is staged). The Implementer records the baseline `git status --short` all the same |
+| HEAD | `82b33968` on `feature/modularization-phase1` (price-check side plan, dev venv plan, deposit cycle 4 and the browser MCP work all swept into that one commit by the owner) |
+| Working tree | clean apart from this folder (2026-10-20). The Implementer records the baseline `git status --short` all the same |
 | Test baseline | `php artisan test` → **15 failed, 1042 passed** (2026-10-08, after cycle 2). The 15 are the known unrelated set: `UdeaScrapingServiceTest` ×7, `CashReconciliationTest` ×3, `FruitVegLabelPrintingTest` ×2, `ProductTest` ×2, `TestScraperControllerTest` ×1. `php artisan test tests/Feature/Shop/ShopDeliveryTest.php` → 59 passed |
 
 ### Production timings (2026-10-08, read-only SSH, session `6717664c-…`, supplier 37, 172 invoice lines, 163 scans)
@@ -146,6 +147,14 @@ Column collations on the POS: `deliveriesScanItems.barcode` and `PRODUCTS.CODE` 
   hold four orphaned PDFs each from the price-check re-imports on dev.
 - Deposit reconciliation is empty on every multi-PDF import (the owner's normal
   Udea case): see `docs/deposit/findings/2026-10-19-multi-pdf-deposit-reconciliation.md`.
+- Production `DEL-20261020-120934` (id 168) is missing `6003103` (4 × €4.63 =
+  €18.52); the owner adds it by hand. Its `36489` / `36491` rows carry a false
+  `Price check` badge (cost €3.17 is right); clears for future imports once
+  `plan-glued-price.md` ships.
+- The descriptions pdfplumber garbles on long lines (`cashewN,L`,
+  `F3 a,1 c7 tory`) are stored as read. A column-based (x-position) read of
+  the line tail would fix the glue / interleave family at the source; not
+  planned while the text rules cover every line we have.
 
 - Correction card edge cases left by cycle 2: a flush deferred behind a scan
   in flight reads the card's current value, so a row switch plus a tap
