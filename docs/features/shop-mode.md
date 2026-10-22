@@ -198,6 +198,39 @@ and there is no card. The card is one implementation on both screens, the
 Alpine part `resources/js/shop/delivery-correction.js` and the partial
 `resources/views/shop/partials/delivery-correction.blade.php`.
 
+### Print labels: Shelf labels and Zebra labels
+
+The Home tile **Print labels** (`labels.print`) opens two tabs, `/shop/labels`
+(Shelf labels) and `/shop/labels/zebra` (Zebra labels). The office pages keep
+every job that makes or maintains labels (Zebra label CRUD, translations,
+templates, the full print history).
+
+- **Shelf labels** is the A4 queue (`labels.queue`, add by scan, Remove, Clear
+  queue for `labels.manage`, Print as a form post to `labels.print-a4` in a new
+  tab). Below it, a collapsed **Printed today** list from `labels.printed-today`:
+  today's `label_print` rows grouped in five-minute windows as on the office
+  page, or yesterday's when nothing has printed today. Each item can go **Back
+  to queue** (`labels.requeue`). Remove and Clear queue offer **Undo** in their
+  toast, through `labels.requeue` and `labels.restore-batch` (manager only, like
+  Clear). Items show price and ×n, not the reason they were queued: the print
+  row does not carry it.
+- **Zebra labels** lists saved Zebra labels (on the till, other products,
+  standalone) and translated labels from `labels.zebra-list`, built by
+  `App\Services\ZebraLabelListService`, which the office Zebra page also uses.
+  Scan a product or search; the print card shows whether the label's price or
+  country still matches the till and prints the till's value **for that print
+  only** (the print endpoint's `fields` override). The saved label is fixed only
+  on the office page. Each item carries its own `print_url`; the ZPL is never
+  sent to the browser.
+- **Printer line**: the spool (`labels.printer-queue`) is read after the page
+  renders, because it can take 15 s when the printer is down. A print to an
+  unreachable printer fails; nothing is held. **Cancel all**
+  (`labels.printer-cancel`) shows only for `labels.manage`.
+- Code: `app/Http/Controllers/Shop/LabelsController.php`, `ZebraController.php`,
+  `resources/views/shop/labels.blade.php`, `zebra.blade.php`,
+  `resources/js/shop/labels.js`, `zebra.js`; endpoints in
+  `LabelAreaController` (`printedToday()`, `zebraList()`).
+
 ### Orders: list and order review
 
 A Home tile **Orders** (permission `orders.review`) opens `/shop/orders`: the

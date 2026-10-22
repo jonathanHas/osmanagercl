@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07b Zebra labels · Shop mode</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="shop.css">
+<style>body{margin:0;background:#f5ead8}</style>
+</head>
+<body>
+<!-- Saved from the Claude Design project (Shop mode, "Screen 07b Zebra labels", revision of
+     2026-10-21). A live template, like screen 07: {{ tokens }}, <sc-if> and <sc-for> are the
+     design tool's bindings, and the <script type="text/x-dc"> at the end is its behaviour spec
+     (states, real label data from the dev database, what each action does). It is a reference,
+     not a page that renders on its own. States: ?state=idle|mismatch|translated|nolabel|offline,
+     ?role=employee|manager, ?printer=empty|waiting|offline. The CSS rules this screen adds are
+     listed in docs/shop_new/plan.md (APP ADDITIONS: Labels). -->
+<div class="shop is-touch" data-screen-label="07b Zebra labels">
+  <header class="shop-topbar">
+    <a class="shop-iconbtn" href="screen-01-home.html" aria-label="Back to Home"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></a>
+    <h1 class="shop-topbar__title">Print labels</h1>
+    <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Help"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></button>
+    <details class="shop-usermenu">
+      <summary class="shop-chip"><span class="shop-avatar">{{ user.ini }}</span><span class="shop-chip__name">{{ user.name }}</span><svg class="shop-ico shop-ico--sm shop-chip__caret" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></summary>
+      <div class="shop-menu" role="menu">
+        <div class="shop-menu__head"><span class="shop-avatar">{{ user.ini }}</span><div><div class="shop-menu__name">{{ user.full }}</div><div class="shop-meta">{{ user.role }}</div></div></div>
+        <a class="shop-menu__item" role="menuitem" href="screen-16-switch-user.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>Switch user</a>
+        <a class="shop-menu__item" role="menuitem" href="screen-18-locked.html"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>Lock</a>
+        <a class="shop-menu__item" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path><rect width="20" height="14" x="2" y="6" rx="2"></rect></svg>Office</a>
+        <div class="shop-menu__sep"></div>
+        <a class="shop-menu__item shop-menu__item--danger" role="menuitem" href="#"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg>Log out</a>
+      </div>
+    </details>
+  </header>
+  <main class="shop-page shop-page--narrow">
+    <nav class="shop-seg shop-seg--block" aria-label="Label type"><a class="shop-seg__opt" href="screen-07-shelf-labels.html"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"></circle></svg>Shelf labels</a><a class="shop-seg__opt" href="screen-07b-zebra-labels.html" aria-current="page"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5v14"></path><path d="M8 5v14"></path><path d="M12 5v14"></path><path d="M17 5v14"></path><path d="M21 5v14"></path></svg>Zebra labels</a></nav>
+    <div class="{{ printerCls }}" role="status"><span>{{ printerText }}</span><sc-if value="{{ canCancel }}" hint-placeholder-val="{{ false }}"><button class="shop-btn shop-btn--ghost" type="button" onClick="{{ cancelAll }}"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>Cancel all</button></sc-if></div>
+    <div class="{{ scanClass }}">
+      <label class="shop-scan__field"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M8 7v10"></path><path d="M12 7v10"></path><path d="M17 7v10"></path></svg><span class="shop-sr-only">Barcode</span><input class="shop-scan__input" ref="{{ scanRef }}" inputmode="none" autocomplete="off" enterkeyhint="go" placeholder="Scan a product to print its label" value="{{ scanValue }}" onChange="{{ onScanChange }}" onKeyDown="{{ onScanKey }}"><button class="shop-iconbtn shop-touch-only" type="button" aria-pressed="false" aria-label="Camera"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></button><button class="shop-iconbtn shop-touch-only" type="button" aria-pressed="false" aria-label="Show keyboard"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"></path></svg></button></label>
+      <p class="shop-scan__msg"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>{{ scanMsg }}</p>
+    </div>
+    <div class="shop-search"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg><input class="shop-input" type="search" placeholder="Search labels" aria-label="Search labels" value="{{ q }}" onChange="{{ setQ }}"></div>
+    <sc-if value="{{ hasCard }}" hint-placeholder-val="{{ false }}">
+      <section class="shop-card" aria-label="Print label">
+        <div class="shop-between shop-between--top">
+          <div class="shop-stack shop-stack--tight"><h2 class="shop-subtitle">{{ card.name }}</h2><span class="shop-row__meta">{{ card.meta }}</span></div>
+          <button class="shop-iconbtn shop-iconbtn--ghost" type="button" aria-label="Close" onClick="{{ closeCard }}"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+        </div>
+        <sc-if value="{{ card.auto }}" hint-placeholder-val="{{ false }}"><div class="shop-inline"><span class="shop-pill shop-pill--muted">Auto-prints on delivery</span></div></sc-if>
+        <sc-if value="{{ card.priceDiff }}" hint-placeholder-val="{{ false }}">
+          <div class="shop-card shop-card--flat">
+            <div class="shop-between"><span class="shop-row__title">{{ card.priceText }}</span><span class="shop-pill shop-pill--warn">Price differs</span></div>
+            <label class="shop-switch"><input type="checkbox" checked="{{ card.useTillPrice }}" onChange="{{ card.togglePrice }}"><span class="shop-switch__track"></span><span class="shop-switch__text"></span><span class="shop-switch__label">Print with till price</span></label>
+            <p class="shop-hint">For this print only. The saved label is fixed in the office.</p>
+          </div>
+        </sc-if>
+        <sc-if value="{{ card.countryDiff }}" hint-placeholder-val="{{ false }}">
+          <div class="shop-card shop-card--flat">
+            <div class="shop-between"><span class="shop-row__title">{{ card.countryText }}</span><span class="shop-pill shop-pill--warn">Country differs</span></div>
+            <label class="shop-switch"><input type="checkbox" checked="{{ card.useTillCountry }}" onChange="{{ card.toggleCountry }}"><span class="shop-switch__track"></span><span class="shop-switch__text"></span><span class="shop-switch__label">Print with till country</span></label>
+            <p class="shop-hint">For this print only. The saved label is fixed in the office.</p>
+          </div>
+        </sc-if>
+        <p class="shop-notice"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>{{ card.stockText }}</p>
+        <sc-if value="{{ offline }}" hint-placeholder-val="{{ false }}"><p class="shop-notice"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>Printer not reachable. Printing will fail until it is back.</p></sc-if>
+        <div class="shop-field"><span class="shop-field__label">Copies</span>
+          <div class="shop-stepper"><button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One fewer" onClick="{{ card.dec }}"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg></button><output class="shop-stepper__value">{{ card.copies }}</output><button class="shop-iconbtn shop-iconbtn--lg" type="button" aria-label="One more" onClick="{{ card.inc }}"><svg class="shop-ico shop-ico--lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></button></div>
+        </div>
+        <button class="shop-btn shop-btn--primary shop-btn--lg shop-btn--block" type="button" onClick="{{ print }}"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3h12v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg>{{ card.printLabel }}</button>
+      </section>
+    </sc-if>
+    <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+      <section class="shop-stack shop-stack--tight">
+        <div class="shop-between"><h2 class="shop-subtitle">{{ g.title }}</h2><span class="shop-meta">{{ g.count }}</span></div>
+        <sc-if value="{{ g.hasHint }}" hint-placeholder-val="{{ false }}"><p class="shop-hint">{{ g.hint }}</p></sc-if>
+        <div class="shop-list">
+          <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="3">
+            <button class="{{ r.cls }}" type="button" onClick="{{ r.pick }}"><span class="shop-row__main"><span class="shop-row__title">{{ r.name }}</span><span class="shop-row__meta">{{ r.meta }}</span></span><sc-if value="{{ r.hasPill }}" hint-placeholder-val="{{ true }}"><span class="{{ r.pillCls }}">{{ r.pillText }}</span></sc-if></button>
+          </sc-for>
+        </div>
+      </section>
+    </sc-for>
+    <sc-if value="{{ translatedCollapsed }}" hint-placeholder-val="{{ true }}">
+      <section class="shop-stack shop-stack--tight">
+        <div class="shop-between"><h2 class="shop-subtitle">Translated labels</h2><span class="shop-meta">301</span></div>
+        <div class="shop-list"><div class="shop-row"><span class="shop-row__lead"><svg class="shop-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></span><div class="shop-row__main"><span class="shop-row__title">Scan or search to find one</span><span class="shop-row__meta">301 translated labels · 58 × 40 mm</span></div></div></div>
+      </section>
+    </sc-if>
+    <sc-if value="{{ noMatch }}" hint-placeholder-val="{{ false }}">
+      <div class="shop-card"><div class="shop-empty"><span class="shop-empty__icon"><svg class="shop-ico shop-ico--xl" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5v14"></path><path d="M8 5v14"></path><path d="M12 5v14"></path><path d="M17 5v14"></path><path d="M21 5v14"></path></svg></span><p class="shop-empty__title">No labels match</p><p class="shop-empty__text">Try another name or code, or scan the product.</p></div></div>
+    </sc-if>
+    <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+      <div class="shop-toasts" role="status"><div class="{{ toastCls }}"><span class="shop-toast__icon"><sc-if value="{{ toastOk }}" hint-placeholder-val="{{ true }}"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></sc-if><sc-if value="{{ toastWarn }}" hint-placeholder-val="{{ false }}"><svg class="shop-ico shop-ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg></sc-if></span><span class="shop-toast__text">{{ toastText }}</span><sc-if value="{{ hasUndo }}" hint-placeholder-val="{{ false }}"><button class="shop-btn shop-btn--ghost" type="button" onClick="{{ undo }}">Undo</button></sc-if></div></div>
+    </sc-if>
+  </main>
+</div>
+<script type="text/x-dc" data-dc-script data-props="{&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;idle&quot;,&quot;mismatch&quot;,&quot;translated&quot;,&quot;nolabel&quot;,&quot;offline&quot;],&quot;default&quot;:&quot;idle&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;employee&quot;,&quot;manager&quot;],&quot;default&quot;:&quot;manager&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;printer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;empty&quot;,&quot;waiting&quot;,&quot;offline&quot;],&quot;default&quot;:&quot;empty&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const SZ = { a: ['112.6 × 75.1 mm', '112 × 75 mm'], b: ['115.2 × 78.3 mm', '115 × 78 mm'], t: ['58 × 40 mm', '58 × 40 mm'] };
+const Z = (id, group, name, label, sz, code, copies = 1, x = {}) => ({ id, group, name, label, sz, code, copies, ...x });
+const LABELS = [
+  Z('carrots', 'till', 'Carrots 700g', 'Carrots imported', 'a', '000000000052'),
+  Z('lambs', 'till', 'Lambs Lettuce 100g', 'lambs lettuce', 'a', '000000000093'),
+  Z('kale1', 'till', 'Curly Kale 200g', 'Kale Curly 300g', 'a', '000000000102', 2, { labelPrice: '€2.49', tillPrice: '€2.79' }),
+  Z('kale2', 'till', 'Curly Kale 200g', 'slieve Bloom Kale', 'a', '000000000102'),
+  Z('rocket', 'till', 'Rocket', 'Rocket imported 100g', 'a', '000000000212'),
+  Z('spin-sb', 'till', 'Spinach - Slieve Bloom 280g', 'SB Spinach 280g', 'b', '000000000217'),
+  Z('spin', 'till', 'Spinach 250g', 'Spinach Imported', 'a', '000000000223', 1, { labelCountry: 'Spain', tillCountry: 'Italy' }),
+  Z('spin-mf', 'till', 'Spinach - Mossfield 300g', 'Spinach_Mossfield', 'b', '000000000224'),
+  Z('beans', 'till', 'Green Beans 200g', 'French Beans 200g', 'a', '000000000285'),
+  Z('salad', 'till', 'Mixed Salad 100g', 'Mixed Salad', 'a', '000000000286'),
+  Z('rocket-mf', 'other', 'Rocket Mossfield 100g', 'Rocket_Mossfield', 'b', '000000000329'),
+  Z('chard', 'other', 'Chard Slieve Bloom 270g', 'SB Chard 270g', 'b', '18016'),
+  Z('chut180', 'other', 'Organic Store Kitchen Beetroot Chutney 180g', 'Beetroot Chutney_back_180g', 'b', '4110'),
+  Z('chut360', 'other', 'Organic Store Beetroot Chutney 360g', 'Beetroot Chutney_back_360g', 'b', '4150'),
+  Z('parsnip', 'alone', 'parsnip', 'parsnip', 'a', ''),
+  Z('chutney', 'alone', 'Beetroot Chutney 180g', 'Beetroot Chutney 180g', 'b', ''),
+  Z('chutney360', 'alone', 'Beetroot Chutney_360g', 'Beetroot Chutney_360g', 'b', ''),
+];
+const TRANSLATED = [
+  ['t-halloumi', 'Dynamis Halloumi 250 g', '5201111222999', true], ['t-passata', 'Mutti Passata 700 g', '8005110060012', true],
+  ['t-lebkuchen', 'Lebkuchen hearts 200 g', '4001234560200', false], ['t-olives', 'Philia Kalamata Olives 350 g', '5201234560350', true],
+  ['t-hazel', 'Rapunzel Hazelnut Spread 250 g', '4006040000250', false], ['t-apple', 'Coteaux Nantais Apple Juice 1 L', '3760123451000', true],
+  ['t-kefir', 'Andechser Kefir 500 g', '4104060005000', true], ['t-flakes', 'Alnatura Oat Flakes 500 g', '4104420050005', false],
+].map(([id, name, code, auto]) => Z(id, 'tr', name, 'Translated', 't', code, 1, { auto }));
+const ALL = [...LABELS, ...TRANSLATED];
+const GROUPS = [['till', 'On the till', ''], ['other', 'Other products', 'Not on the till right now.'], ['alone', 'Standalone labels', 'Not linked to a product, so a scan won’t find them. Search or tap.']];
+const PRINTER = { checking: ['shop-printer', 'Counter Zebra · checking printer…'], empty: ['shop-printer is-ok', 'Counter Zebra · printer queue empty'], waiting: ['shop-printer is-busy', 'Counter Zebra · 2 jobs waiting'], offline: ['shop-printer is-off', 'Counter Zebra · printer not reachable'] };
+const qp = () => { try { return new URLSearchParams(window.location.search); } catch (e) { return new URLSearchParams(); } };
+const cardFor = id => { const l = ALL.find(x => x.id === id); return { id, copies: l.copies, tillPrice: true, tillCountry: true }; };
+const metaFor = l => l.group === 'alone' ? `Label only · ${SZ[l.sz][0]}` : l.group === 'tr' ? `Translated · ${SZ[l.sz][0]} · ${l.code}` : `${l.label} · ${SZ[l.sz][0]} · ${l.code}`;
+const pillFor = l => l.group === 'alone' ? ['muted', 'No product'] : l.group === 'tr' ? (l.auto ? ['muted', 'Auto-print'] : null) : l.labelPrice ? ['warn', 'Price differs'] : l.labelCountry ? ['warn', 'Country differs'] : ['ok', 'Matches till'];
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+class Component extends DCLogic {
+  preset = qp().get('state') ?? this.props.preset ?? 'idle';
+  state = {
+    card: this.preset === 'mismatch' ? cardFor('kale1') : this.preset === 'translated' ? cardFor('t-halloumi') : null,
+    q: '', scan: this.preset === 'nolabel' ? '8712345678906' : '',
+    scanError: this.preset === 'nolabel' ? 'No Zebra label for this product' : '',
+    printer: 'checking', toast: null,
+  };
+  scanRef = React.createRef();
+  componentDidMount() {
+    const target = qp().get('printer') ?? (this.preset === 'offline' ? 'offline' : (this.props.printer ?? 'empty'));
+    this.pt = setTimeout(() => this.setState({ printer: target }), 900);
+    if (window.self === window.top && this.scanRef.current) this.scanRef.current.focus();
+  }
+  componentWillUnmount() { clearTimeout(this.pt); clearTimeout(this.tt); }
+  flash(text, kind = 'ok') {
+    clearTimeout(this.tt);
+    this.setState({ toast: { text, kind } });
+    this.tt = setTimeout(() => this.setState({ toast: null }), 4000);
+  }
+  open(id) {
+    this.setState({ card: cardFor(id), scanError: '', scan: '' });
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+  }
+  doScan() {
+    const v = this.state.scan.trim();
+    if (!v) return;
+    const l = ALL.find(x => x.code && x.code === v);
+    if (l) this.open(l.id); else this.setState({ scanError: 'No Zebra label for this product', card: null });
+  }
+  setCard(patch) { this.setState(s => ({ card: { ...s.card, ...patch } })); }
+  print() {
+    const s = this.state, l = ALL.find(x => x.id === s.card.id), n = s.card.copies;
+    const till = (l.labelPrice && s.card.tillPrice) ? ' with the till price' : (l.labelCountry && s.card.tillCountry) ? ' with the till country' : '';
+    if (s.printer === 'offline') this.flash('Print failed · printer not reachable', 'bad');
+    else this.flash(`Printing ${plural(n, 'label')}${till}`);
+    this.setState({ card: null });
+    if (this.scanRef.current && window.self === window.top) this.scanRef.current.focus();
+  }
+  renderVals() {
+    const s = this.state;
+    const role = qp().get('role') ?? this.props.role ?? 'manager';
+    const isManager = role === 'manager';
+    const q = s.q.trim().toLowerCase();
+    const match = l => !q || [l.name, l.label, l.code].join(' ').toLowerCase().includes(q);
+    const row = l => {
+      const p = pillFor(l);
+      return { name: l.name, meta: metaFor(l), hasPill: !!p, pillCls: p ? `shop-pill shop-pill--${p[0]}` : '', pillText: p ? p[1] : '',
+        cls: 'shop-row' + (s.card && s.card.id === l.id ? ' is-latest' : ''), pick: () => this.open(l.id) };
+    };
+    const groups = GROUPS.map(([k, title, hint]) => {
+      const rows = LABELS.filter(l => l.group === k && match(l)).map(row);
+      return { title, hint, hasHint: !!hint, count: String(rows.length), rows };
+    }).filter(g => g.rows.length);
+    if (q) {
+      const rows = TRANSLATED.filter(match).map(row);
+      if (rows.length) groups.push({ title: 'Translated labels', hint: '', hasHint: false, count: `${rows.length} of 301`, rows });
+    }
+    const c = s.card && ALL.find(l => l.id === s.card.id);
+    const [printerCls, printerText] = PRINTER[s.printer];
+    return {
+      user: isManager ? { ini: 'J', name: 'Jessika', full: 'Jessika', role: 'Manager' } : { ini: 'MJ', name: 'Maya', full: 'Maya Jensen', role: 'Shop floor' },
+      printerCls, printerText, canCancel: isManager && s.printer === 'waiting', offline: s.printer === 'offline',
+      cancelAll: () => { this.setState({ printer: 'empty' }); this.flash('Printer queue cleared'); },
+      scanRef: this.scanRef, scanValue: s.scan, scanMsg: s.scanError,
+      scanClass: 'shop-scan shop-scan--inline ' + (s.scanError ? 'is-error' : 'is-focused'),
+      onScanChange: e => this.setState({ scan: e.target.value, scanError: '' }),
+      onScanKey: e => { if (e.key === 'Enter') { e.preventDefault(); this.doScan(); } },
+      q: s.q, setQ: e => this.setState({ q: e.target.value }),
+      hasCard: !!c,
+      card: c ? {
+        name: c.name, meta: metaFor(c), auto: !!c.auto,
+        priceDiff: !!c.labelPrice, priceText: `Label says ${c.labelPrice}, till says ${c.tillPrice}`, useTillPrice: s.card.tillPrice,
+        togglePrice: () => this.setCard({ tillPrice: !s.card.tillPrice }),
+        countryDiff: !!c.labelCountry, countryText: `Label says ${c.labelCountry}, till says ${c.tillCountry}`, useTillCountry: s.card.tillCountry,
+        toggleCountry: () => this.setCard({ tillCountry: !s.card.tillCountry }),
+        stockText: `Check the printer has ${SZ[c.sz][1]} labels loaded`,
+        copies: s.card.copies,
+        dec: () => this.setCard({ copies: Math.max(1, s.card.copies - 1) }),
+        inc: () => this.setCard({ copies: Math.min(99, s.card.copies + 1) }),
+        printLabel: `Print ${plural(s.card.copies, 'label')}`,
+      } : {},
+      closeCard: () => this.setState({ card: null }),
+      print: () => this.print(),
+      groups, translatedCollapsed: !q, noMatch: !!q && groups.length === 0,
+      hasToast: !!s.toast, toastText: s.toast ? s.toast.text : '',
+      toastCls: 'shop-toast shop-toast--' + (s.toast ? s.toast.kind : 'ok'),
+      toastOk: !!s.toast && s.toast.kind === 'ok', toastWarn: !!s.toast && s.toast.kind !== 'ok',
+      hasUndo: false, undo: () => {},
+    };
+  }
+}
+</script>
+</body>
+</html>

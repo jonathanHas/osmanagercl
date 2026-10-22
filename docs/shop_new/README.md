@@ -15,10 +15,10 @@ changing it. Feature documentation: `docs/features/shop-mode.md`.
 
 | | |
 |---|---|
-| Current task | none. Accepted 2026-10-02 and uncommitted: delivery follow-ups (`archive/2026-10-02-delivery-follow-ups/`), product-search failure message (`archive/2026-10-02-search-failure-message/`), sticky "New request" / Print bars + "No products match" (`archive/2026-10-02-requests-sticky-bar/`). Committed: find-by-name, `9247c79e`. The owner's `ToDo.txt` item is done |
+| Current task | none. **Labels** accepted 2026-10-21 and uncommitted (`plan.md` / `implemented.md`, to archive as `archive/2026-10-21-labels/`): Shelf labels and Zebra labels tabs inside Shop mode, from the Claude Design revision saved as `docs/design/shop-mode/screen-07-shelf-labels.html` / `screen-07b-zebra-labels.html` (brief: `design-brief-labels.md`); the owner's production print check is still to do. Accepted 2026-10-02 and uncommitted: delivery follow-ups (`archive/2026-10-02-delivery-follow-ups/`), product-search failure message (`archive/2026-10-02-search-failure-message/`), sticky "New request" / Print bars + "No products match" (`archive/2026-10-02-requests-sticky-bar/`). Committed: find-by-name, `9247c79e`. The owner's `ToDo.txt` item is done |
 | HEAD | `9247c79e` on `feature/modularization-phase1` (track opened at `9f796b28`) |
 | Working tree | three accepted tasks uncommitted (Shop delivery, typeahead, requests and labels views, `shop.css`, their tests, `docs/features/shop-mode.md`, `docs/shop_new/`) |
-| Test baseline | 15 failed / 942 passed (see "Test baseline" below) |
+| Test baseline | 16 failed (2026-10-21; see "Test baseline" below) |
 
 ## Where the code is
 
@@ -37,7 +37,7 @@ changing it. Feature documentation: `docs/features/shop-mode.md`.
 
 Screens today: Home, Stock scan, Find product, Deliveries (list, scan,
 summary; built on the **legacy** `delivery-legacy.*` endpoints, which is the
-flow employees use), Print labels, Customer requests (board, detail, edit; the
+flow employees use), Print labels (Shelf labels and Zebra labels tabs), Customer requests (board, detail, edit; the
 public `/customer-requests` route), Vouchers, F&V waste and harvest, PIN
 switch / lock / locked, trust device, Help (BookStack procedures). The coffee
 KDS is deliberately outside the Shop view.
@@ -70,7 +70,13 @@ KDS is deliberately outside the Shop view.
    getter/setter there. `x-show` reveals an element after `$nextTick` has run,
    so focusing something just shown needs a frame
    (`$nextTick(() => requestAnimationFrame(…))`, see `focusField()` in
-   `delivery-scan.js`).
+   `delivery-scan.js`). An expression that evaluates to a function is
+   *called* by Alpine, so `x-show="toast?.undo"` runs the undo as the toast
+   renders; write `x-show="!! toast?.undo"`. The lost-`$root` trap also hits a
+   closure created inside an `x-for` row that its own action removes (Remove
+   → Undo): pass the component into the callback (`(c) => c.restore(row)`) and
+   call it from the live scope rather than closing over `this` (Labels cycle,
+   2026-10-21). A node exercise cannot see either; only the browser can.
 6. **Lists of identical rows**: never float a popup with one-tap actions over
    neighbouring rows; expand in flow instead (cycle 13b).
 7. **Sticky action bars.** A sticky `.shop-actions` must be laid out as a
@@ -152,6 +158,9 @@ are pre-existing and unrelated to the Shop view: `UdeaScrapingServiceTest` ×7,
 `TestScraperControllerTest` ×1. A task is clean when the same 15 fail and
 nothing else does.
 
+2026-10-21 (before the Labels cycle): **16 failed**; the 15 above plus
+`BackupConfigurationTest` ×1 (also unrelated to the Shop view).
+
 ## Open items inherited from `docs/planImp/`
 
 Not started; the owner chooses.
@@ -173,7 +182,8 @@ Not started; the owner chooses.
   (same file). Cycles 29–33 addressed parts of this; whether it still holds
   on production is unconfirmed.
 - Zebra labels in Shop mode: plan parked at
-  `docs/planImp/parked/2026-09-25-shop-mode-cycle-11-zebra/plan.md`.
+  `docs/planImp/parked/2026-09-25-shop-mode-cycle-11-zebra/plan.md`; superseded
+  by the Labels design brief (`design-brief-labels.md`, 2026-10-21), which reuses it.
 - F&V availability and labels screens (design screens 12 and 15): unplanned.
 - Deliveries list does not show which sessions have invoice lines loaded.
 - Thumbnail prune keep-set misses invoice lines never scanned.

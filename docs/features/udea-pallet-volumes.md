@@ -149,6 +149,13 @@ persists per-browser in `localStorage`.
 Lines with a quantity but no pallet data are counted and reported, so an understated total is
 always visible as such rather than silently wrong.
 
+Each line also shows, under its quantity control, its share of the selected pallets at its
+current quantity and the share one order unit adds (e.g. `1.23% · 0.41%/case`; a line with no
+quantity shows only `0.41%/unit`). The bar's `recalc()` writes these into the row's
+`pallet-line-pct-{id}` / `pallet-unit-pct-{id}` spans using the same per-line rounded figure it
+sums, so the lines add up to the bar's total. Lines without pallet data say "No pallet data".
+The per-line text is rendered on Udea orders only (`isUdeaOrder`, passed from the show pages).
+
 **`/orders/create` deliberately has no total** — it is the generation form (supplier + dates)
 and has no line items yet.
 
@@ -191,6 +198,10 @@ php artisan udea:sync-pallet-volumes
 - `review-table.blade.php` and `review-table-christmas.blade.php` emit
   `data-pallet-volume="{{ sve * unit_volume }}"` on each quantity input; the summary component
   sums `value × data-pallet-volume` across them.
+- Programmatic quantity changes (the `−`/`+` buttons, the Udea case-snap buttons and the
+  min-stock editor) set `input.value` and then dispatch a bubbling `change` event on the input,
+  so the bar and the per-line figures follow them. They dispatch `change`, not `input`: the
+  table's own `input` listener saves the quantity, and the buttons have already saved it.
 - Shares `udea_product_cards` with the price-tier cache written by `udea:refresh-tiers`
   (see [Supplier Integration](./supplier-integration.md)).
 
@@ -249,8 +260,9 @@ where those limits are lifted. If a very large sync is ever cut off, check the w
   weight-priced goods differ (e.g. `45006` Kipfilet has `sve` 0.22). Worth spot-checking an
   order against Udea's own calculator once coverage is complete.
 - **Some products genuinely have `data-volume` of `0`** and contribute nothing to the total.
-- **The A2 and Grid order layouts have no pallet bar.** They carry their own quantity markup
-  rather than sharing `review-table.blade.php`, so they would need the same two edits.
+- **The A2 and Grid order layouts have no pallet bar and no per-line pallet figures.** They
+  carry their own quantity markup rather than sharing `review-table.blade.php`, so they would
+  need the same edits.
 - Only Udea publishes this data; the feature is Udea-only by nature.
 
 ## Related documentation

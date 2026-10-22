@@ -135,6 +135,7 @@
                                     qtyInputEl.value = isCaseProduct && caseUnits > 0
                                         ? (suggestedUnits / caseUnits).toFixed(1)
                                         : suggestedUnits.toFixed(0);
+                                    qtyInputEl.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
                             }
                         } else {

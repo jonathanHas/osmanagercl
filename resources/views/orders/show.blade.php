@@ -138,6 +138,7 @@
                 'backLink' => route('orders.index'),
                 'primaryActions' => $primaryActions,
                 'categoryGroups' => $categoryGroups,
+                'isUdeaOrder' => $isUdeaOrder,
             ])
         </div>
     </div>

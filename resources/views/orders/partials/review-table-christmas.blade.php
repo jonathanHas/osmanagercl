@@ -64,6 +64,9 @@
         })
     );
 
+    // Per-line pallet share is shown on Udea orders only (same gate as the pallet bar).
+    $showPalletLine = (bool) ($isUdeaOrder ?? false);
+
     // Split items by category and case/unit type
     // Category IDs: Cheese = "032", Refrigerated = "002"
     $cheeseProducts = $displayItems->filter(function ($item) {
@@ -733,6 +736,18 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($showPalletLine)
+                                @php $palletPerUnit = $supplierCode ? ($udeaPalletVolumes[(string) $supplierCode] ?? null) : null; @endphp
+                                <div id="pallet-line-{{ $item->id }}" class="text-xs text-center text-gray-500"
+                                     data-pallet-line="{{ $item->id }}">
+                                    @if($palletPerUnit === null)
+                                        <span class="text-amber-600">No pallet data</span>
+                                    @else
+                                        <span id="pallet-line-pct-{{ $item->id }}" class="font-semibold text-gray-700"></span>
+                                        <span id="pallet-unit-pct-{{ $item->id }}" class="text-gray-400"></span>
+                                    @endif
+                                </div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -1264,6 +1279,18 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($showPalletLine)
+                                @php $palletPerUnit = $supplierCode ? ($udeaPalletVolumes[(string) $supplierCode] ?? null) : null; @endphp
+                                <div id="pallet-line-{{ $item->id }}" class="text-xs text-center text-gray-500"
+                                     data-pallet-line="{{ $item->id }}">
+                                    @if($palletPerUnit === null)
+                                        <span class="text-amber-600">No pallet data</span>
+                                    @else
+                                        <span id="pallet-line-pct-{{ $item->id }}" class="font-semibold text-gray-700"></span>
+                                        <span id="pallet-unit-pct-{{ $item->id }}" class="text-gray-400"></span>
+                                    @endif
+                                </div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -1707,6 +1734,18 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($showPalletLine)
+                                @php $palletPerUnit = $supplierCode ? ($udeaPalletVolumes[(string) $supplierCode] ?? null) : null; @endphp
+                                <div id="pallet-line-{{ $item->id }}" class="text-xs text-center text-gray-500"
+                                     data-pallet-line="{{ $item->id }}">
+                                    @if($palletPerUnit === null)
+                                        <span class="text-amber-600">No pallet data</span>
+                                    @else
+                                        <span id="pallet-line-pct-{{ $item->id }}" class="font-semibold text-gray-700"></span>
+                                        <span id="pallet-unit-pct-{{ $item->id }}" class="text-gray-400"></span>
+                                    @endif
+                                </div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -2150,6 +2189,18 @@
                                 Order: <span id="units-label-{{ $item->id }}">{{ number_format($finalUnits, 0) }}</span> units
                                 <span class="text-gray-400">(<span id="order-quantity-display-{{ $item->id }}">{{ $orderDisplayText }}</span> {{ $quantityLabel }})</span>
                             </div>
+                            @if($showPalletLine)
+                                @php $palletPerUnit = $supplierCode ? ($udeaPalletVolumes[(string) $supplierCode] ?? null) : null; @endphp
+                                <div id="pallet-line-{{ $item->id }}" class="text-xs text-center text-gray-500"
+                                     data-pallet-line="{{ $item->id }}">
+                                    @if($palletPerUnit === null)
+                                        <span class="text-amber-600">No pallet data</span>
+                                    @else
+                                        <span id="pallet-line-pct-{{ $item->id }}" class="font-semibold text-gray-700"></span>
+                                        <span id="pallet-unit-pct-{{ $item->id }}" class="text-gray-400"></span>
+                                    @endif
+                                </div>
+                            @endif
                             @if(abs($finalUnits - $suggestedUnits) > 0.001)
                                 <div class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-600">
                                     Adjusted from {{ $suggestedDisplayText }} {{ $quantityLabel }}
@@ -3249,6 +3300,9 @@
 
                     // Save immediately (no debounce for buttons)
                     saveQuantityToServer(itemId, newValue);
+
+                    // Let the pallet bar follow (it listens for 'change'; 'input' would save twice)
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             });
         });
@@ -3267,6 +3321,9 @@
 
                     // Save immediately (no debounce for buttons)
                     saveQuantityToServer(itemId, newValue);
+
+                    // Let the pallet bar follow (it listens for 'change'; 'input' would save twice)
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             });
         });

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Country;
 use App\Models\LabelLog;
 use App\Models\LabelTemplate;
 use App\Models\Product;
@@ -13,6 +12,7 @@ use App\Services\LabelQueueService;
 use App\Services\LabelService;
 use App\Services\SupplierService;
 use App\Services\TillVisibilityService;
+use App\Services\ZebraLabelListService;
 use App\Services\ZebraPrintService;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
@@ -35,13 +35,16 @@ class LabelAreaController extends Controller
 
     protected LabelQueueService $labelQueue;
 
-    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator, TillVisibilityService $tillVisibilityService, ZebraPrintService $zebraPrint, LabelQueueService $labelQueue)
+    protected ZebraLabelListService $zebraList;
+
+    public function __construct(LabelService $labelService, ZplGeneratorService $zplGenerator, TillVisibilityService $tillVisibilityService, ZebraPrintService $zebraPrint, LabelQueueService $labelQueue, ZebraLabelListService $zebraList)
     {
         $this->labelService = $labelService;
         $this->zplGenerator = $zplGenerator;
         $this->tillVisibilityService = $tillVisibilityService;
         $this->zebraPrint = $zebraPrint;
         $this->labelQueue = $labelQueue;
+        $this->zebraList = $zebraList;
     }
 
     /**
@@ -77,94 +80,65 @@ class LabelAreaController extends Controller
             $supplierService = app(SupplierService::class);
             [$translationsByCategory, $translationProducts] = $this->loadTranslationsByCategory($search);
         } else {
-            $zebraLabelsQuery = ZebraLabel::active()->whereNotNull('product_code');
-
-            if ($search) {
-                $zebraLabelsQuery->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('product_code', 'like', "%{$search}%");
-                });
-            }
-
-            $allZebraLabels = $zebraLabelsQuery->get();
-
-            $standAloneQuery = ZebraLabel::active()->whereNull('product_code');
-            if ($search) {
-                $standAloneQuery->where('name', 'like', "%{$search}%");
-            }
-            $standAloneLabels = $standAloneQuery->get()->map(fn ($label) => [
-                'id' => $label->id,
-                'name' => $label->name,
-                'product_name' => null,
-                'product_code' => null,
-                'width_mm' => $label->label_width_mm,
-                'height_mm' => $label->label_height_mm,
-                'default_copies' => $label->default_copies ?? 1,
-                'mismatches' => null,
-                'fields' => ZebraLabel::extractTextFields($label->zpl_content),
-            ])->values()->toArray();
-
-            $countryNames = Country::pluck('name')->toArray();
-
-            foreach ($allZebraLabels as $label) {
-                $product = $label->product;
-                if (! $product) {
-                    continue;
-                }
-
-                $isOnTill = $this->tillVisibilityService->isVisibleOnTill($product->ID);
-
-                $fields = ZebraLabel::extractTextFields($label->zpl_content);
-                $mismatches = [];
-
-                $priceField = ZebraLabel::findPriceField($fields);
-                if ($priceField) {
-                    $dbPrice = (float) $product->getGrossPrice();
-                    if (abs($priceField[1] - $dbPrice) > 0.005) {
-                        $mismatches['price'] = [
-                            'field_index' => $priceField[0],
-                            'label_value' => number_format($priceField[1], 2),
-                            'db_value' => number_format($dbPrice, 2),
-                            'new_field' => '\\15'.number_format($dbPrice, 2),
-                        ];
-                    }
-                }
-
-                $product->load('vegDetails.country');
-                $countryField = ZebraLabel::findCountryField($fields, $countryNames);
-                $dbCountry = $product->vegDetails?->country?->name;
-                if ($countryField && $dbCountry && $countryField[1] !== $dbCountry) {
-                    $mismatches['country'] = [
-                        'field_index' => $countryField[0],
-                        'label_value' => $countryField[1],
-                        'db_value' => $dbCountry,
-                        'new_field' => $dbCountry,
-                    ];
-                }
-
-                $labelData = [
-                    'id' => $label->id,
-                    'name' => $label->name,
-                    'product_name' => $product->NAME,
-                    'product_code' => $label->product_code,
-                    'width_mm' => $label->label_width_mm,
-                    'height_mm' => $label->label_height_mm,
-                    'default_copies' => $label->default_copies ?? 1,
-                    'mismatches' => $mismatches ?: null,
-                    'fields' => $fields,
-                ];
-
-                if ($isOnTill) {
-                    $zebraLabels[] = $labelData;
-                } else {
-                    $otherLabels[] = $labelData;
-                }
-            }
+            $groups = $this->zebraList->grouped($search);
+            $zebraLabels = $groups['onTill'];
+            $otherLabels = $groups['other'];
+            $standAloneLabels = $groups['standalone'];
         }
 
         $translationProducts = $translationProducts ?? collect();
 
         return view('labels.zebra', compact('zebraLabels', 'otherLabels', 'standAloneLabels', 'search', 'view', 'translationsByCategory', 'supplierService', 'translationProducts'));
+    }
+
+    /**
+     * Saved Zebra labels and translated labels as one JSON list, for the Shop
+     * mode Zebra tab.
+     *
+     * Same groups and mismatches the office page shows (ZebraLabelListService),
+     * in the order on the till, other, standalone, translated. Each item carries
+     * its own print URL; the ZPL never leaves the server.
+     */
+    public function zebraList(): \Illuminate\Http\JsonResponse
+    {
+        $groups = $this->zebraList->grouped();
+
+        $zebra = fn (array $label, string $group) => [
+            'kind' => 'zebra',
+            'group' => $group,
+            'id' => $label['id'],
+            'name' => $label['product_name'] ?? $label['name'],
+            // Standalone labels have no product, so their name is the title.
+            'label' => $group === 'standalone' ? null : $label['name'],
+            'product_code' => $label['product_code'],
+            'width_mm' => $label['width_mm'],
+            'height_mm' => $label['height_mm'],
+            'default_copies' => (int) ($label['default_copies'] ?? 1),
+            'mismatches' => $label['mismatches'],
+            'print_url' => route('zebra-labels.print', $label['id']),
+        ];
+
+        $labels = array_merge(
+            array_map(fn ($l) => $zebra($l, 'till'), $groups['onTill']),
+            array_map(fn ($l) => $zebra($l, 'other'), $groups['other']),
+            array_map(fn ($l) => $zebra($l, 'standalone'), $groups['standalone']),
+            array_map(fn ($t) => [
+                'kind' => 'translated',
+                'group' => 'translated',
+                'id' => $t['id'],
+                'name' => $t['name'],
+                'label' => null,
+                'product_code' => $t['product_code'],
+                'width_mm' => $t['width_mm'],
+                'height_mm' => $t['height_mm'],
+                'default_copies' => 1,
+                'mismatches' => null,
+                'auto_print' => $t['auto_print'],
+                'print_url' => route('labels.translate.print', $t['id']),
+            ], $this->zebraList->translated()),
+        );
+
+        return response()->json(['labels' => $labels]);
     }
 
     /**
@@ -222,15 +196,10 @@ class LabelAreaController extends Controller
 
         // Get recent label print requests (last 7 days)
         // Increased limit to 200 to allow more restoration options
-        $recentLabelPrints = LabelLog::with('product')
-            ->eventType(LabelLog::EVENT_LABEL_PRINT)
-            ->where('created_at', '>=', now()->subDays(7))
-            ->orderBy('created_at', 'desc')
-            ->limit(200)
-            ->get();
+        $recentLabelPrints = $this->labelQueue->recentPrints(now()->subDays(7));
 
         // Group recent prints by time windows (5-minute intervals)
-        $groupedLabelPrints = $this->groupLabelPrintsByTime($recentLabelPrints);
+        $groupedLabelPrints = $this->labelQueue->groupPrintsByWindow($recentLabelPrints);
 
         // Get products that need labels (with optional filtering)
         $productsNeedingLabels = $this->getProductsNeedingLabels($filters);
@@ -253,40 +222,6 @@ class LabelAreaController extends Controller
             'labelTemplates',
             'defaultTemplate'
         ));
-    }
-
-    /**
-     * Group label prints by time windows (5-minute intervals).
-     */
-    private function groupLabelPrintsByTime($labelPrints)
-    {
-        $groups = [];
-
-        foreach ($labelPrints as $labelPrint) {
-            // Round to nearest 5-minute interval for grouping
-            $timestamp = $labelPrint->created_at;
-            $roundedMinutes = floor($timestamp->minute / 5) * 5;
-            $groupKey = $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0)->format('Y-m-d H:i:s');
-
-            if (! isset($groups[$groupKey])) {
-                $groups[$groupKey] = [
-                    'timestamp' => $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0),
-                    'display_time' => $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0)->format('M j, Y H:i'),
-                    'products' => [],
-                    'count' => 0,
-                ];
-            }
-
-            $groups[$groupKey]['products'][] = $labelPrint;
-            $groups[$groupKey]['count']++;
-        }
-
-        // Sort groups by timestamp (newest first)
-        uasort($groups, function ($a, $b) {
-            return $b['timestamp']->timestamp - $a['timestamp']->timestamp;
-        });
-
-        return $groups;
     }
 
     /**
@@ -418,6 +353,65 @@ class LabelAreaController extends Controller
             'rows' => $rows,
             'counts' => $this->labelQueue->countsByEventType(),
             'labels_per_sheet' => LabelTemplate::getDefault()?->labels_per_a4 ?? 24,
+        ]);
+    }
+
+    /**
+     * Today's shelf-label prints as JSON, for the Shop mode "Printed today" list.
+     *
+     * Yesterday's when nothing has printed yet today, so the first person in can
+     * still put back a label from last night's sheet. Same five-minute windows as
+     * the office history; within a window, one item per barcode with its copies.
+     */
+    public function printedToday(): \Illuminate\Http\JsonResponse
+    {
+        $day = 'today';
+        $prints = $this->labelQueue->recentPrints(today());
+
+        if ($prints->isEmpty()) {
+            // Nothing today, so everything from yesterday's midnight on is yesterday's.
+            $yesterday = $this->labelQueue->recentPrints(today()->subDay());
+
+            if ($yesterday->isNotEmpty()) {
+                $prints = $yesterday;
+                $day = 'yesterday';
+            }
+        }
+
+        $batches = collect($this->labelQueue->groupPrintsByWindow($prints))
+            ->map(function (array $group, string $key) {
+                $items = collect($group['products'])
+                    ->groupBy('barcode')
+                    ->map(function ($rows, $barcode) {
+                        $product = $rows->first()->product;
+                        $price = $product?->formatted_price_with_vat;
+                        $copies = $rows->count();
+
+                        return [
+                            'key' => (string) $barcode,
+                            'id' => $product?->ID,
+                            'code' => (string) $barcode,
+                            'name' => $product?->NAME ?? 'Product not found',
+                            'price' => $price,
+                            'copies' => $copies,
+                            'meta' => implode(' · ', array_filter([$price, $copies > 1 ? '×'.$copies : null])),
+                        ];
+                    })
+                    ->values();
+
+                return [
+                    'key' => $key,
+                    'time' => $group['timestamp']->format('H:i'),
+                    'at' => $group['timestamp']->toIso8601String(),
+                    'count' => $group['count'],
+                    'items' => $items,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'day' => $day,
+            'batches' => $batches,
         ]);
     }
 

@@ -12,6 +12,10 @@
     running total is just sum(input.value * data-pallet-volume). Rounding per line before
     summing is what reproduces Udea's displayed figure rather than being ~0.02% out.
 
+    recalc() also writes each line's rounded share, and the share one order unit adds, into
+    the row's pallet-line-pct-{id} / pallet-unit-pct-{id} spans (rendered by the review
+    tables on Udea orders only), so the per-line figures always sum to the bar.
+
     Inputs:
       $coverage  – ['withData' => int, 'total' => int] products with/without pallet data
 --}}
@@ -121,8 +125,8 @@
                         }
                     } catch (e) { /* ignore - a bad or blocked store just means defaults */ }
 
-                    // Quantity inputs are updated by the review table's own handlers (and by
-                    // the case-snap buttons, which set .value directly), so listen broadly.
+                    // Typing fires input/change; the table's −/+, case-snap and min-stock
+                    // buttons set .value directly and then dispatch a bubbling 'change'.
                     ['input', 'change'].forEach(evt => {
                         document.addEventListener(evt, e => {
                             if (e.target && e.target.classList && e.target.classList.contains('qty-input')) {
@@ -141,19 +145,30 @@
 
                     document.querySelectorAll('.qty-input').forEach(input => {
                         const qty = parseFloat(input.value);
-                        if (!Number.isFinite(qty) || qty <= 0) return;
-
                         const perUnit = parseFloat(input.dataset.palletVolume);
-                        if (!Number.isFinite(perUnit)) { uncounted++; return; }
-
-                        const lineVolume = perUnit * qty;
-                        volume += lineVolume;
-                        counted++;
+                        const hasQty = Number.isFinite(qty) && qty > 0;
 
                         // Udea rounds each line to 2dp before summing; summing raw and
                         // rounding once gives a slightly different figure to their page.
+                        // The line's own figure is this same rounded value, so the lines
+                        // add up to the bar.
+                        let linePct = 0;
+                        if (Number.isFinite(perUnit) && hasQty && this.capacity > 0) {
+                            linePct = Math.round(perUnit * qty / this.capacity * 100 * 100) / 100;
+                        }
+
+                        if (Number.isFinite(perUnit)) {
+                            this.writeLine(input, perUnit, hasQty, linePct);
+                        }
+
+                        if (!hasQty) return;
+                        if (!Number.isFinite(perUnit)) { uncounted++; return; }
+
+                        volume += perUnit * qty;
+                        counted++;
+
                         if (this.capacity > 0) {
-                            pctSum += Math.round(lineVolume / this.capacity * 100 * 100) / 100;
+                            pctSum += linePct;
                         }
                     });
 
@@ -165,6 +180,27 @@
                     try {
                         localStorage.setItem('udea_pallet_selection', JSON.stringify({ euro: this.euro, block: this.block }));
                     } catch (e) { /* ignore */ }
+                },
+
+                // Fill the row's pallet-line-pct-{id} / pallet-unit-pct-{id} placeholders.
+                // Rows without them (non-Udea pages) are skipped; text is only assigned when
+                // it changes, so a keystroke on a large order does not rewrite every row.
+                writeLine(input, perUnit, hasQty, linePct) {
+                    const lineEl = document.getElementById('pallet-line-pct-' + input.dataset.itemId);
+                    const unitEl = document.getElementById('pallet-unit-pct-' + input.dataset.itemId);
+                    if (!lineEl || !unitEl) return;
+
+                    let lineText = '—', unitText = '';
+                    if (this.capacity > 0) {
+                        const suffix = input.dataset.isCaseProduct === '1' ? '/case' : '/unit';
+                        const u = perUnit / this.capacity * 100;
+                        const perUnitText = ((u > 0 && u < 0.005) ? '<0.01%' : u.toFixed(2) + '%') + suffix;
+                        lineText = hasQty ? linePct.toFixed(2) + '%' : '';
+                        unitText = hasQty ? ' · ' + perUnitText : perUnitText;
+                    }
+
+                    if (lineEl.textContent !== lineText) lineEl.textContent = lineText;
+                    if (unitEl.textContent !== unitText) unitEl.textContent = unitText;
                 },
             }
         }

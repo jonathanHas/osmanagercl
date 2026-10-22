@@ -109,6 +109,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/labels', [\App\Http\Controllers\Shop\LabelsController::class, 'index'])
             ->middleware('permission:labels.print')
             ->name('labels');
+        Route::get('/labels/zebra', [\App\Http\Controllers\Shop\ZebraController::class, 'index'])
+            ->middleware('permission:labels.print')
+            ->name('zebra');
         // A product picture for any signed-in staff member. Not behind a task
         // permission: a Shop screen that shows the name may show the picture.
         Route::get('/products/{code}/photo', [\App\Http\Controllers\Shop\ProductPhotoController::class, 'show'])
@@ -428,6 +431,8 @@ Route::middleware('auth')->group(function () {
     // Label area routes
     Route::get('/labels', [LabelAreaController::class, 'hub'])->name('labels.index')->middleware('permission:labels.print');
     Route::get('/labels/zebra', [LabelAreaController::class, 'zebra'])->name('labels.zebra')->middleware('permission:labels.print');
+    // Before any labels/zebra/{…} route, so "list" is never captured as a parameter.
+    Route::get('/labels/zebra/list', [LabelAreaController::class, 'zebraList'])->name('labels.zebra-list')->middleware('permission:labels.print');
     Route::get('/labels/shelf-labels', [LabelAreaController::class, 'shelfLabels'])->name('labels.shelf-labels')->middleware('permission:labels.print');
     Route::post('/labels/print-a4', [LabelAreaController::class, 'printA4'])->name('labels.print-a4')->middleware('permission:labels.print');
     Route::get('/labels/preview-a4', [LabelAreaController::class, 'previewA4'])->name('labels.preview-a4')->middleware('permission:labels.print');
@@ -447,6 +452,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/labels/lookup-barcode', [LabelAreaController::class, 'lookupBarcode'])->name('labels.lookup-barcode')->middleware('permission:labels.print');
     Route::post('/labels/scan', [LabelAreaController::class, 'processBarcodeScan'])->name('labels.scan')->middleware('permission:labels.print');
     Route::get('/labels/queue', [LabelAreaController::class, 'queue'])->name('labels.queue')->middleware('permission:labels.print');
+    Route::get('/labels/printed-today', [LabelAreaController::class, 'printedToday'])->name('labels.printed-today')->middleware('permission:labels.print');
     Route::post('/labels/dismiss', [LabelAreaController::class, 'dismiss'])->name('labels.dismiss')->middleware('permission:labels.print');
 
     // Label translation - debug

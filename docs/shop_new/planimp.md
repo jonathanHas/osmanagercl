@@ -97,7 +97,13 @@ Do:
   shorthand that is also a Blade directive (`@error`, `@class`, …; write
   `x-on:error`); and `x-show` hides an element but still evaluates its other
   bindings, so anything nullable behind an `x-show` guard needs `?.` in `:src`,
-  `:alt` and handlers, or an `x-if` template instead (cycle 14b).
+  `:alt` and handlers, or an `x-if` template instead (cycle 14b). Two more
+  from the Labels cycle (2026-10-21): an expression that evaluates to a
+  function is *called* (`x-show="toast?.undo"` ran the undo on render; use
+  `!!`); and a closure made inside an `x-for` row that its own action removes
+  has no `$root` afterwards, so an Undo callback takes the component as an
+  argument and is called from the Undo button's scope. Neither shows up in a
+  node exercise; plan a browser check for every Undo or callback-in-row.
 
 Don't:
 

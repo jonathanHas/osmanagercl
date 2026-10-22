@@ -86,6 +86,56 @@ class LabelQueueService
     }
 
     /**
+     * Label prints since a moment, newest first, with their products.
+     *
+     * The office "Recent Label Prints" history (last 7 days) and the Shop
+     * "Printed today" list both read prints through this.
+     */
+    public function recentPrints(Carbon $since, int $limit = 200): Collection
+    {
+        return LabelLog::with('product')
+            ->eventType(LabelLog::EVENT_LABEL_PRINT)
+            ->where('created_at', '>=', $since)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Group label prints by time windows (5-minute intervals).
+     */
+    public function groupPrintsByWindow(Collection $prints): array
+    {
+        $groups = [];
+
+        foreach ($prints as $labelPrint) {
+            // Round to nearest 5-minute interval for grouping
+            $timestamp = $labelPrint->created_at;
+            $roundedMinutes = floor($timestamp->minute / 5) * 5;
+            $groupKey = $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0)->format('Y-m-d H:i:s');
+
+            if (! isset($groups[$groupKey])) {
+                $groups[$groupKey] = [
+                    'timestamp' => $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0),
+                    'display_time' => $timestamp->copy()->setMinute($roundedMinutes)->setSecond(0)->format('M j, Y H:i'),
+                    'products' => [],
+                    'count' => 0,
+                ];
+            }
+
+            $groups[$groupKey]['products'][] = $labelPrint;
+            $groups[$groupKey]['count']++;
+        }
+
+        // Sort groups by timestamp (newest first)
+        uasort($groups, function ($a, $b) {
+            return $b['timestamp']->timestamp - $a['timestamp']->timestamp;
+        });
+
+        return $groups;
+    }
+
+    /**
      * The queue itself: one entry per barcode whose latest queue event in the
      * window is newer than its latest print in the same window.
      *
@@ -103,6 +153,7 @@ class LabelQueueService
         $eventsByBarcode = LabelLog::whereIn('event_type', LabelLog::QUEUE_EVENTS)
             ->where('created_at', '>=', $since)
             ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->get()
             ->groupBy('barcode');
 
@@ -121,20 +172,27 @@ class LabelQueueService
                 ->where('created_at', '>=', $since)
                 ->whereIn('barcode', $chunk->all())
                 ->groupBy('barcode')
-                ->selectRaw('barcode, MAX(created_at) as last_resolved')
-                ->pluck('last_resolved', 'barcode');
+                ->selectRaw('barcode, MAX(created_at) as last_resolved, MAX(id) as last_resolved_id')
+                ->get();
 
-            foreach ($found as $barcode => $resolvedAt) {
-                $lastResolved[$barcode] = $resolvedAt;
+            foreach ($found as $row) {
+                $lastResolved[$row->barcode] = [$row->last_resolved, (int) $row->last_resolved_id];
             }
         }
 
         return $eventsByBarcode->map(function ($events, $barcode) use ($lastResolved) {
             $mostRecentEvent = $events->first();
-            $resolvedAt = $lastResolved[$barcode] ?? null;
+            [$resolvedAt, $resolvedId] = $lastResolved[$barcode] ?? [null, null];
 
-            if ($resolvedAt !== null && $mostRecentEvent->created_at <= Carbon::parse($resolvedAt)) {
-                return null;
+            // created_at is to the second, so an Undo tapped within a second of
+            // Remove ties with the dismissal; the later row (higher id) wins a tie.
+            if ($resolvedAt !== null) {
+                $resolved = Carbon::parse($resolvedAt);
+
+                if ($mostRecentEvent->created_at < $resolved
+                    || ($mostRecentEvent->created_at->equalTo($resolved) && $mostRecentEvent->id < $resolvedId)) {
+                    return null;
+                }
             }
 
             return [

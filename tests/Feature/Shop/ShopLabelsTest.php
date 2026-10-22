@@ -123,8 +123,18 @@ class ShopLabelsTest extends TestCase
         $response->assertSee('data-queue-url="'.e(route('labels.queue')).'"', false);
         $response->assertSee('shop-scan__input', false);
         $response->assertSee('Print queue');
-        $response->assertSee('href="'.e(route('labels.zebra')).'"', false);
         $response->assertDontSee('Clear queue');
+
+        // Both tabs live in Shop mode; the old tile into the office Zebra page is gone.
+        $response->assertSee('href="'.e(route('shop.labels')).'" aria-current="page"', false);
+        $response->assertSee('href="'.e(route('shop.zebra')).'"', false);
+        $response->assertDontSee('href="'.e(route('shop.zebra')).'" aria-current="page"', false);
+        $response->assertDontSee('href="'.e(route('labels.zebra')).'"', false);
+
+        $response->assertSee('data-printed-url="'.e(route('labels.printed-today')).'"', false);
+        $response->assertSee('data-requeue-url="'.e(route('labels.requeue')).'"', false);
+        // Undo after Clear queue is a manager action, like Clear queue itself.
+        $response->assertSee('data-restore-url=""', false);
 
         // A failed load must show only the error, not "All caught up" beside it.
         $response->assertSee('! loading && ! error && total === 0', false);
@@ -148,7 +158,8 @@ class ShopLabelsTest extends TestCase
             ->get(route('shop.labels'))
             ->assertOk()
             ->assertSee('Clear queue')
-            ->assertSee('data-clear-url="'.e(route('labels.dismiss-all')).'"', false);
+            ->assertSee('data-clear-url="'.e(route('labels.dismiss-all')).'"', false)
+            ->assertSee('data-restore-url="'.e(route('labels.restore-batch')).'"', false);
     }
 
     public function test_barista_is_forbidden(): void
@@ -462,5 +473,159 @@ class ShopLabelsTest extends TestCase
             "new CustomEvent('shop-scan-saved')",
             file_get_contents(resource_path('js/shop/labels.js'))
         );
+    }
+
+    /**
+     * Prints are grouped in the office history's five-minute windows; within a
+     * window one item per barcode, newest first, with how many were printed.
+     */
+    public function test_printed_today_groups_prints_in_five_minute_windows(): void
+    {
+        $this->travelTo(now()->setTime(9, 0, 10));
+        LabelLog::logLabelPrint(self::LEEKS);
+        $this->travelTo(now()->setTime(9, 1, 0));
+        LabelLog::logLabelPrint('9999999999999');
+
+        $this->travelTo(now()->setTime(14, 2, 0));
+        LabelLog::logLabelPrint(self::OAT);
+        $this->travelTo(now()->setTime(14, 3, 0));
+        LabelLog::logLabelPrint(self::LEEKS);
+        $this->travelTo(now()->setTime(14, 4, 0));
+        LabelLog::logLabelPrint(self::OAT);
+
+        $this->travelTo(now()->setTime(15, 0, 0));
+
+        $json = $this->actingAs($this->employee())
+            ->getJson(route('labels.printed-today'))
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('today', $json['day']);
+        $this->assertCount(2, $json['batches']);
+
+        [$afternoon, $morning] = $json['batches'];
+
+        $this->assertSame('14:00', $afternoon['time']);
+        $this->assertSame(3, $afternoon['count']);
+        $this->assertSame([self::OAT, self::LEEKS], array_column($afternoon['items'], 'code'));
+        $this->assertSame('p1', $afternoon['items'][0]['id']);
+        $this->assertSame('Oat drink 1 L', $afternoon['items'][0]['name']);
+        $this->assertSame(2, $afternoon['items'][0]['copies']);
+        $this->assertSame('€2.99 · ×2', $afternoon['items'][0]['meta']);
+        $this->assertSame(1, $afternoon['items'][1]['copies']);
+        $this->assertSame('€1.50', $afternoon['items'][1]['meta']);
+
+        $this->assertSame('09:00', $morning['time']);
+        $this->assertSame(2, $morning['count']);
+        $unknown = $morning['items'][0];
+        $this->assertSame('9999999999999', $unknown['code']);
+        $this->assertNull($unknown['id']);
+        $this->assertSame('Product not found', $unknown['name']);
+        $this->assertNull($unknown['price']);
+        $this->assertSame('', $unknown['meta']);
+    }
+
+    /**
+     * First thing in the morning nothing has printed yet; yesterday's sheet is
+     * still worth showing.
+     */
+    public function test_printed_today_falls_back_to_yesterday(): void
+    {
+        $this->travelTo(now()->subDay()->setTime(18, 0, 0));
+        LabelLog::logLabelPrint(self::OAT);
+
+        $this->travelTo(now()->addDay()->setTime(8, 30, 0));
+
+        $json = $this->actingAs($this->employee())
+            ->getJson(route('labels.printed-today'))
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('yesterday', $json['day']);
+        $this->assertCount(1, $json['batches']);
+        $this->assertSame('18:00', $json['batches'][0]['time']);
+        $this->assertSame(self::OAT, $json['batches'][0]['items'][0]['code']);
+    }
+
+    public function test_printed_today_is_empty_when_neither_day_has_prints(): void
+    {
+        $this->actingAs($this->employee())
+            ->getJson(route('labels.printed-today'))
+            ->assertOk()
+            ->assertExactJson(['day' => 'today', 'batches' => []]);
+    }
+
+    public function test_requeue_puts_a_printed_product_back_on_the_queue(): void
+    {
+        LabelLog::logPriceUpdate(self::OAT);
+        LabelLog::logLabelPrint(self::OAT);
+
+        $employee = $this->employee();
+
+        $this->assertCount(0, $this->actingAs($employee)->getJson(route('labels.queue'))->json('rows'));
+
+        $this->actingAs($employee)
+            ->postJson(route('labels.requeue'), ['product_id' => 'p1'])
+            ->assertOk()
+            ->assertJson(['success' => true]);
+
+        $rows = $this->actingAs($employee)->getJson(route('labels.queue'))->json('rows');
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(self::OAT, $rows[0]['code']);
+    }
+
+    public function test_restore_batch_is_for_managers(): void
+    {
+        LabelLog::logPriceUpdate(self::OAT);
+        LabelLog::logNewProduct(self::LEEKS);
+
+        $manager = $this->manager();
+
+        $this->actingAs($manager)->postJson(route('labels.dismiss-all'))->assertOk();
+        $this->assertCount(0, $this->actingAs($manager)->getJson(route('labels.queue'))->json('rows'));
+
+        $body = ['timestamp' => now()->toIso8601String(), 'product_ids' => ['p1', 'p2']];
+
+        $this->actingAs($this->employee())
+            ->postJson(route('labels.restore-batch'), $body)
+            ->assertForbidden();
+
+        $this->actingAs($manager)
+            ->postJson(route('labels.restore-batch'), $body)
+            ->assertOk()
+            ->assertJson(['success' => true, 'restored_count' => 2]);
+
+        $codes = array_column($this->actingAs($manager)->getJson(route('labels.queue'))->json('rows'), 'code');
+        sort($codes);
+
+        $this->assertSame([self::OAT, self::LEEKS], $codes);
+    }
+
+    public function test_printed_today_is_forbidden_for_baristas(): void
+    {
+        $barista = $this->userWith('barista', ['kds.access']);
+
+        $this->actingAs($barista)->getJson(route('labels.printed-today'))->assertForbidden();
+    }
+
+    /**
+     * Undo is usually tapped within a second of Remove, and created_at is to
+     * the second: the re-queue ties with the dismissal and must still win,
+     * because it is the later row.
+     */
+    public function test_undo_in_the_same_second_as_remove_puts_the_product_back(): void
+    {
+        $this->freezeSecond();
+
+        LabelLog::logPriceUpdate(self::OAT);
+        LabelLog::logLabelDismiss(self::OAT);
+
+        $service = app(LabelQueueService::class);
+        $this->assertNotContains(self::OAT, $this->candidateBarcodes($service), 'A dismissal in the same second as the event resolves it.');
+
+        LabelLog::logRequeueLabel(self::OAT);
+
+        $this->assertContains(self::OAT, $this->candidateBarcodes($service), 'A re-queue in the same second as the dismissal puts it back.');
     }
 }

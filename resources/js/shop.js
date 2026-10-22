@@ -23,6 +23,7 @@ import requestsBoard from './shop/requests-board';
 import scanInput from './shop/scan-input';
 import stockScan from './shop/stock-scan';
 import vouchers from './shop/vouchers';
+import zebra from './shop/zebra';
 
 // Outside alpine:init: the idle lock is plain DOM and must run even if Alpine
 // never boots — a tablet left signed in is the thing this prevents.
@@ -38,6 +39,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('shopDeliveryScan', deliveryScan);
     Alpine.data('shopDeliverySummary', deliverySummary);
     Alpine.data('shopLabels', labels);
+    Alpine.data('shopZebra', zebra);
     Alpine.data('shopRequestForm', requestForm);
     Alpine.data('shopRequestEdit', requestEdit);
     Alpine.data('shopRequestsBoard', requestsBoard);

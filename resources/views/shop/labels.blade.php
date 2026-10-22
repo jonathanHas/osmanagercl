@@ -1,28 +1,16 @@
 <x-shop-layout title="Print labels" :back="route('shop.home')">
-    <main class="shop-page" x-data="shopLabels()"
+    <main class="shop-page shop-page--narrow" x-data="shopLabels()"
           data-queue-url="{{ route('labels.queue') }}"
           data-scan-url="{{ route('labels.scan') }}"
           data-dismiss-url="{{ route('labels.dismiss') }}"
           data-clear-url="{{ $canClear ? route('labels.dismiss-all') : '' }}"
+          data-printed-url="{{ route('labels.printed-today') }}"
+          data-requeue-url="{{ route('labels.requeue') }}"
+          data-restore-url="{{ $canClear ? route('labels.restore-batch') : '' }}"
           @scan="onScan($event.detail.code)">
-        <x-shop.scan-input placeholder="Scan a product to add a label" hint="Ready — scan to add to the queue" />
+        @include('shop.partials.labels-nav', ['active' => 'shelf'])
 
-        <nav class="shop-tiles shop-tiles--hub" aria-label="Label tools">
-            <a class="shop-tile shop-tile--row" href="{{ $zebraUrl }}">
-                <span class="shop-tile__icon"><x-shop.icon name="barcode" size="lg" /></span>
-                <span class="shop-tile__text">
-                    <span class="shop-tile__label">Zebra labels</span>
-                    <span class="shop-tile__hint">Saved labels and the counter printer</span>
-                </span>
-            </a>
-            <a class="shop-tile shop-tile--row" href="{{ route('labels.shelf-labels') }}">
-                <span class="shop-tile__icon"><x-shop.icon name="list-checks" size="lg" /></span>
-                <span class="shop-tile__text">
-                    <span class="shop-tile__label">Printed recently</span>
-                    <span class="shop-tile__hint">Office page: history and re-queue</span>
-                </span>
-            </a>
-        </nav>
+        <x-shop.scan-input placeholder="Scan a product to add a label" hint="Ready — scan to add to the queue" />
 
         <div class="shop-between">
             <h2 class="shop-subtitle">Print queue</h2>
@@ -49,7 +37,7 @@
         <div class="shop-empty" x-show="! loading && ! error && total === 0" x-cloak>
             <div class="shop-empty__icon"><x-shop.icon name="check" size="xl" /></div>
             <p class="shop-empty__title">All caught up</p>
-            <p class="shop-empty__text">Nothing needs a label. Scan a product to add one.</p>
+            <p class="shop-empty__text">Every product has its shelf label. Scan a product to add one.</p>
         </div>
 
         <section class="shop-empty" x-show="error" x-cloak>
@@ -58,11 +46,50 @@
             <p class="shop-empty__text" x-text="error"></p>
         </section>
 
+        {{-- Printed today: the history is a convenience, so it stays collapsed and
+             never blocks the queue. Batch rows sit in an x-if; their handlers only
+             touch component state, never $root. --}}
+        <section class="shop-list" aria-label="Printed today" x-show="batches.length" x-cloak>
+            <button class="shop-row" type="button" :aria-expanded="historyOpen" @click="historyOpen = ! historyOpen">
+                <span class="shop-row__lead"><x-shop.icon name="printer" /></span>
+                <span class="shop-row__main">
+                    <span class="shop-row__title">Printed today</span>
+                    <span class="shop-row__meta" x-text="historyMeta"></span>
+                </span>
+                <x-shop.icon name="chevron-right" class="shop-row__chev" x-bind:class="historyOpen && 'is-open'" />
+            </button>
+            <template x-if="historyOpen">
+                <div class="shop-contents">
+                    <template x-for="b in batches" :key="b.key">
+                        <div class="shop-contents">
+                            <button class="shop-row shop-row--batch" type="button" :aria-expanded="openBatch === b.key" @click="openBatch = openBatch === b.key ? null : b.key">
+                                <span class="shop-row__main">
+                                    <span class="shop-row__title" x-text="b.time + ' · ' + plural(b.count, 'label')"></span>
+                                    <span class="shop-row__meta" x-text="plural(b.items.length, 'product')"></span>
+                                </span>
+                                <x-shop.icon name="chevron-right" class="shop-row__chev" x-bind:class="openBatch === b.key && 'is-open'" />
+                            </button>
+                            <template x-for="it in b.items" :key="it.key">
+                                <div class="shop-row shop-row--nested" x-show="openBatch === b.key">
+                                    <div class="shop-row__main">
+                                        <span class="shop-row__title" x-text="it.name"></span>
+                                        <span class="shop-row__meta" x-text="it.meta"></span>
+                                    </div>
+                                    <button class="shop-btn shop-btn--secondary shop-row__action" type="button" x-show="it.id && ! inQueue(it)" :disabled="busy" @click="requeue(b, it)">Back to queue</button>
+                                    <span class="shop-pill shop-pill--ok" x-show="it.id && inQueue(it)">In queue</span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </section>
+
         {{-- The A4 sheet opens in a new tab, so this tab's queue is stale until the
              prints are logged; reload shortly after submitting. --}}
         {{-- shop-contents (display: contents) so the sticky Print bar is laid out in <main> and sticks. --}}
         <form class="shop-contents" method="POST" action="{{ route('labels.print-a4') }}" target="_blank"
-              x-show="total > 0" x-cloak @submit="setTimeout(() => load(), 1500)">
+              x-show="total > 0" x-cloak @submit="setTimeout(() => { load(); loadPrinted(); }, 1500)">
             @csrf
             <template x-for="id in ids" :key="id">
                 <input type="hidden" name="products[]" :value="id">
@@ -84,6 +111,9 @@
                 <span class="shop-toast__icon" x-show="! toast || toast.tone === 'ok'"><x-shop.icon name="check" size="sm" /></span>
                 <span class="shop-toast__icon" x-show="toast && toast.tone !== 'ok'" x-cloak><x-shop.icon name="alert" size="sm" /></span>
                 <span class="shop-toast__text" x-text="toast?.text"></span>
+                {{-- "!!": Alpine calls a function an expression returns, so a bare
+                     toast?.undo would run the undo the moment the toast shows. --}}
+                <button class="shop-btn shop-btn--ghost" type="button" x-show="!! toast?.undo" @click="undo()">Undo</button>
             </div>
         </div>
     </main>

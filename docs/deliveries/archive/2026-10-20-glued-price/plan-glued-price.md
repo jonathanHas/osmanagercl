@@ -1,6 +1,6 @@
 # Udea parser: prices run into the description
 
-Status: READY
+Status: ACCEPTED
 Revision: 1
 Planner: Fable 5.1
 Date: 2026-10-20
@@ -458,4 +458,56 @@ Owner action (not the Implementer's): on production, add `6003103` to
 
 ## Review
 
-(Planner fills this in after reading implemented-glued-price.md and the diff.)
+Planner, 2026-10-20, after reading `implemented-glued-price.md` to the end
+and the full `git diff`, and rerunning every verification command.
+
+### Criteria
+
+| Step | Result |
+|---|---|
+| 1 un-glue | Pass. `MONEY` / `GLUED_PRICE_REGEX` verbatim from the plan, applied as the last rule of `_preprocess_line()`. |
+| 2 shifted-tail repair | Pass. The six conditions in the plan's order; runs only when the case-size repair declined; called before the fields are read; `Purchase price repaired for …` warning; `price_repaired` on the item. |
+| 3 unparsed guard | Pass. `_is_likely_product_line()` on the preprocessed line with the structural clause; raw line still recorded. |
+| 4 parser tests | Pass. 8 tests, real lines, `220 passed` rerun. |
+| 5 wrapper runs | Pass, rerun: 4795456 → 62 items, confidence 100, exactly the three `Purchase price repaired` warnings, no `Price mismatch` / `likely product` / `total mismatch`; 4798553 → 5 items, no warnings, `6003103` 4 × €4.63 = €18.52, `price_valid` true, note null. |
+| 6 page labels | Pass. Count split by note prefix, second blue span, both badges keyed on `purchase price`; new Feature test; `--filter=DeliveryPriceCheckTest` and the three delivery test files rerun, 0 failures; pint PASS. |
+| 7 doc | Pass. One paragraph after the price-check one; nothing else in `docs/features/` changed. |
+| 8 dev import | Pass, re-checked in the DB: delivery 169 `DEL-20261020-131040`, 67 items, 3 parser warnings, `unparsed_lines` null; `36488` / `36489` / `36491` `price_valid` true with the note, cost €3.17; `6003103` 4 × €4.63, no note. Delivery 168 untouched (279 items). |
+| Full suite | `16 failed, 43 passed (5099 assertions)`, the baseline set exactly. |
+
+Whole-corpus check with the implemented parser (`parse_invoice()` on all
+158 Udea dockets we have, 13,271 items): 0 unmatched lines, 0 products-total
+mismatches, 12 case-size repairs, 31 purchase-price repairs on 6 products
+(`36488`, `36489`, `36491`, `5007341`, `88927`, `6000681`), and the only 2
+price-check failures left are the known `530144` variable-weight glue.
+
+### Deviations
+
+1. Supplier 5 "Udea" on the dev import instead of production's 85 "Udea
+   Frozen": accepted; the parser output does not depend on the supplier.
+2. Test-file docstring extended with a new paragraph rather than the last
+   one rewritten: accepted; that is what the step meant.
+
+### Notes for Planner
+
+1. The Constraints line "except for the one assertion step 6 names" named
+   nothing: Planner's wording error, no assertion needed changing. Noted.
+2. `_repair_shifted_price()` running on every line the case-size repair
+   declined: as intended (the two glues never coincide; the case-size repair
+   has first go).
+3. The no-VAT check line being listed because of the split unit: as the
+   plan's step 3 check already says; the unit-less line covers the
+   structural clause. No action.
+4. Owner action unchanged: add `6003103` to production
+   `DEL-20261020-120934` by hand (4 × €4.63).
+
+### Archive
+
+```
+mkdir -p docs/deliveries/archive/2026-10-20-glued-price
+git mv docs/deliveries/plan-glued-price.md docs/deliveries/implemented-glued-price.md docs/deliveries/archive/2026-10-20-glued-price/ 2>/dev/null \
+  || mv docs/deliveries/plan-glued-price.md docs/deliveries/implemented-glued-price.md docs/deliveries/archive/2026-10-20-glued-price/
+```
+
+(Both files are untracked, so plain `mv` is what will run.) Then commit the
+five code files with the doc change.
