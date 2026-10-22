@@ -505,6 +505,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/{zebraLabel}/print', [ZebraLabelController::class, 'print'])->name('print')->middleware('permission:labels.print');
         Route::patch('/{zebraLabel}/copies', [ZebraLabelController::class, 'updateCopies'])->name('update-copies')->middleware('permission:labels.manage');
         Route::patch('/{zebraLabel}/fields', [ZebraLabelController::class, 'updateFields'])->name('update-fields')->middleware('permission:labels.manage');
+        Route::patch('/{zebraLabel}/country', [ZebraLabelController::class, 'setCountry'])->name('set-country')->middleware('permission:labels.print');
     });
 
     // Fruit & Veg routes

@@ -97,26 +97,13 @@ class LabelAreaController extends Controller
      *
      * Same groups and mismatches the office page shows (ZebraLabelListService),
      * in the order on the till, other, standalone, translated. Each item carries
-     * its own print URL; the ZPL never leaves the server.
+     * its own print and country URLs; the ZPL never leaves the server.
      */
     public function zebraList(): \Illuminate\Http\JsonResponse
     {
         $groups = $this->zebraList->grouped();
 
-        $zebra = fn (array $label, string $group) => [
-            'kind' => 'zebra',
-            'group' => $group,
-            'id' => $label['id'],
-            'name' => $label['product_name'] ?? $label['name'],
-            // Standalone labels have no product, so their name is the title.
-            'label' => $group === 'standalone' ? null : $label['name'],
-            'product_code' => $label['product_code'],
-            'width_mm' => $label['width_mm'],
-            'height_mm' => $label['height_mm'],
-            'default_copies' => (int) ($label['default_copies'] ?? 1),
-            'mismatches' => $label['mismatches'],
-            'print_url' => route('zebra-labels.print', $label['id']),
-        ];
+        $zebra = fn (array $label, string $group) => $this->zebraList->shopItem($label, $group);
 
         $labels = array_merge(
             array_map(fn ($l) => $zebra($l, 'till'), $groups['onTill']),
@@ -133,8 +120,10 @@ class LabelAreaController extends Controller
                 'height_mm' => $t['height_mm'],
                 'default_copies' => 1,
                 'mismatches' => null,
+                'country' => null,
                 'auto_print' => $t['auto_print'],
                 'print_url' => route('labels.translate.print', $t['id']),
+                'country_url' => null,
             ], $this->zebraList->translated()),
         );
 

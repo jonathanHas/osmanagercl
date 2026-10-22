@@ -217,11 +217,19 @@ templates, the full print history).
 - **Zebra labels** lists saved Zebra labels (on the till, other products,
   standalone) and translated labels from `labels.zebra-list`, built by
   `App\Services\ZebraLabelListService`, which the office Zebra page also uses.
-  Scan a product or search; the print card shows whether the label's price or
-  country still matches the till and prints the till's value **for that print
-  only** (the print endpoint's `fields` override). The saved label is fixed only
-  on the office page. Each item carries its own `print_url`; the ZPL is never
-  sent to the browser.
+  Scan a product or search; the print card shows whether the label's price
+  still matches the till and prints the till's price **for that print only**
+  (the print endpoint's `fields` override); the saved price is fixed only on the
+  office page. The card also shows the **country of origin** in a select:
+  changing it saves at once, to the label's country text and to the product's
+  till record (`vegDetails` via `VegDetails::upsertForProduct()`, no shelf label
+  reprint), through `zebra-labels.set-country` (PATCH, `labels.print`; it can
+  change only the detected country field, to a name from `countries`). Labels
+  without recognised country text (graphics-only ZPL, no country, or a word not
+  in `countries` such as "Holland") carry the `help` icon in the list and a
+  notice on the card; for them only the till record changes, and the label is
+  fixed in the office. Each item carries its own `print_url` and `country_url`;
+  the ZPL is never sent to the browser.
 - **Printer line**: the spool (`labels.printer-queue`) is read after the page
   renders, because it can take 15 s when the printer is down. A print to an
   unreachable printer fails; nothing is held. **Cancel all**
@@ -229,7 +237,8 @@ templates, the full print history).
 - Code: `app/Http/Controllers/Shop/LabelsController.php`, `ZebraController.php`,
   `resources/views/shop/labels.blade.php`, `zebra.blade.php`,
   `resources/js/shop/labels.js`, `zebra.js`; endpoints in
-  `LabelAreaController` (`printedToday()`, `zebraList()`).
+  `LabelAreaController` (`printedToday()`, `zebraList()`) and
+  `ZebraLabelController::setCountry()`.
 
 ### Orders: list and order review
 

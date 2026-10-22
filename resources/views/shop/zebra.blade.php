@@ -46,13 +46,17 @@
                 <p class="shop-hint">For this print only. The saved label is fixed in the office.</p>
             </div>
 
-            <div class="shop-card shop-card--flat" x-show="selected?.mismatches?.country" x-cloak>
-                <div class="shop-between">
-                    <span class="shop-row__title" x-text="countryText"></span>
-                    <span class="shop-pill shop-pill--warn">Country differs</span>
-                </div>
-                <label class="shop-switch"><input type="checkbox" x-model="useTillCountry"><span class="shop-switch__track"></span><span class="shop-switch__text"></span><span class="shop-switch__label">Print with till country</span></label>
-                <p class="shop-hint">For this print only. The saved label is fixed in the office.</p>
+            {{-- Saves at once: the label's country text (when it has one) and the till record. --}}
+            <div class="shop-field" x-show="selected?.kind === 'zebra'" x-cloak>
+                <label class="shop-field__label" for="zebra-country">Country of origin</label>
+                <select id="zebra-country" class="shop-input shop-select" x-model="countryId" :disabled="busy" @change="setCountry()">
+                    <option value="">Choose…</option>
+                    @foreach ($countries as $country)
+                        <option value="{{ $country->id }}">{{ $country->name }}</option>
+                    @endforeach
+                </select>
+                <p class="shop-notice" x-show="noCountryText(selected)" x-cloak><x-shop.icon name="help" size="sm" />Not printed on this label. Fix the label in the office.</p>
+                <p class="shop-hint" x-show="countryHint" x-text="countryHint"></p>
             </div>
 
             <p class="shop-notice"><x-shop.icon name="info" size="sm" /><span x-text="stockText"></span></p>
@@ -87,7 +91,11 @@
                         <button class="shop-row" type="button" :class="{ 'is-latest': isSelected(r) }" @click="open(r)">
                             <span class="shop-row__main">
                                 <span class="shop-row__title" x-text="r.name"></span>
-                                <span class="shop-row__meta" x-text="rowMeta(r)"></span>
+                                <span class="shop-row__meta shop-row__meta--icon">
+                                    <x-shop.icon name="help" size="sm" x-show="noCountryText(r)" />
+                                    <span class="shop-sr-only" x-show="noCountryText(r)">Country not printed on this label</span>
+                                    <span x-text="rowMeta(r)"></span>
+                                </span>
                             </span>
                             <span class="shop-pill" :class="'shop-pill--' + pill(r)?.tone" x-show="pill(r)" x-text="pill(r)?.text"></span>
                         </button>

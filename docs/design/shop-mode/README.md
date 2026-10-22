@@ -13,7 +13,7 @@ session so the Implementer can build from files. This folder is documentation, n
 | `screen-NN-*.html` | The screens in scope (17 at first, 19 and 20 added 2026-10-06), as plain static pages that open in a browser from this folder. Markup inside `<div class="shop">` is identical to the design; only the Claude Design viewer wrapper was replaced by a normal `<head>` and the cross-links renamed to these filenames. Screen 08 (Coffee KDS) is deliberately omitted: the KDS keeps its existing page. |
 
 Screens: 01 Home · 02 Stock scan · 03 Price check · 04 Deliveries · 05 Delivery scan · 06 Delivery summary ·
-07 Shelf labels + 07b Zebra labels (replace 07 Print labels; saved 2026-10-21 from the owner's Claude Design revision, as live templates with their `<script type="text/x-dc">` behaviour spec kept; `screen-07-print-labels.html` is superseded) · 09 Requests board (guest) · 10 Requests staff · 11 Vouchers · 12 F&V availability ·
+07 Shelf labels + 07b Zebra labels (replace 07 Print labels; saved 2026-10-21 from the owner's Claude Design revision, as live templates with their `<script type="text/x-dc">` behaviour spec kept; `screen-07-print-labels.html` is superseded; in 07b the "Print with till country" switch was replaced by a Country of origin select, owner decision 2026-10-22, `docs/shop_new/findings/2026-10-22-zebra-country.md`) · 09 Requests board (guest) · 10 Requests staff · 11 Vouchers · 12 F&V availability ·
 13 F&V waste · 14 F&V harvest · 15 F&V labels · 16 Switch user · 17 PIN · 18 Locked ·
 19 New order · 20 Order review (added to the design and saved here 2026-10-06; `shop.css` refreshed to 608 lines the same day, additive only: `.shop-select`, `.shop-hint`, `.shop-disclosure`, `.shop-ord*`, `.shop-spark*`).
 

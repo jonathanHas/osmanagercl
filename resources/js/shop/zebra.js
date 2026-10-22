@@ -9,10 +9,14 @@
  *   - labels.printer-queue  GET   the counter printer's spool (up to 15 s)
  *   - labels.printer-cancel POST  cancel every job (managers only; the URL is
  *                                 blank otherwise)
+ *   - zebra-labels.set-country PATCH  each Zebra item's country_url: saves the
+ *                                 country of origin to the label's country text
+ *                                 (when it has one) and the till record
  *
- * A price or country that no longer matches the till is printed with the till's
- * value through the print endpoint's `fields` override, for that print only. The
- * saved label is never edited from here; that stays on the office page.
+ * A price that no longer matches the till is printed with the till's price
+ * through the print endpoint's `fields` override, for that print only; the saved
+ * price is fixed on the office page. The country of origin is the one thing
+ * saved from here.
  */
 const TOAST_MS = 4000;
 const MAX_COPIES = 99;
@@ -29,7 +33,8 @@ export default () => ({
     selected: null,
     copies: 1,
     useTillPrice: true,
-    useTillCountry: true,
+    // The country select's value: a countries.id as a string, '' for none.
+    countryId: '',
     busy: false,
     loading: true,
     error: null,
@@ -151,7 +156,7 @@ export default () => ({
         this.selected = l;
         this.copies = l.default_copies || 1;
         this.useTillPrice = true;
-        this.useTillCountry = true;
+        this.countryId = String(l.country?.label_id ?? l.country?.till_id ?? '');
 
         try {
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -239,10 +244,82 @@ export default () => ({
         return m ? `Label says €${m.label_value}, till says €${m.db_value}` : '';
     },
 
-    get countryText() {
-        const m = this.selected?.mismatches?.country;
+    /**
+     * A saved Zebra label whose country is not printed as text the app knows:
+     * graphics-only ZPL, no country, or a word not in countries ("Holland").
+     * field_index can be 0, so it is compared with null.
+     */
+    noCountryText(r) {
+        return r?.kind === 'zebra' && (r.country?.field_index ?? null) === null;
+    },
 
-        return m ? `Label says ${m.label_value}, till says ${m.db_value}` : '';
+    get countryHint() {
+        const s = this.selected;
+        const c = s?.country;
+
+        if (! s || s.kind !== 'zebra' || ! c) {
+            return '';
+        }
+
+        if (c.label && c.till && c.label !== c.till) {
+            return `Label says ${c.label} · till says ${c.till}`;
+        }
+
+        if (c.label && ! c.till && s.product_code) {
+            return 'Not on the till';
+        }
+
+        return '';
+    },
+
+    async setCountry() {
+        const s = this.selected;
+
+        if (! this.countryId || ! s?.country_url) {
+            return;
+        }
+
+        this.busy = true;
+
+        try {
+            const response = await fetch(s.country_url, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': this.csrf,
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ country_id: Number(this.countryId) }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok && data.success && data.label) {
+                const index = this.labels.findIndex((l) => l.kind === data.label.kind && l.id === data.label.id);
+
+                if (index !== -1) {
+                    this.labels.splice(index, 1, data.label);
+                }
+
+                this.selected = data.label;
+
+                const name = data.label.country?.till ?? data.label.country?.label;
+
+                this.showToast('ok', 'Country of origin: ' + (name ?? ''));
+            } else {
+                this.countryFailed(s);
+            }
+        } catch (e) {
+            this.countryFailed(s);
+        } finally {
+            this.busy = false;
+        }
+    },
+
+    countryFailed(s) {
+        this.showToast('bad', 'Could not save the country');
+        this.countryId = String(s.country?.label_id ?? s.country?.till_id ?? '');
     },
 
     get stockText() {
@@ -256,8 +333,8 @@ export default () => ({
     },
 
     /**
-     * Field index → text, applied by the print endpoint for this print only.
-     * Saved Zebra labels only; translations carry no mismatches.
+     * Field index → text, applied by the print endpoint for this print only: the
+     * till price. Saved Zebra labels only; translations carry no mismatches.
      */
     overrides() {
         const fields = {};
@@ -269,10 +346,6 @@ export default () => ({
 
         if (m.price && this.useTillPrice) {
             fields[m.price.field_index] = m.price.new_field;
-        }
-
-        if (m.country && this.useTillCountry) {
-            fields[m.country.field_index] = m.country.new_field;
         }
 
         return fields;

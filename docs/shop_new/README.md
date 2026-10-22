@@ -15,7 +15,7 @@ changing it. Feature documentation: `docs/features/shop-mode.md`.
 
 | | |
 |---|---|
-| Current task | none. **Labels** accepted 2026-10-21 and uncommitted (`plan.md` / `implemented.md`, to archive as `archive/2026-10-21-labels/`): Shelf labels and Zebra labels tabs inside Shop mode, from the Claude Design revision saved as `docs/design/shop-mode/screen-07-shelf-labels.html` / `screen-07b-zebra-labels.html` (brief: `design-brief-labels.md`); the owner's production print check is still to do. Accepted 2026-10-02 and uncommitted: delivery follow-ups (`archive/2026-10-02-delivery-follow-ups/`), product-search failure message (`archive/2026-10-02-search-failure-message/`), sticky "New request" / Print bars + "No products match" (`archive/2026-10-02-requests-sticky-bar/`). Committed: find-by-name, `9247c79e`. The owner's `ToDo.txt` item is done |
+| Current task | side plan **Zebra country** (`plan-zebra-country.md` READY, Revision 1, 2026-10-22; report in `implemented-zebra-country.md`): country-of-origin select on the Zebra card, saves label text + till record. **Labels** accepted 2026-10-21 and uncommitted (`plan.md` / `implemented.md`, to archive as `archive/2026-10-21-labels/`): Shelf labels and Zebra labels tabs inside Shop mode, from the Claude Design revision saved as `docs/design/shop-mode/screen-07-shelf-labels.html` / `screen-07b-zebra-labels.html` (brief: `design-brief-labels.md`); the owner's production print check is still to do. Accepted 2026-10-02 and uncommitted: delivery follow-ups (`archive/2026-10-02-delivery-follow-ups/`), product-search failure message (`archive/2026-10-02-search-failure-message/`), sticky "New request" / Print bars + "No products match" (`archive/2026-10-02-requests-sticky-bar/`). Committed: find-by-name, `9247c79e`. The owner's `ToDo.txt` item is done |
 | HEAD | `9247c79e` on `feature/modularization-phase1` (track opened at `9f796b28`) |
 | Working tree | three accepted tasks uncommitted (Shop delivery, typeahead, requests and labels views, `shop.css`, their tests, `docs/features/shop-mode.md`, `docs/shop_new/`) |
 | Test baseline | 16 failed (2026-10-21; see "Test baseline" below) |
@@ -37,7 +37,8 @@ changing it. Feature documentation: `docs/features/shop-mode.md`.
 
 Screens today: Home, Stock scan, Find product, Deliveries (list, scan,
 summary; built on the **legacy** `delivery-legacy.*` endpoints, which is the
-flow employees use), Print labels (Shelf labels and Zebra labels tabs), Customer requests (board, detail, edit; the
+flow employees use), Print labels (Shelf labels and Zebra labels tabs; the Zebra card sets the
+country of origin), Customer requests (board, detail, edit; the
 public `/customer-requests` route), Vouchers, F&V waste and harvest, PIN
 switch / lock / locked, trust device, Help (BookStack procedures). The coffee
 KDS is deliberately outside the Shop view.

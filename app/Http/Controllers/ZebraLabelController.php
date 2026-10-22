@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Country;
 use App\Models\Product;
 use App\Models\ZebraLabel;
+use App\Services\ZebraLabelListService;
 use App\Services\ZebraPrintService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -190,6 +193,19 @@ class ZebraLabelController extends Controller
         $newFields = ZebraLabel::extractTextFields($zpl);
 
         return response()->json(['success' => true, 'fields' => $newFields]);
+    }
+
+    /**
+     * Set the country of origin from the Shop Zebra tab: the label's country text
+     * and the product's till record. Unlike updateFields() it can change nothing
+     * else on the label, so it is open to every labels.print user.
+     */
+    public function setCountry(Request $request, ZebraLabel $zebraLabel, ZebraLabelListService $list): JsonResponse
+    {
+        $data = $request->validate(['country_id' => 'required|integer|exists:App\Models\Country,id']);
+        $item = $list->setCountry($zebraLabel, Country::findOrFail($data['country_id']));
+
+        return response()->json(['success' => true, 'label' => $list->shopItem($item, $list->groupOf($zebraLabel))]);
     }
 
     public function destroy(ZebraLabel $zebraLabel)

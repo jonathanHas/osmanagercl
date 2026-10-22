@@ -100,6 +100,7 @@ return [
         'vouchers.deduct',
         'vouchers.lookup',
         'zebra-labels.print',
+        'zebra-labels.set-country',
         'ui-mode.set',
         'login',
         'logout',

@@ -749,4 +749,8 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
    display: contents wrappers and are no longer siblings of the row above them;
    this puts back the separator .shop-row + .shop-row draws in the design. */
 .shop .shop-list > .shop-contents .shop-row { border-top: 1px solid var(--shop-line); }
+/* Zebra rows whose country of origin is not printed as text: a small help icon
+   before the meta text. */
+.shop .shop-row__meta--icon { display: inline-flex; align-items: center; gap: 4px; }
+.shop .shop-row__meta--icon > .shop-ico { width: 16px; height: 16px; color: var(--shop-ink-3); }
 /* === APP ADDITIONS END === */

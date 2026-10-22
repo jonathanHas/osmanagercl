@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
+use App\Models\Country;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -12,7 +13,8 @@ use Illuminate\View\View;
  *
  * The list comes client-side from `labels.zebra-list` (each item carries its
  * print URL) and the spool from `labels.printer-queue`, which can take seconds,
- * so nothing is prepared here beyond whether this user may cancel spool jobs.
+ * so nothing is prepared here beyond whether this user may cancel spool jobs
+ * and the countries for the country of origin select.
  */
 class ZebraController extends Controller
 {
@@ -20,6 +22,7 @@ class ZebraController extends Controller
     {
         return view('shop.zebra', [
             'canCancel' => $request->user()->hasPermission('labels.manage'),
+            'countries' => Country::orderBy('name')->get(['id', 'name']),
         ]);
     }
 }
