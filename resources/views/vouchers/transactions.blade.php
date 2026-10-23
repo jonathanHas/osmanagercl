@@ -6,6 +6,12 @@
                 <p class="text-sm text-gray-400 mt-1">
                     Created by {{ $voucher->creator?->name ?? '—' }} on {{ $voucher->created_at?->format('d M Y H:i') }}
                 </p>
+                @if ($voucher->isSponsored())
+                    <p class="text-sm mt-1">
+                        <span class="text-xs px-2 py-0.5 rounded bg-pink-800/50 text-pink-300">Sponsored</span>
+                        <span class="text-gray-300">Given to {{ $voucher->sponsored_to }} on {{ $voucher->sponsored_at?->format('d M Y') }} — no sale, booked as sponsorship</span>
+                    </p>
+                @endif
             </div>
             <a href="{{ route('vouchers.list') }}" class="text-blue-400 hover:text-blue-300 text-sm">Back to list</a>
         </div>
@@ -60,7 +66,7 @@
                         <tr>
                             <td class="px-4 py-2 text-gray-400 text-xs">{{ $tx->created_at?->format('d M Y H:i') }}</td>
                             <td class="px-4 py-2">
-                                <span class="text-xs px-2 py-0.5 rounded {{ $badge }}">{{ ['for_sale' => 'Made for sale', 'delete' => 'Deleted', 'restore' => 'Restored'][$tx->type] ?? ucfirst($tx->type) }}</span>
+                                <span class="text-xs px-2 py-0.5 rounded {{ $tx->isSponsorship() ? 'bg-pink-800/50 text-pink-300' : $badge }}">{{ $tx->isSponsorship() ? 'Sponsored' : (['for_sale' => 'Made for sale', 'delete' => 'Deleted', 'restore' => 'Restored'][$tx->type] ?? ucfirst($tx->type)) }}</span>
                                 @if ($tx->source === 'till')
                                     <span class="text-xs px-1.5 py-0.5 rounded bg-purple-800/50 text-purple-300">till</span>
                                 @endif

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Management;
 
 use App\Http\Controllers\Controller;
 use App\Services\SalesAccountingImportService;
+use App\Services\VoucherSponsorshipService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -57,12 +58,25 @@ class SalesAccountingReportController extends Controller
         // Check if we have pre-aggregated data for this date range
         $hasAggregatedData = $this->hasAggregatedData($startDate, $endDate);
 
-        if ($hasAggregatedData) {
-            return $this->getAggregatedReport($startDate, $endDate);
-        } else {
+        $data = $hasAggregatedData
+            ? $this->getAggregatedReport($startDate, $endDate)
             // Fall back to real-time query from POS database
-            return $this->getRealTimeReport($startDate, $endDate);
-        }
+            : $this->getRealTimeReport($startDate, $endDate);
+
+        // Vouchers an admin activated without a sale (charities, fundraisers).
+        // Nothing for them goes through the till, so they are listed here for the
+        // accounts to book as sponsorship. See docs/features/voucher-management.md.
+        $sponsored = app(VoucherSponsorshipService::class)->issuedBetween($startDate, $endDate);
+        $data['sponsored_vouchers'] = $sponsored->map(fn ($v) => [
+            'date' => $v->sponsored_at?->format('Y-m-d'),
+            'code' => $v->code,
+            'beneficiary' => $v->sponsored_to,
+            'amount' => round((float) $v->initial_value, 2),
+            'balance' => round((float) $v->current_balance, 2),
+        ])->values()->all();
+        $data['sponsored_total'] = round($sponsored->sum(fn ($v) => (float) $v->initial_value), 2);
+
+        return $data;
     }
 
     /**
@@ -414,7 +428,22 @@ class SalesAccountingReportController extends Controller
             if ($data['summary_metrics']['voucher_sales'] > 0) {
                 fputcsv($file, ['Voucher Sales:', '€'.number_format($data['summary_metrics']['voucher_sales'], 2)]);
             }
+            if (! empty($data['sponsored_vouchers'])) {
+                fputcsv($file, ['Sponsored Vouchers (activated without a sale):', '€'.number_format($data['sponsored_total'], 2)]);
+            }
             fputcsv($file, []); // Empty row
+
+            // Sponsored vouchers: no till sale, so nothing above carries them
+            if (! empty($data['sponsored_vouchers'])) {
+                fputcsv($file, ['SPONSORED VOUCHERS']);
+                fputcsv($file, ['Activated by an admin without a sale (charity / fundraiser). No money taken. Book as sponsorship expense; when redeemed the paperin adjust removes the goods from revenue as for any voucher.']);
+                fputcsv($file, ['Date', 'Voucher', 'Given to', 'Amount', 'Balance left']);
+                foreach ($data['sponsored_vouchers'] as $v) {
+                    fputcsv($file, [$v['date'], $v['code'], $v['beneficiary'], number_format($v['amount'], 2), number_format($v['balance'], 2)]);
+                }
+                fputcsv($file, ['TOTAL SPONSORED', '', '', number_format($data['sponsored_total'], 2), '']);
+                fputcsv($file, []); // Empty row
+            }
 
             // Write VAT breakdown
             fputcsv($file, ['VAT BREAKDOWN']);

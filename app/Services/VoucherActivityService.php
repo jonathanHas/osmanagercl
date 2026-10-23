@@ -89,7 +89,7 @@ class VoucherActivityService
         $redemption = $t->tillRedemption;
 
         [$kind, $label] = match ($t->type) {
-            VoucherTransaction::TYPE_ISSUE => ['issue', $till ? 'Sold at till' : 'Issued'],
+            VoucherTransaction::TYPE_ISSUE => ['issue', $till ? 'Sold at till' : ($t->isSponsorship() ? 'Sponsored' : 'Issued')],
             VoucherTransaction::TYPE_DEDUCT => $till ? ['redeem_till', 'Redeemed at till'] : ['redeem_manual', 'Redeemed'],
             VoucherTransaction::TYPE_DEACTIVATE => ['deactivate', 'Deactivated'],
             VoucherTransaction::TYPE_ACTIVATE => ['reactivate', 'Reactivated'],

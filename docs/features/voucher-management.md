@@ -28,6 +28,7 @@ Gift-voucher system for the shop. Customers buy vouchers and redeem them against
 - **`vouchers`** — `code` (unique), `initial_value`, `current_balance`, `status`, `created_by`, timestamps, soft deletes. Model: `app/Models/Voucher.php`.
 - **`vouchers.pos_product_id`** — the uniCenta `PRODUCTS.ID` of the voucher's hidden redemption product (nullable, unique; cycle 28).
 - **`vouchers.face_value`** — the value an unsold voucher is sold for at the till (nullable; vouchers cycle 3). Set by generation; NULL for vouchers generated before it. `initial_value` stays NULL until the voucher is activated.
+- **`vouchers.sponsored_to`, `sponsored_at`** — set when an admin activates the voucher without a sale (a charity or fundraiser; 2026-10-23): who it was given to and when. NULL for every sold or hand-activated voucher; cleared by Make for sale. See [Sponsorship activation](#admin-sponsorship-activation-no-sale).
 - **`voucher_transactions`** — full audit log: `voucher_id`, `type` (`issue` / `deduct` / `deactivate` / `activate`), `source` (`manual` / `till`, default `manual`), `amount`, `balance_after`, `note` (optional admin reason; `Till #N` for till redemptions), `user_id` (null for till rows), timestamps. Model: `app/Models/VoucherTransaction.php`.
 - **`voucher_till_redemptions`** — one row per voucher line seen on a till ticket: `pos_ticket_id` + `pos_product_id` (unique pair, the idempotency backstop), `voucher_code` snapshot, `ticket_number`, `ticket_type`, `sold_at`, `voucher_tender`, `ticket_total`, `sale_amount` (what the till charged for the voucher's own line on a sale; NULL on redemptions; vouchers cycle 3), `amount_deducted`, `shortfall`, `status`, `voucher_id`, `voucher_transaction_id`, `note`, `reviewed_at`, `reviewed_by`. Model: `app/Models/VoucherTillRedemption.php`.
 
@@ -235,6 +236,18 @@ Vouchers print on the shop's Zebra label printer (the same one used by `/labels`
 
 On the **All Vouchers** page (`/vouchers/list`), an admin-only **Edit** button (shown for `active`/`deactivated` rows) opens a modal to deactivate or reactivate the voucher with an optional reason/note. The action is logged to the voucher's transaction history (with the note). Deactivating preserves the balance and blocks redemption; reactivating restores it to `active`.
 
+## Admin: sponsorship activation (no sale)
+
+Added 2026-10-23. Vouchers given away to charities, raffles and fundraisers are activated **without a sale**, and the accounts need to see them as **sponsorship**, not as voucher sales.
+
+On `/vouchers/list` an admin-only **Sponsor** button (shown on `inactive` rows) opens a modal: **Amount** (pre-filled with the voucher's value, editable, so pre-2026-09-30 vouchers with no value work too), **Given to** (required, the charity / club / event) and an optional note. Submitting activates the voucher at once: `initial_value` and `current_balance` = the amount, status `active`, `sponsored_to` / `sponsored_at` set, one `issue` transaction (`source = manual`) whose note reads `Sponsorship: <given to> · <note>`, and the till product renamed to `[bal €X]` at €0.00 so it redeems like any other voucher. Only an unsold (`inactive`, not deleted) voucher qualifies; the till screens' manual activation (`vouchers.activate`) is unchanged and still has no sponsorship meaning.
+
+Where it shows: a pink **Sponsored** badge on the list row (hover for who and when) and a **Sponsored (no sale)** status filter; a "Given to … — no sale, booked as sponsorship" line on the voucher's transactions page; the issue labelled **Sponsored** in the till-screen history and on `/vouchers/activity` (it still counts in "Issued today"). **Make for sale** on a sponsored voucher clears the sponsorship (it is a sale again).
+
+**For the accounts.** A sold voucher is revenue at 0% VAT when sold, and the `paperin adjust` row removes the goods from revenue when it is redeemed. A sponsored voucher never goes through the till, so nothing in the sales tables carries it. The **Sales Accounting report** (`/management/sales-accounting`, and its CSV) therefore has a **Sponsored Vouchers (no sale)** section listing every voucher sponsored in the period (date, code, given to, amount, balance left) with a total: book the total as a **sponsorship expense** with the matching credit to voucher sales; the redemption's paperin adjust then nets out as for any voucher. The data comes from `vouchers.sponsored_at` / `initial_value` (`VoucherSponsorshipService::issuedBetween()`), so it needs no POS import.
+
+Code: `app/Services/VoucherSponsorshipService.php`, `VoucherController::sponsor()`, the Sponsor modal in `resources/views/vouchers/list.blade.php`, `VoucherTransaction::isSponsorship()`, and the `sponsored_vouchers` block in `SalesAccountingReportController` / `resources/views/management/sales-accounting/index.blade.php`. Tests: `tests/Feature/VoucherSponsorshipTest.php`.
+
 ## Admin changeover tools
 
 Added in vouchers cycle 4 (2026-09-29). Tools for bringing the vouchers that predate the sell-at-the-till process (activated by hand, 2026-06 to 2026-09) into it, and for clearing out test vouchers. **Admins only**, and all behind one switch, **`VOUCHER_ADMIN_TOOLS`** (`config('vouchers.admin_tools')`, default `true`): when false the five routes answer 404, the list page shows none of the controls, and the retire command refuses to run.
@@ -303,8 +316,9 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 | `vouchers.activity` | GET `/vouchers/activity` | manage |
 | `vouchers.activity.feed` | GET `/vouchers/activity/feed?days=1\|7\|30&q=` (JSON) | manage |
 | `vouchers.deactivate` / `.reactivate` | POST `/vouchers/{voucher}/...` | admin |
+| `vouchers.sponsor` | POST `/vouchers/{voucher}/sponsor` (`amount`, `beneficiary`, `note`) | admin |
 | `vouchers.bulk.for-sale` / `.deactivate` / `.reactivate` / `.delete` / `.restore` | POST `/vouchers/bulk/{action}` (`ids[]`, `note`) | admin, and `VOUCHER_ADMIN_TOOLS` on |
-| `vouchers.list` extras | GET `/vouchers/list?per_page=25\|50\|100\|200&status=deleted` | `status=deleted` admin only |
+| `vouchers.list` extras | GET `/vouchers/list?per_page=25\|50\|100\|200&status=deleted\|sponsored` | `status=deleted` admin only |
 
 ## Key files
 
@@ -312,8 +326,9 @@ Employees get a cut-down till screen: they can ring up a voucher payment but can
 - **Models**: `app/Models/Voucher.php`, `app/Models/VoucherTransaction.php`, `app/Models/VoucherTillRedemption.php`
 - **Till redemption**: `app/Services/VoucherPosProductService.php`, `app/Services/VoucherTillSyncService.php`, `app/Console/Commands/SyncVoucherPosProducts.php`, `app/Console/Commands/SyncVoucherTillRedemptions.php`, `config/vouchers.php`
 - **Activity screen**: `app/Services/VoucherActivityService.php`, `app/Services/VoucherSyncHeartbeat.php`
+- **Sponsorship activation**: `app/Services/VoucherSponsorshipService.php`, `tests/Feature/VoucherSponsorshipTest.php`
 - **Admin changeover tools**: `app/Services/VoucherAdminService.php`, `app/Http/Controllers/VoucherAdminToolsController.php`, `resources/views/vouchers/partials/admin-tools.blade.php`, `app/Console/Commands/RetireFixedVoucherProducts.php`
-- **Migrations**: `database/migrations/2026_06_24_120000_create_vouchers_table.php`, `..._120001_create_voucher_transactions_table.php`, `2026_06_25_120000_add_note_to_voucher_transactions_table.php`, `2026_09_28_100000_create_voucher_till_redemptions_table.php`, `..._100001_add_source_to_voucher_transactions_table.php`, `..._100002_add_pos_product_id_to_vouchers_table.php`, `2026_09_30_100000_add_face_value_to_vouchers_table.php`, `..._100001_add_sale_amount_to_voucher_till_redemptions_table.php`
+- **Migrations**: `database/migrations/2026_06_24_120000_create_vouchers_table.php`, `..._120001_create_voucher_transactions_table.php`, `2026_06_25_120000_add_note_to_voucher_transactions_table.php`, `2026_09_28_100000_create_voucher_till_redemptions_table.php`, `..._100001_add_source_to_voucher_transactions_table.php`, `..._100002_add_pos_product_id_to_vouchers_table.php`, `2026_09_30_100000_add_face_value_to_vouchers_table.php`, `..._100001_add_sale_amount_to_voucher_till_redemptions_table.php`, `2026_10_23_100000_add_sponsorship_to_vouchers_table.php`
 - **Views**: `resources/views/vouchers/{index,list,generate,print,transactions,exceptions,activity}.blade.php`
 - **Permissions/nav**: `database/seeders/RolesAndPermissionsSeeder.php`, `resources/views/layouts/admin.blade.php`
 - **Dev helpers** (never against production): `docs/vouchers/scripts/` — `simsale.php` (fake till sale; `SALE=1` sells a voucher as an item), `numeric_barcode.php`, `reset_voucher.php`

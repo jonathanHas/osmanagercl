@@ -1271,6 +1271,8 @@ Route::middleware('auth')->group(function () {
             Route::post('vouchers/bulk/delete', [VoucherAdminToolsController::class, 'delete'])->name('vouchers.bulk.delete');
             Route::post('vouchers/bulk/restore', [VoucherAdminToolsController::class, 'restore'])->name('vouchers.bulk.restore');
             Route::post('vouchers/bulk/for-sale', [VoucherAdminToolsController::class, 'forSale'])->name('vouchers.bulk.for-sale');
+            // Activate an unsold voucher without a sale (charity / fundraiser), recorded as a sponsorship.
+            Route::post('vouchers/{voucher}/sponsor', [VoucherController::class, 'sponsor'])->name('vouchers.sponsor');
             Route::post('vouchers/{voucher}/deactivate', [VoucherController::class, 'deactivate'])->name('vouchers.deactivate');
             Route::post('vouchers/{voucher}/reactivate', [VoucherController::class, 'reactivate'])->name('vouchers.reactivate');
         });

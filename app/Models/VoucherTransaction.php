@@ -32,6 +32,12 @@ class VoucherTransaction extends Model
 
     const SOURCE_TILL = 'till';     // the uniCenta Voucher tender, via vouchers:sync-till
 
+    /**
+     * An `issue` row written by a sponsorship activation (no sale) starts its
+     * note with this, followed by the beneficiary. See VoucherSponsorshipService.
+     */
+    const SPONSORSHIP_NOTE_PREFIX = 'Sponsorship: ';
+
     protected $fillable = [
         'voucher_id',
         'type',
@@ -46,6 +52,15 @@ class VoucherTransaction extends Model
         'amount' => 'decimal:2',
         'balance_after' => 'decimal:2',
     ];
+
+    /**
+     * An issue that was a sponsorship rather than a sale or a hand activation.
+     */
+    public function isSponsorship(): bool
+    {
+        return $this->type === self::TYPE_ISSUE
+            && str_starts_with((string) $this->note, self::SPONSORSHIP_NOTE_PREFIX);
+    }
 
     public function voucher(): BelongsTo
     {

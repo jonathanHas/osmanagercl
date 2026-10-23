@@ -28,6 +28,7 @@
                     <option value="active" @selected(request('status') === 'active')>Active</option>
                     <option value="deactivated" @selected(request('status') === 'deactivated')>Deactivated</option>
                     <option value="exhausted" @selected(request('status') === 'exhausted')>Exhausted</option>
+                    <option value="sponsored" @selected(request('status') === 'sponsored')>Sponsored (no sale)</option>
                     @if ($adminTools)
                         <option value="deleted" @selected($showDeleted)>Deleted</option>
                     @endif
@@ -86,6 +87,10 @@
                                     'exhausted' => 'bg-gray-700 text-gray-400',
                                 ][$voucher->status] ?? 'bg-yellow-800/50 text-yellow-300')
                                 <span class="text-xs px-2 py-0.5 rounded {{ $badge }}">{{ ucfirst($voucher->status) }}</span>
+                                @if ($voucher->isSponsored())
+                                    <span class="text-xs px-2 py-0.5 rounded bg-pink-800/50 text-pink-300"
+                                          title="Sponsorship: {{ $voucher->sponsored_to }} ({{ $voucher->sponsored_at?->format('d M Y') }})">Sponsored</span>
+                                @endif
                                 @if ($voucher->trashed())
                                     <span class="text-xs px-2 py-0.5 rounded bg-red-900 text-red-200">Deleted</span>
                                 @endif
@@ -108,6 +113,12 @@
                                     <button type="button"
                                             @click="openEdit({{ $voucher->id }}, @js($voucher->code), @js($voucher->status), {{ (float) $voucher->current_balance }})"
                                             class="text-yellow-400 hover:text-yellow-300">Edit</button>
+                                @endif
+                                @if ($isAdmin && $voucher->status === 'inactive')
+                                    <button type="button"
+                                            @click="openSponsor({{ $voucher->id }}, @js($voucher->code), {{ $voucher->face_value !== null ? (float) $voucher->face_value : 'null' }})"
+                                            title="Activate without a sale, for a charity or fundraiser"
+                                            class="text-pink-400 hover:text-pink-300">Sponsor</button>
                                 @endif
                                 <a href="{{ route('vouchers.transactions', $voucher) }}" class="text-blue-400 hover:text-blue-300">Log ({{ $voucher->transactions_count }})</a>
                                 <a href="{{ route('vouchers.print', ['ids' => $voucher->id]) }}" target="_blank" class="text-gray-400 hover:text-gray-200">Print</a>
@@ -176,10 +187,59 @@
                 </div>
             </div>
 
+            <!-- Sponsor modal: activate an unsold voucher without a sale -->
+            <div x-show="sponsorOpen" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                 style="display:none;" @keydown.escape.window="closeSponsor()">
+                <div class="absolute inset-0 bg-black/60" @click="closeSponsor()"></div>
+
+                <div class="relative bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 text-gray-100" @click.stop>
+                    <h3 class="text-lg font-semibold mb-1">Activate as a sponsorship</h3>
+                    <p class="font-mono text-sm text-gray-400 mb-3" x-text="sponsor.code"></p>
+                    <p class="text-xs text-gray-400 mb-4">
+                        No sale goes through the till. The voucher is activated now with the amount below and
+                        appears on the Sales Accounting report as a sponsored voucher, so the accounts can book it
+                        as sponsorship rather than a voucher sale.
+                    </p>
+
+                    <form @submit.prevent="submitSponsor()">
+                        <label for="sponsor-amount" class="block text-xs text-gray-400 mb-1">Amount (€)</label>
+                        <input id="sponsor-amount" type="number" step="0.01" min="0.01" max="{{ config('vouchers.max_face_value') }}" required
+                               x-model="sponsor.amount"
+                               class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-gray-100 mb-3">
+
+                        <label for="sponsor-beneficiary" class="block text-xs text-gray-400 mb-1">Given to (charity, club, event)</label>
+                        <input id="sponsor-beneficiary" type="text" maxlength="120" minlength="2" required
+                               x-model="sponsor.beneficiary" placeholder="e.g. St Mary's School raffle"
+                               class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-gray-100 mb-3">
+
+                        <label for="sponsor-note" class="block text-xs text-gray-400 mb-1">Note (optional)</label>
+                        <textarea id="sponsor-note" x-model="sponsor.note" rows="2" maxlength="300"
+                                  placeholder="Who asked, what for…"
+                                  class="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-gray-100 mb-4"></textarea>
+
+                        <div x-show="sponsorError" x-cloak class="mb-3 rounded bg-red-700 text-white px-3 py-2 text-sm" x-text="sponsorError"></div>
+
+                        <div class="flex justify-end gap-2">
+                            <button type="button" @click="closeSponsor()"
+                                    class="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white">Cancel</button>
+                            <button type="submit" :disabled="processing"
+                                    class="px-4 py-2 rounded bg-pink-600 hover:bg-pink-700 disabled:bg-gray-500 text-white font-medium">
+                                <span x-show="!processing">Activate as sponsorship</span>
+                                <span x-show="processing">Working…</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <script>
                 function voucherAdmin() {
                     return {
                         open: false,
+                        sponsorOpen: false,
+                        sponsorError: '',
+                        sponsor: { id: null, code: '', amount: '', beneficiary: '', note: '' },
+                        sponsorTpl: '{{ route('vouchers.sponsor', ['voucher' => '__ID__']) }}',
                         processing: false,
                         error: '',
                         note: '',
@@ -198,6 +258,58 @@
                         close() {
                             if (this.processing) return;
                             this.open = false;
+                        },
+
+                        openSponsor(id, code, faceValue) {
+                            this.sponsor = {
+                                id, code,
+                                amount: faceValue !== null ? Number(faceValue).toFixed(2) : '',
+                                beneficiary: '', note: '',
+                            };
+                            this.sponsorError = '';
+                            this.processing = false;
+                            this.sponsorOpen = true;
+                            // After x-show has made the modal visible (a hidden input cannot take focus).
+                            setTimeout(() => document.getElementById('sponsor-beneficiary')?.focus(), 50);
+                        },
+
+                        closeSponsor() {
+                            if (this.processing) return;
+                            this.sponsorOpen = false;
+                        },
+
+                        async submitSponsor() {
+                            if (this.processing) return;
+                            this.processing = true;
+                            this.sponsorError = '';
+                            const url = this.sponsorTpl.replace('__ID__', this.sponsor.id);
+                            try {
+                                const res = await fetch(url, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                        'Accept': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        amount: this.sponsor.amount,
+                                        beneficiary: this.sponsor.beneficiary,
+                                        note: this.sponsor.note,
+                                    }),
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                    window.location.reload();
+                                } else {
+                                    // A 422 from validation carries `errors`; the service carries `message`.
+                                    const first = data.errors ? Object.values(data.errors).flat()[0] : null;
+                                    this.sponsorError = first || data.message || 'Action failed.';
+                                    this.processing = false;
+                                }
+                            } catch (err) {
+                                this.sponsorError = 'Action failed: ' + err.message;
+                                this.processing = false;
+                            }
                         },
 
                         async submit(action) {

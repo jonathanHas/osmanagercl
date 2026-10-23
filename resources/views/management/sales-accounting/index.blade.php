@@ -400,6 +400,50 @@
                         </div>
                     @endif
 
+                    <!-- Sponsored vouchers: activated by an admin without a sale, so nothing above carries them -->
+                    @if(!empty($data['sponsored_vouchers']))
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
+                            <div class="px-6 py-4 border-b border-gray-200">
+                                <h2 class="text-xl font-semibold text-pink-800">Sponsored Vouchers (no sale)</h2>
+                                <p class="text-sm text-gray-600 mt-1">
+                                    Gift vouchers an admin activated without a sale, for charities and fundraisers. No money was taken and
+                                    nothing went through the till, so they are not in the sales above. Book the total as a
+                                    <strong>sponsorship expense</strong> (with the matching credit to voucher sales); when one is redeemed the
+                                    paperin adjust removes the goods from revenue, as for any voucher.
+                                </p>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-pink-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Voucher</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Given to</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance left</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        @foreach($data['sponsored_vouchers'] as $v)
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900">{{ \Carbon\Carbon::parse($v['date'])->format('M j, Y') }}</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm font-mono text-gray-900">{{ $v['code'] }}</td>
+                                                <td class="px-6 py-3 text-sm text-gray-900">{{ $v['beneficiary'] }}</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-900 text-right">€{{ number_format($v['amount'], 2) }}</td>
+                                                <td class="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">€{{ number_format($v['balance'], 2) }}</td>
+                                            </tr>
+                                        @endforeach
+                                        <tr class="bg-gradient-to-r from-pink-100 to-pink-200 font-bold text-pink-900 border-t-2 border-pink-400">
+                                            <td class="px-6 py-3 text-sm font-bold" colspan="3">Total Sponsored</td>
+                                            <td class="px-6 py-3 text-sm text-right">€{{ number_format($data['sponsored_total'], 2) }}</td>
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Summary Section -->
                     @if(!empty($data['payment_types']))
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">

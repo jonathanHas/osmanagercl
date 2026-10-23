@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🎁 Sponsorship activation for gift vouchers** (2026-10-23)
+  - Vouchers given to charities, raffles and fundraisers are activated without a sale, and the accounts need to see them as sponsorship rather than voucher sales. An admin-only **Sponsor** button on `/vouchers/list` (inactive rows) opens a modal with the amount (pre-filled with the voucher's value), who it was given to (required) and a note; the voucher is activated at once and its till product dropped to €0.00 so it redeems like any other
+  - The voucher records `sponsored_to` / `sponsored_at`; the issue transaction's note reads `Sponsorship: …`. Shown as a **Sponsored** badge on the list (with a `Sponsored (no sale)` filter), on the voucher's log page, in the till-screen history and on `/vouchers/activity`. Make for sale clears it
+  - The Sales Accounting report (`/management/sales-accounting`) and its CSV gain a **Sponsored Vouchers (no sale)** section listing the period's sponsored vouchers with a total, to be booked as a sponsorship expense (the redemption's paperin adjust then nets out as for any voucher). Read from the app's own tables, so no POS import is involved
+  - **Added**: `app/Services/VoucherSponsorshipService.php`, `database/migrations/2026_10_23_100000_add_sponsorship_to_vouchers_table.php`, `tests/Feature/VoucherSponsorshipTest.php`
+  - **Modified**: `app/Http/Controllers/VoucherController.php` (`sponsor()`, `status=sponsored` filter, history label), `app/Http/Controllers/Management/SalesAccountingReportController.php`, `app/Models/{Voucher,VoucherTransaction}.php`, `app/Services/{VoucherActivityService,VoucherAdminService}.php`, `resources/views/vouchers/{list,transactions}.blade.php`, `resources/views/management/sales-accounting/index.blade.php`, `routes/web.php`, `docs/features/voucher-management.md`, `docs/FEATURES_INDEX.md`
+
 - **💾 Nightly backups on production** (2026-10-15)
   - There was no backup of this app at all; timekeeper had one. Added `spatie/laravel-backup` in the same shape: `backup:clean` 01:00 → `backup:run` 01:30 → `backup:monitor` 02:30 from the existing scheduler, writing to the `backups` disk (`BACKUP_PATH`, default `/var/backups/osmanager`, outside the project) and logging to `storage/logs/backup.log`
   - Archives hold a gzipped `mysqldump --single-transaction` of the `mysql` connection plus the project files including `.env` and `storage/app`; `vendor/`, `node_modules/`, `.git/`, the parser venv, logs and framework caches are excluded as reproducible. The POS and OSAccounts databases are deliberately not included — on production they live on other machines and the POS one is the live till

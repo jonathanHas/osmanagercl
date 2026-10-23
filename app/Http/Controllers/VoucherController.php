@@ -6,6 +6,7 @@ use App\Models\Voucher;
 use App\Models\VoucherTillRedemption;
 use App\Models\VoucherTransaction;
 use App\Services\VoucherPosProductService;
+use App\Services\VoucherSponsorshipService;
 use App\Services\VoucherTillSyncService;
 use App\Services\ZebraPrintService;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ class VoucherController extends Controller
         protected ZebraPrintService $zebraPrint,
         protected VoucherPosProductService $posProducts,
         protected VoucherTillSyncService $tillSync,
+        protected VoucherSponsorshipService $sponsorship,
     ) {}
 
     /**
@@ -52,6 +54,9 @@ class VoucherController extends Controller
 
         if ($showDeleted) {
             $query->onlyTrashed();
+        } elseif ($request->query('status') === 'sponsored') {
+            // Activated without a sale (any status since).
+            $query->sponsored();
         } elseif (($status = $request->query('status')) && $status !== 'deleted') {
             $query->where('status', $status);
         }
@@ -148,7 +153,7 @@ class VoucherController extends Controller
                 'label' => match ($t->type) {
                     VoucherTransaction::TYPE_ISSUE => $t->source === VoucherTransaction::SOURCE_TILL
                         ? 'Sold at till'
-                        : 'Issued',
+                        : ($t->isSponsorship() ? 'Sponsored' : 'Issued'),
                     VoucherTransaction::TYPE_DEDUCT => $t->source === VoucherTransaction::SOURCE_TILL
                         ? 'Redeemed at till'
                         : 'Redeemed',
@@ -293,6 +298,34 @@ class VoucherController extends Controller
 
         if ($result['success']) {
             $this->syncPosProduct($data['code']);
+        }
+
+        return response()->json($result, $result['success'] ? 200 : 422);
+    }
+
+    /**
+     * Admin: activate an unsold voucher without a sale, as a sponsorship
+     * (a charity, raffle or fundraiser). Records who it went to so the
+     * accounts can book it as sponsorship rather than a voucher sale.
+     */
+    public function sponsor(Request $request, Voucher $voucher): JsonResponse
+    {
+        $data = $request->validate([
+            'amount' => ['required', 'numeric', 'gt:0', 'max:'.config('vouchers.max_face_value'), 'decimal:0,2'],
+            'beneficiary' => ['required', 'string', 'min:2', 'max:120'],
+            'note' => ['nullable', 'string', 'max:300'],
+        ]);
+
+        $result = $this->sponsorship->sponsor(
+            $voucher,
+            (float) $data['amount'],
+            $data['beneficiary'],
+            $data['note'] ?? null,
+            $request->user(),
+        );
+
+        if ($result['success']) {
+            $result['message'] = 'Voucher activated as a sponsorship.';
         }
 
         return response()->json($result, $result['success'] ? 200 : 422);

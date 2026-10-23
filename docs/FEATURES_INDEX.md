@@ -599,6 +599,7 @@ Gift-voucher system with scannable barcodes, server-tracked balances and a full 
 - **Double-Spend Safe**: `DB::transaction` + `lockForUpdate()` row locking re-validates the balance under lock; no overspend across concurrent tills
 - **Full Audit Log**: `voucher_transactions` records every issue/deduct/deactivate/activate with amount, balance-after, optional note, user and timestamp
 - **Admin Controls**: Edit modal to deactivate/reactivate a voucher (with reason); admin-only
+- **Sponsorship Activation** (2026-10-23): admins can activate an unsold voucher **without a sale** for a charity or fundraiser (Sponsor button on `/vouchers/list`: amount, who it was given to, note). Marked Sponsored on the list, the voucher log and the activity screen; the Sales Accounting report and its CSV list the period's sponsored vouchers with a total so the accounts book them as sponsorship, not voucher sales
 - **Tiered Access**: `vouchers.redeem` (employees redeem only), `vouchers.manage` (managers activate/generate/print), deactivate/reactivate (admin)
 
 📖 [Voucher Management Documentation](./features/voucher-management.md)

@@ -154,6 +154,9 @@ class VoucherAdminService
             $v->current_balance = 0;
             $v->initial_value = null;
             $v->status = Voucher::STATUS_INACTIVE;
+            // A sponsored voucher put back on sale is no longer a sponsorship.
+            $v->sponsored_to = null;
+            $v->sponsored_at = null;
             $v->save();
             $this->log($v, VoucherTransaction::TYPE_FOR_SALE, $balance, $note, $admin);
 

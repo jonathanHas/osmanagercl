@@ -36,6 +36,8 @@ class Voucher extends Model
         'code',
         'pos_product_id',
         'face_value',
+        'sponsored_to',
+        'sponsored_at',
         'initial_value',
         'current_balance',
         'status',
@@ -46,6 +48,7 @@ class Voucher extends Model
         'face_value' => 'decimal:2',
         'initial_value' => 'decimal:2',
         'current_balance' => 'decimal:2',
+        'sponsored_at' => 'datetime',
     ];
 
     public function transactions(): HasMany
@@ -80,6 +83,23 @@ class Voucher extends Model
     public function isForSale(): bool
     {
         return $this->status === self::STATUS_INACTIVE && (float) $this->face_value > 0;
+    }
+
+    /**
+     * Activated by an admin without a sale (a charity or fundraiser): the
+     * accounts treat it as a sponsorship, not a voucher sale.
+     */
+    public function isSponsored(): bool
+    {
+        return $this->sponsored_at !== null;
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Voucher>  $query
+     */
+    public function scopeSponsored($query): void
+    {
+        $query->whereNotNull('sponsored_at');
     }
 
     public function isExhausted(): bool
