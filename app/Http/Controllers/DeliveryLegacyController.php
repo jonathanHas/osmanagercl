@@ -1970,6 +1970,65 @@ class DeliveryLegacyController extends Controller
     }
 
     /**
+     * Delete a pending scan session, e.g. one started by mistake.
+     *
+     * A session with scanned items is only deleted when the form says the user
+     * confirmed the warning. Completed sessions have changed stock, so they must
+     * be undone first.
+     */
+    public function deleteSession(Request $request)
+    {
+        $validated = $request->validate([
+            'sessionId' => 'required|string',
+            'confirmed' => 'nullable|boolean',
+        ]);
+
+        $sessionId = $validated['sessionId'];
+
+        $session = DB::connection('pos')->table('deliveriesScan')
+            ->where('ID', $sessionId)
+            ->first();
+
+        if (! $session) {
+            return redirect()->route('delivery-legacy.index')->with('error', 'Session not found.');
+        }
+
+        if ($session->status != 0) {
+            return redirect()->route('delivery-legacy.index')->with('error', 'Only pending sessions can be deleted. Undo the completion first.');
+        }
+
+        $itemCount = DB::connection('pos')->table('deliveriesScanItems')
+            ->where('delID', $sessionId)
+            ->count();
+
+        if ($itemCount > 0 && ! ($validated['confirmed'] ?? false)) {
+            return redirect()->route('delivery-legacy.index')
+                ->with('error', 'This session has '.$itemCount.' scanned items. Confirm the warning to delete it.');
+        }
+
+        DB::connection('pos')->transaction(function () use ($sessionId) {
+            DB::connection('pos')->table('deliveriesScanItems')
+                ->where('delID', $sessionId)
+                ->delete();
+
+            DB::connection('pos')->table('deliveriesScan')
+                ->where('ID', $sessionId)
+                ->delete();
+        });
+
+        // Translated label print history only serves this session's match page
+        DeliveryLabelPrint::where('delivery_id', $sessionId)->delete();
+
+        $supplier = DB::connection('pos')->table('suppliers')
+            ->where('SupplierID', $session->supID)
+            ->first();
+
+        return redirect()->route('delivery-legacy.index')
+            ->with('success', 'Scan session for '.($supplier->Supplier ?? 'Unknown').' deleted'
+                .($itemCount > 0 ? ' with its '.$itemCount.' scanned items.' : '.'));
+    }
+
+    /**
      * Create a new delivery scan session.
      */
     public function createSession(Request $request)

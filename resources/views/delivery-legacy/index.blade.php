@@ -191,6 +191,13 @@
                                        class="flex-1 py-2 px-3 text-xs font-semibold text-green-600 bg-green-50 rounded-md hover:bg-green-100 touch-manipulation text-center">
                                         View Match
                                     </a>
+                                    @if($isPending)
+                                        <button type="button"
+                                            @click="askDelete('{{ $session->ID }}', '{{ addslashes($session->Supplier ?? 'Unknown') }}', {{ $itemCount }})"
+                                            class="py-2 px-3 text-xs font-semibold text-red-600 bg-red-50 rounded-md hover:bg-red-100 touch-manipulation">
+                                            Delete
+                                        </button>
+                                    @endif
                                 </div>
                             </div>
                         @empty
@@ -294,6 +301,13 @@
                                                class="text-green-600 hover:text-green-900">
                                                 View Match
                                             </a>
+                                            @if($isPending)
+                                                <button type="button"
+                                                    @click="askDelete('{{ $session->ID }}', '{{ addslashes($session->Supplier ?? 'Unknown') }}', {{ $itemCount }})"
+                                                    class="ml-4 text-red-600 hover:text-red-900">
+                                                    Delete
+                                                </button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
@@ -310,6 +324,39 @@
                     <p class="mt-2 text-xs text-gray-500" x-show="selectedSessions.length > 0 && selectedSessions.length < 2">
                         Select one more pending session to merge.
                     </p>
+                </div>
+
+                {{-- Delete Session: shared form, plus a warning dialog for sessions with scanned items --}}
+                <form x-ref="deleteForm" action="{{ route('delivery-legacy.delete-session') }}" method="POST" class="hidden">
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="sessionId" :value="deleteTarget.id">
+                    <input type="hidden" name="confirmed" :value="deleteTarget.items > 0 ? 1 : 0">
+                </form>
+
+                <div x-show="showDeleteDialog" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @keydown.escape.window="showDeleteDialog = false">
+                    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6" @click.away="showDeleteDialog = false">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Delete Scan Session?</h3>
+                        <div class="mb-4 bg-red-50 border border-red-200 text-red-800 px-3 py-2 rounded text-sm flex items-start">
+                            <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.832c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                            </svg>
+                            <span>
+                                Session <strong x-text="'#' + deleteTarget.id.substring(0, 8) + '...'"></strong>
+                                for <strong x-text="deleteTarget.supplier"></strong>
+                                has <strong x-text="deleteTarget.items + (deleteTarget.items === 1 ? ' scanned item' : ' scanned items')"></strong>.
+                                Deleting it removes all of those scans. This cannot be undone.
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-4">If the scans belong to another session for the same delivery, merge the sessions instead.</p>
+                        <div class="flex justify-end gap-3">
+                            <button @click="showDeleteDialog = false" class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
+                            <button type="button" @click="$refs.deleteForm.submit()"
+                                class="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-md hover:bg-red-700">
+                                Delete Session
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- Merge Sessions Dialog --}}
@@ -373,6 +420,18 @@
                 sessionDetails: [],
                 showMergeDialog: false,
                 keepSessionId: '',
+                showDeleteDialog: false,
+                deleteTarget: { id: '', supplier: '', items: 0 },
+
+                askDelete(id, supplier, items) {
+                    this.deleteTarget = { id, supplier, items };
+                    if (items > 0) {
+                        this.showDeleteDialog = true;
+                        return;
+                    }
+                    // Empty session: nothing to lose, delete straight away
+                    this.$nextTick(() => this.$refs.deleteForm.submit());
+                },
 
                 get differentSuppliers() {
                     if (this.sessionDetails.length < 2) return false;
