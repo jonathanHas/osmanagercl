@@ -54,7 +54,7 @@ class DeliveryLegacyController extends Controller
 
         // Get distinct delivery scan sessions with supplier info
         // deliveriesScan.supID links to suppliers.SupplierID
-        $scanSessions = DB::connection('pos')
+        $sessions = fn () => DB::connection('pos')
             ->table('deliveriesScan')
             ->select(
                 'deliveriesScan.ID',
@@ -64,9 +64,14 @@ class DeliveryLegacyController extends Controller
                 'suppliers.Supplier'
             )
             ->leftJoin('suppliers', 'deliveriesScan.supID', '=', 'suppliers.SupplierID')
-            ->orderByDesc('dateUpload')
-            ->limit(100)
-            ->get();
+            ->orderByDesc('dateUpload');
+
+        // Open sessions are never windowed (same as Shop > Deliveries): a plain
+        // "latest 100" hid pending sessions older than the window.
+        $scanSessions = $sessions()->where('deliveriesScan.status', 0)->get()
+            ->merge($sessions()->where('deliveriesScan.status', 1)->limit(100)->get())
+            ->sortByDesc('dateUpload')
+            ->values();
 
         // Get count of items per scan session
         $scanItemCounts = DB::connection('pos')
