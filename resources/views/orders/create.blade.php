@@ -32,6 +32,27 @@
                             @enderror
                         </div>
 
+                        @foreach($incomingDeliveries as $incomingSupplierId => $deliveries)
+                            <div class="hidden rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" data-incoming-supplier="{{ $incomingSupplierId }}">
+                                <div class="font-semibold">
+                                    {{ $deliveries->count() }} {{ Str::plural('delivery', $deliveries->count()) }} will be counted as incoming stock
+                                </div>
+                                <ul class="mt-1">
+                                    @foreach($deliveries as $delivery)
+                                        <li>
+                                            <a href="{{ route('deliveries.show', $delivery) }}" class="font-medium underline hover:text-amber-700" target="_blank">{{ $delivery->delivery_number }}</a>
+                                            @if($delivery->delivery_date)
+                                                · dated {{ $delivery->delivery_date->format('j M Y') }}
+                                            @endif
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                <div class="mt-1 text-xs text-amber-700">
+                                    They are unticked from "Include in Orders" once this order is generated, so later orders will not count them.
+                                </div>
+                            </div>
+                        @endforeach
+
                         <!-- Order Date -->
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             <div>
@@ -299,6 +320,28 @@
 
                         supplierSelect.addEventListener('change', toggleBlocks);
                         toggleBlocks();
+                    });
+                </script>
+            @endif
+
+            @if($incomingDeliveries->isNotEmpty())
+                <script>
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const supplierSelect = document.getElementById('supplier_id');
+                        const notes = document.querySelectorAll('[data-incoming-supplier]');
+
+                        if (!supplierSelect) {
+                            return;
+                        }
+
+                        function toggleIncomingNotes() {
+                            notes.forEach(function (note) {
+                                note.classList.toggle('hidden', note.getAttribute('data-incoming-supplier') !== supplierSelect.value);
+                            });
+                        }
+
+                        supplierSelect.addEventListener('change', toggleIncomingNotes);
+                        toggleIncomingNotes();
                     });
                 </script>
             @endif

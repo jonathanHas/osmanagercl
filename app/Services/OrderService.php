@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Delivery;
 use App\Models\DeliveryItem;
 use App\Models\OrderAdjustment;
 use App\Models\OrderItem;
@@ -259,9 +260,11 @@ class OrderService
             ->keyBy('PRODUCT');
         \Log::info('Order generation: Stock levels fetched in '.round((microtime(true) - $t3) * 1000).'ms');
 
-        // Pre-fetch pending delivery quantities (from flagged deliveries only)
+        // Pre-fetch pending delivery quantities (deliveries ticked "Include in Orders",
+        // or on a regenerate the ones this order already counted)
         $tPending = microtime(true);
-        $allPendingDeliveries = $this->getBulkPendingDeliveryQuantities($productIds, $orderSession->supplier_id);
+        $incomingDeliveryIds = $this->resolveIncomingDeliveryIds($orderSession);
+        $allPendingDeliveries = $this->getBulkPendingDeliveryQuantities($productIds, $incomingDeliveryIds);
         \Log::info('Order generation: Pending delivery quantities fetched in '.round((microtime(true) - $tPending) * 1000).'ms for '.count($allPendingDeliveries).' products');
 
         // Pre-fetch Christmas comparison data if enabled
@@ -406,6 +409,9 @@ class OrderService
         if ($onProgress) {
             $onProgress('saving_order', 'Saving order...', 85);
         }
+
+        // Only once the items are saved, so a failed generation leaves the deliveries ticked
+        $this->markDeliveriesCounted($orderSession, $incomingDeliveryIds, $productIds);
 
         $orderSession->updateTotals();
 
@@ -755,34 +761,106 @@ class OrderService
     }
 
     /**
-     * Get pending delivery quantities for products from FLAGGED deliveries only.
-     * Only includes deliveries where include_in_order_stock is true.
+     * Deliveries whose outstanding quantities count as incoming stock for an order.
+     *
+     * The first generation takes the supplier's active deliveries ticked "Include in
+     * Orders"; after that the order keeps the list it recorded, so a regenerate still
+     * counts them even though they have been unticked.
+     *
+     * @return array<int>
+     */
+    protected function resolveIncomingDeliveryIds(OrderSession $orderSession, bool $includeFlagged = true): array
+    {
+        if ($orderSession->incoming_deliveries !== null) {
+            return array_map('intval', array_column($orderSession->incoming_deliveries, 'id'));
+        }
+
+        if (! $includeFlagged) {
+            return [];
+        }
+
+        return Delivery::includedInOrderStock()
+            ->active()
+            ->where('supplier_id', $orderSession->supplier_id)
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Record on the order which deliveries it counted as incoming stock, and untick
+     * them so they do not carry over to the next order. Only on first generation.
+     *
+     * @param  array<int>  $deliveryIds
+     * @param  array<string>  $productIds
+     */
+    protected function markDeliveriesCounted(OrderSession $orderSession, array $deliveryIds, array $productIds): void
+    {
+        if ($orderSession->incoming_deliveries !== null) {
+            return;
+        }
+
+        if (empty($deliveryIds)) {
+            $orderSession->update(['incoming_deliveries' => []]);
+
+            return;
+        }
+
+        $unitsByDelivery = DeliveryItem::query()
+            ->select('delivery_id', DB::raw('SUM('.$this->pendingUnitsSql().') as pending_units'))
+            ->whereIn('delivery_id', $deliveryIds)
+            ->whereIn('product_id', $productIds)
+            ->groupBy('delivery_id')
+            ->pluck('pending_units', 'delivery_id');
+
+        $deliveries = Delivery::whereIn('id', $deliveryIds)->orderBy('delivery_date')->get();
+
+        $orderSession->update([
+            'incoming_deliveries' => $deliveries->map(fn (Delivery $delivery) => [
+                'id' => $delivery->id,
+                'delivery_number' => $delivery->delivery_number,
+                'delivery_date' => $delivery->delivery_date?->toDateString(),
+                'units' => max(0, (float) ($unitsByDelivery[$delivery->id] ?? 0)),
+            ])->values()->all(),
+        ]);
+
+        Delivery::whereIn('id', $deliveryIds)->update([
+            'include_in_order_stock' => false,
+            'counted_in_order_session_id' => $orderSession->id,
+            'counted_in_order_at' => now(),
+        ]);
+    }
+
+    /**
+     * Outstanding units on a delivery item: ordered minus received, in units.
+     */
+    protected function pendingUnitsSql(): string
+    {
+        return '(COALESCE(delivery_items.case_ordered_quantity, 0) * COALESCE(delivery_items.supplier_case_units, delivery_items.units_per_case, 1) + COALESCE(delivery_items.unit_ordered_quantity, 0))
+                - (COALESCE(delivery_items.case_received_quantity, 0) * COALESCE(delivery_items.supplier_case_units, delivery_items.units_per_case, 1) + COALESCE(delivery_items.unit_received_quantity, 0))';
+    }
+
+    /**
+     * Get pending delivery quantities for products from the given deliveries.
+     * Only draft and receiving deliveries count.
      *
      * @param  array<string>  $productIds  Product IDs to look up
-     * @param  string|null  $supplierId  Optional supplier filter
+     * @param  array<int>  $deliveryIds  Deliveries to count (see resolveIncomingDeliveryIds)
      * @return array<string, float> Keyed by product_id => pending units
      */
-    protected function getBulkPendingDeliveryQuantities(array $productIds, ?string $supplierId = null): array
+    protected function getBulkPendingDeliveryQuantities(array $productIds, array $deliveryIds): array
     {
-        if (empty($productIds)) {
+        if (empty($productIds) || empty($deliveryIds)) {
             return [];
         }
 
         $query = DeliveryItem::query()
-            ->select('delivery_items.product_id', DB::raw('SUM(
-                (COALESCE(delivery_items.case_ordered_quantity, 0) * COALESCE(delivery_items.supplier_case_units, delivery_items.units_per_case, 1) + COALESCE(delivery_items.unit_ordered_quantity, 0))
-                - (COALESCE(delivery_items.case_received_quantity, 0) * COALESCE(delivery_items.supplier_case_units, delivery_items.units_per_case, 1) + COALESCE(delivery_items.unit_received_quantity, 0))
-            ) as pending_units'))
+            ->select('delivery_items.product_id', DB::raw('SUM('.$this->pendingUnitsSql().') as pending_units'))
             ->join('deliveries', 'delivery_items.delivery_id', '=', 'deliveries.id')
-            ->where('deliveries.include_in_order_stock', true)
+            ->whereIn('deliveries.id', $deliveryIds)
             ->whereIn('deliveries.status', ['draft', 'receiving'])
             ->whereIn('delivery_items.product_id', $productIds)
             ->whereNotNull('delivery_items.product_id')
             ->groupBy('delivery_items.product_id');
-
-        if ($supplierId) {
-            $query->where('deliveries.supplier_id', $supplierId);
-        }
 
         return $query->pluck('pending_units', 'product_id')
             ->map(fn ($value) => max(0, (float) $value))
@@ -997,7 +1075,10 @@ class OrderService
             return $existing;
         }
 
-        $suggestion = $this->calculateProductSuggestion($product);
+        $pending = $this->getBulkPendingDeliveryQuantities([$product->ID], $this->resolveIncomingDeliveryIds($order, false));
+        $suggestion = $this->calculateProductSuggestion($product, [], [
+            'pending_delivery_qty' => $pending[$product->ID] ?? 0,
+        ]);
         $caseUnits = (int) ($suggestion['case_units'] ?? 1);
         $unitCost = (float) ($suggestion['unit_cost'] ?? 0);
 

@@ -74,6 +74,8 @@
 
     <div class="py-6">
         <div class="max-w-none mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            @include('orders.partials.incoming-deliveries-note')
+
             @if($isUdeaOrder)
                 <x-udea-pallet-summary :coverage="$palletCoverage" />
             @endif

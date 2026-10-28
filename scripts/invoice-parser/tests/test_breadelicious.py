@@ -50,6 +50,13 @@ def xero_new_template():
 
 
 @pytest.fixture(scope='module')
+def xero_minus_glyph():
+    """INV-0498, 2026-10-18. New template with two 0% credit lines whose minus sign
+    pdfplumber returns as the icon-font glyph: "1 \\ue0884.80 0% \\ue0884.80"."""
+    return parse('2026-10-18_xero_minus_glyph.txt')
+
+
+@pytest.fixture(scope='module')
 def fakturownia():
     """2025/1760, 2025-12-28. Legacy layout with an explicit VAT summary table."""
     return parse('2025-12-28_fakturownia.txt')
@@ -124,6 +131,21 @@ def test_xero_new_template_buckets(xero_new_template):
     assert 'Parse_Warnings' not in xero_new_template
 
 
+def test_xero_new_template_reads_icon_minus_as_negative(xero_minus_glyph):
+    assert xero_minus_glyph['Invoice Number'] == 'INV-0498'
+    assert xero_minus_glyph['Invoice Date'] == '18/10/2026'
+    assert xero_minus_glyph['Credit Note'] is False
+    # 72.00 + 24.00 + 9.60 - 4.80 + 4.80 + 9.60 - 11.00
+    assert xero_minus_glyph['VAT 0%'] == '104.20'
+    # Brioche 26.00 + 11.20 = 37.20 gross, less the stated 4.42
+    assert xero_minus_glyph['VAT 13.5%'] == '32.78'
+    assert xero_minus_glyph['Total_VAT'] == 4.42
+    assert xero_minus_glyph['Total'] == '141.40'
+    # Without the glyph fix the credit lines are dropped and the 0% bucket is only
+    # rescued by the "assigning the difference" fallback, which warns
+    assert 'Parse_Warnings' not in xero_minus_glyph
+
+
 def test_fakturownia_layout_still_parses(fakturownia):
     assert fakturownia['Invoice Number'] == '2025/1760'
     assert fakturownia['Invoice Date'] == '28/12/2025'
@@ -140,6 +162,7 @@ def test_fakturownia_layout_still_parses(fakturownia):
     '2026-07-12_xero_credit_line.txt',
     '2026-08-03_xero_zero_qty.txt',
     '2026-10-11_xero_new_template.txt',
+    '2026-10-18_xero_minus_glyph.txt',
     '2025-12-28_fakturownia.txt',
 ])
 def test_every_fixture_reconciles_net_plus_vat_to_total(fixture):

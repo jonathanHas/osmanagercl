@@ -77,6 +77,8 @@
 
     <div class="py-6">
         <div class="max-w-none mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            @include('orders.partials.incoming-deliveries-note')
+
             @if(session('success'))
                 <div class="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                     {{ session('success') }}

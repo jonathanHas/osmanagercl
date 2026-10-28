@@ -154,6 +154,26 @@ also drive coverage overrides.
 
 📖 **[Shop Mode — Orders](../shop-mode.md#orders-list-and-order-review)**
 
+### 2026-10-28 Late deliveries: counting incoming stock
+
+When a delivery is late and the next order has to go in before it arrives, import its invoice on
+`/deliveries/create` as usual (leave it a Draft, don't receive it) and tick **More… → Include in
+Orders** on the delivery page. The next order generated for that supplier adds the delivery's
+outstanding units (ordered − received, linked lines only) to current stock before sizing each line;
+review lines show `(+N incoming)`. uniCenta stock is not touched.
+
+Deliveries are never marked completed in day-to-day use, so the tick would otherwise reduce every later
+order. Instead the first order that counts a delivery records it in `order_sessions.incoming_deliveries`
+and unticks it (`deliveries.counted_in_order_session_id` / `counted_in_order_at`); regenerating that
+order still counts it, a new order does not. To count it in another order, tick it again.
+
+- `/orders/create`: an amber note lists the ticked deliveries for the selected supplier.
+- Order review pages (all layouts): a blue note lists the deliveries counted, with units still to arrive.
+- Delivery page: "Counted as incoming stock in order #N".
+
+Code: `OrderService::resolveIncomingDeliveryIds()`, `markDeliveriesCounted()`,
+`getBulkPendingDeliveryQuantities()`; test `tests/Feature/OrderIncomingDeliveriesTest.php`.
+
 ### 4. Learning System
 The system tracks manual adjustments to improve future suggestions:
 - Records user modifications to suggested quantities
@@ -176,6 +196,7 @@ The system tracks manual adjustments to improve future suggestions:
 - total_items (count)
 - total_value (decimal)
 - sales_history_weeks (tinyint)
+- incoming_deliveries (json, nullable; deliveries counted as incoming stock: id, delivery_number, delivery_date, units)
 - created_at, updated_at
 ```
 

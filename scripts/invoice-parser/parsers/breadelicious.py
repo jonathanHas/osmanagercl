@@ -32,7 +32,8 @@ INCLUDES_TAX_RE = re.compile(
 TOTAL_RE = re.compile(r'^TOTAL(?:EUR)?(' + NUMBER + r')$', re.IGNORECASE | re.MULTILINE)
 
 # The 2026-10 template sets the hyphen in an icon font, so pdfplumber returns a
-# private-use character in its place: "INV\ue0880467"
+# private-use character in its place: "INV\ue0880467". parse_invoice() normalises it
+# to "-" first (see ICON_MINUS); the optional separator still covers older text.
 INVOICE_NUMBER_RE = re.compile(r'\bINV[^\w\s]?(\d+)')
 
 # "11 Oct 2026" on the 2026-10 template; month map rather than %b so "Sept" parses
@@ -44,6 +45,10 @@ MONTHS = {
 
 # Zero-width characters that some extractors leave in front of the header values
 INVISIBLE_RE = re.compile('[\u200b-\u200d\ufeff]')
+
+# The 2026-10 template also sets the minus sign of credit lines in that icon font:
+# "1 \ue0884.80 0% \ue0884.80" is a -4.80 line
+ICON_MINUS = '\ue088'
 
 # Map a rate as printed on the invoice onto the four buckets Laravel understands
 RATE_KEYS = {'0': '0', '9': '9', '13.5': '13.5', '23': '23'}
@@ -261,7 +266,7 @@ def parse_invoice(text, filename):
     print(f"[DEBUG] Parsing BreaDelicious invoice: {filename}", file=sys.stderr)
 
     try:
-        text = INVISIBLE_RE.sub('', text)
+        text = INVISIBLE_RE.sub('', text).replace(ICON_MINUS, '-')
         warnings = []
         if 'Issue date:' in text:
             print("[DEBUG] Layout: Fakturownia (legacy)", file=sys.stderr)

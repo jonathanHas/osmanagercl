@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Delivery;
 use App\Models\OrderItem;
 use App\Models\OrderSession;
 use App\Models\Product;
@@ -81,7 +82,15 @@ class OrderController extends Controller
 
         $specialCategoryGroups = SpecialOrderCategories::mapSuppliers($suppliers);
 
-        return view('orders.create', compact('suppliers', 'specialCategoryGroups'));
+        // Late deliveries ticked "Include in Orders": the next order for their supplier
+        // counts them as incoming stock and then unticks them.
+        $incomingDeliveries = Delivery::includedInOrderStock()
+            ->active()
+            ->orderBy('delivery_date')
+            ->get(['id', 'delivery_number', 'supplier_id', 'delivery_date'])
+            ->groupBy(fn (Delivery $delivery) => (string) $delivery->supplier_id);
+
+        return view('orders.create', compact('suppliers', 'specialCategoryGroups', 'incomingDeliveries'));
     }
 
     /**

@@ -296,6 +296,8 @@
 
     <div class="py-6">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            @include('orders.partials.incoming-deliveries-note')
+
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="bg-white shadow-sm rounded-lg p-4">
                     <div class="text-sm font-medium text-slate-500">Total Items</div>

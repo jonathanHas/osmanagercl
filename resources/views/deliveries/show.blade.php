@@ -175,6 +175,20 @@
             <x-alert type="success" :message="session('success')" />
             <x-alert type="error" :message="session('error')" />
 
+            {{-- Counted as incoming stock by an order (OrderService::markDeliveriesCounted) --}}
+            @if($delivery->counted_in_order_session_id)
+                <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-900 dark:text-blue-100">
+                    Counted as incoming stock in
+                    <a href="{{ route('orders.show', $delivery->counted_in_order_session_id) }}" class="font-medium underline">order #{{ $delivery->counted_in_order_session_id }}</a>
+                    @if($delivery->counted_in_order_at)
+                        on {{ $delivery->counted_in_order_at->format('j M Y, H:i') }}
+                    @endif
+                    @if(! $delivery->include_in_order_stock)
+                        <span class="text-blue-700 dark:text-blue-300">· No longer included in orders. Use More… → Include in Orders to count it in another order.</span>
+                    @endif
+                </div>
+            @endif
+
             {{-- Import Summary (shown after PDF import) --}}
             @if(session('import_summary'))
                 @php $summary = session('import_summary'); @endphp

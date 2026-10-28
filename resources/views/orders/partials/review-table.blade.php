@@ -514,7 +514,8 @@
                     $suggestedDisplayQuantity = $isCaseProduct ? $suggestedCases : $suggestedUnits;
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
-                    $afterStock = $currentStock + $finalUnits;
+                    // Incoming stock from a late delivery is already counted in the suggestion
+                    $afterStock = $currentStock + (float) $pendingDeliveryQty + $finalUnits;
                     $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
                     $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
                     $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
@@ -773,6 +774,7 @@
                                        step="1"
                                        data-item-id="{{ $item->id }}"
                                        data-current-stock="{{ $currentStock }}"
+                                       data-pending-delivery="{{ (float) $pendingDeliveryQty }}"
                                        data-case-units="{{ $caseUnits }}"
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
@@ -1017,7 +1019,8 @@
                     $suggestedDisplayQuantity = $isCaseProduct ? $suggestedCases : $suggestedUnits;
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
-                    $afterStock = $currentStock + $finalUnits;
+                    // Incoming stock from a late delivery is already counted in the suggestion
+                    $afterStock = $currentStock + (float) $pendingDeliveryQty + $finalUnits;
                     $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
                     $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
                     $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
@@ -1276,6 +1279,7 @@
                                        step="1"
                                        data-item-id="{{ $item->id }}"
                                        data-current-stock="{{ $currentStock }}"
+                                       data-pending-delivery="{{ (float) $pendingDeliveryQty }}"
                                        data-case-units="{{ $caseUnits }}"
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
@@ -1432,7 +1436,8 @@
                     $suggestedDisplayQuantity = $isCaseProduct ? $suggestedCases : $suggestedUnits;
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
-                    $afterStock = $currentStock + $finalUnits;
+                    // Incoming stock from a late delivery is already counted in the suggestion
+                    $afterStock = $currentStock + (float) $pendingDeliveryQty + $finalUnits;
                     $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
                     $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
                     $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
@@ -1691,6 +1696,7 @@
                                        step="1"
                                        data-item-id="{{ $item->id }}"
                                        data-current-stock="{{ $currentStock }}"
+                                       data-pending-delivery="{{ (float) $pendingDeliveryQty }}"
                                        data-case-units="{{ $caseUnits }}"
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
@@ -1847,7 +1853,8 @@
                     $suggestedDisplayQuantity = $isCaseProduct ? $suggestedCases : $suggestedUnits;
                     $quantityLabel = $isCaseProduct ? 'cases' : 'units';
                     $quantityPrecision = $isCaseProduct ? 3 : 0;
-                    $afterStock = $currentStock + $finalUnits;
+                    // Incoming stock from a late delivery is already counted in the suggestion
+                    $afterStock = $currentStock + (float) $pendingDeliveryQty + $finalUnits;
                     $orderInputValue = $formatQuantityInput($displayOrderQuantity, $quantityPrecision);
                     $suggestedDisplayText = $formatQuantityDisplay($suggestedDisplayQuantity, $quantityPrecision);
                     $orderDisplayText = $formatQuantityDisplay($displayOrderQuantity, $quantityPrecision);
@@ -2106,6 +2113,7 @@
                                        step="1"
                                        data-item-id="{{ $item->id }}"
                                        data-current-stock="{{ $currentStock }}"
+                                       data-pending-delivery="{{ (float) $pendingDeliveryQty }}"
                                        data-case-units="{{ $caseUnits }}"
                                        data-is-case-product="{{ $isCaseProduct ? 1 : 0 }}"
                                        data-product-peak="{{ $peakWeeklySales }}"
@@ -2368,7 +2376,8 @@
                 $isCaseProductValue = (bool) ($contextData['is_case_product'] ?? ($caseUnitsValue > 1));
                 $suggestedUnitsValue = (float) ($item->suggested_quantity ?? 0);
                 $finalUnitsValue = (float) ($item->final_quantity ?? $suggestedUnitsValue);
-                $afterStockValue = $currentStockValue + $finalUnitsValue;
+                $pendingDeliveryValue = (float) ($contextData['pending_delivery_qty'] ?? 0);
+                $afterStockValue = $currentStockValue + $pendingDeliveryValue + $finalUnitsValue;
                 $avgWeeklySalesValue = (float) ($contextData['avg_weekly_sales'] ?? 0);
                 $peakWeeklySalesValue = $contextData['peak_weekly_sales'] ?? (count($weekUnits) > 0 ? max($weekUnits) : $avgWeeklySalesValue);
                 if ($peakWeeklySalesValue <= 0 && $avgWeeklySalesValue > 0) {
@@ -2394,6 +2403,7 @@
                 const averageUnits = {{ $avgWeeklySalesValue }};
                 const currentStock = {{ $currentStockValue }};
                 const afterStock = {{ $afterStockValue }};
+                const pendingDelivery = {{ $pendingDeliveryValue }};
                 const peakWeeklySales = {{ $peakWeeklySalesValue }};
                 const currentPct = {{ $currentPctValue }};
                 const afterPct = {{ $afterPctValue }};
@@ -2401,12 +2411,17 @@
                 const caseUnits = {{ $caseUnitsValue }};
                 const minStockOverride = {{ isset($contextData['min_stock_override']) && $contextData['min_stock_override'] > 0 ? $contextData['min_stock_override'] : 'null' }};
 
-                const extendedLabels = labels.concat(['Current stock', 'After order']);
-                const salesData = dataPoints.concat([null, null]);
-                const coffeeData = coffeeDataPoints.concat([null, null]);
-                const kitchenData = kitchenDataPoints.concat([null, null]);
-                const averageLineData = labels.map(() => averageUnits).concat([null, null]);
-                const minStockLineData = minStockOverride !== null ? labels.map(() => minStockOverride).concat([null, null]) : null;
+                // Stock points after the sales weeks; 'Incoming' (stock once a late delivery
+                // counted in this order arrives) only when there is any.
+                const stockLabels = pendingDelivery > 0 ? ['Current stock', 'Incoming', 'After order'] : ['Current stock', 'After order'];
+                const tailNulls = stockLabels.map(() => null);
+                const tailZeros = stockLabels.map(() => 0);
+                const extendedLabels = labels.concat(stockLabels);
+                const salesData = dataPoints.concat(tailNulls);
+                const coffeeData = coffeeDataPoints.concat(tailNulls);
+                const kitchenData = kitchenDataPoints.concat(tailNulls);
+                const averageLineData = labels.map(() => averageUnits).concat(tailNulls);
+                const minStockLineData = minStockOverride !== null ? labels.map(() => minStockOverride).concat(tailNulls) : null;
 
                 // Set point colors - grey for 0 sales, regular color otherwise
                 const primaryColor = '{{ $item->review_priority === "review" ? "rgb(239, 68, 68)" : ($item->review_priority === "standard" ? "rgb(234, 179, 8)" : "rgb(34, 197, 94)") }}';
@@ -2414,20 +2429,27 @@
                 const pointColors = dataPoints.map(value => value === 0 ? greyColor : primaryColor);
                 const pointBorderColors = dataPoints.map(value => value === 0 ? greyColor : primaryColor);
                 const pointRadius = dataPoints.map(value => value === 0 ? 2 : 3); // Smaller grey points
-                pointColors.push('transparent', 'transparent');
-                pointBorderColors.push('transparent', 'transparent');
-                pointRadius.push(0, 0);
+                stockLabels.forEach(() => {
+                    pointColors.push('transparent');
+                    pointBorderColors.push('transparent');
+                    pointRadius.push(0);
+                });
 
                 const currentStockData = Array(extendedLabels.length).fill(null);
-                currentStockData[extendedLabels.length - 2] = currentStock;
+                currentStockData[extendedLabels.indexOf('Current stock')] = currentStock;
+
+                const incomingStockData = Array(extendedLabels.length).fill(null);
+                if (pendingDelivery > 0) {
+                    incomingStockData[extendedLabels.indexOf('Incoming')] = currentStock + pendingDelivery;
+                }
 
                 const afterStockData = Array(extendedLabels.length).fill(null);
-                afterStockData[extendedLabels.length - 1] = afterStock;
+                afterStockData[extendedLabels.indexOf('After order')] = afterStock;
 
                 const salesMax = dataPoints.length ? Math.max(...dataPoints) : 0;
                 const coffeeMax = coffeeDataPoints.length ? Math.max(...coffeeDataPoints) : 0;
                 const kitchenMax = kitchenDataPoints.length ? Math.max(...kitchenDataPoints) : 0;
-                const chartMax = Math.max(salesMax, coffeeMax, kitchenMax, currentStock, afterStock, peakWeeklySales, averageUnits, minStockOverride || 0, 1);
+                const chartMax = Math.max(salesMax, coffeeMax, kitchenMax, currentStock, currentStock + pendingDelivery, afterStock, peakWeeklySales, averageUnits, minStockOverride || 0, 1);
                 const chartMin = Math.min(0, currentStock, afterStock);
 
                 // Build datasets array
@@ -2466,7 +2488,7 @@
                 if (hasCoffeeSales) {
                     const coffeeColor = 'rgb(168, 85, 247)'; // Purple
                     const coffeePointColors = coffeeDataPoints.map(value => value === 0 ? greyColor : coffeeColor);
-                    coffeePointColors.push('transparent', 'transparent');
+                    coffeePointColors.push(...stockLabels.map(() => 'transparent'));
                     datasets.push({
                         label: 'Coffee dept',
                         data: coffeeData,
@@ -2474,8 +2496,8 @@
                         backgroundColor: 'rgba(168, 85, 247, 0.1)',
                         pointBackgroundColor: coffeePointColors,
                         pointBorderColor: coffeePointColors,
-                        pointRadius: coffeeDataPoints.map(value => value === 0 ? 2 : 3).concat([0, 0]),
-                        pointHoverRadius: coffeeDataPoints.map(value => value === 0 ? 3 : 5).concat([0, 0]),
+                        pointRadius: coffeeDataPoints.map(value => value === 0 ? 2 : 3).concat(tailZeros),
+                        pointHoverRadius: coffeeDataPoints.map(value => value === 0 ? 3 : 5).concat(tailZeros),
                         segment: {
                             borderColor: ctx => {
                                 const prevValue = ctx.p0.parsed.y;
@@ -2498,7 +2520,7 @@
                 if (hasKitchenSales) {
                     const kitchenColor = 'rgb(249, 115, 22)'; // Orange (distinct from Coffee purple and Sales colors)
                     const kitchenPointColors = kitchenDataPoints.map(value => value === 0 ? greyColor : kitchenColor);
-                    kitchenPointColors.push('transparent', 'transparent');
+                    kitchenPointColors.push(...stockLabels.map(() => 'transparent'));
                     datasets.push({
                         label: 'Kitchen',
                         data: kitchenData,
@@ -2506,8 +2528,8 @@
                         backgroundColor: 'rgba(249, 115, 22, 0.1)',
                         pointBackgroundColor: kitchenPointColors,
                         pointBorderColor: kitchenPointColors,
-                        pointRadius: kitchenDataPoints.map(value => value === 0 ? 2 : 3).concat([0, 0]),
-                        pointHoverRadius: kitchenDataPoints.map(value => value === 0 ? 3 : 5).concat([0, 0]),
+                        pointRadius: kitchenDataPoints.map(value => value === 0 ? 2 : 3).concat(tailZeros),
+                        pointHoverRadius: kitchenDataPoints.map(value => value === 0 ? 3 : 5).concat(tailZeros),
                         segment: {
                             borderColor: ctx => {
                                 const prevValue = ctx.p0.parsed.y;
@@ -2564,6 +2586,16 @@
                             pointRadius: 5,
                             pointHoverRadius: 7,
                             pointBackgroundColor: 'rgb(100, 116, 139)',
+                            pointBorderColor: 'white',
+                            borderColor: 'transparent',
+                            order: 2
+                        },{
+                            label: 'Incoming',
+                            data: incomingStockData,
+                            showLine: false,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            pointBackgroundColor: 'rgb(37, 99, 235)',
                             pointBorderColor: 'white',
                             borderColor: 'transparent',
                             order: 2
@@ -2661,6 +2693,13 @@
                                                 : `${units} units`;
 
                                             return `Current stock · ${displayValue} (${currentPercentage.toFixed(0)}% of peak)`;
+                                        }
+
+                                        if (context.dataset.label === 'Incoming') {
+                                            if (context.parsed.y === null || Number.isNaN(context.parsed.y)) {
+                                                return null;
+                                            }
+                                            return `With incoming delivery · ${Math.round(context.parsed.y)} units (+${Math.round(pendingDelivery)} incoming)`;
                                         }
 
                                         if (context.dataset.label === 'After order') {
@@ -3063,6 +3102,7 @@
             if (!input) return;
 
             const currentStock = parseFloat(input.dataset.currentStock) || 0;
+            const pendingDelivery = parseFloat(input.dataset.pendingDelivery) || 0;
             const caseUnits = parseFloat(input.dataset.caseUnits) || 1;
             const isCaseProduct = input.dataset.isCaseProduct === '1';
             const productPeak = parseFloat(input.dataset.productPeak) || 1;
@@ -3074,7 +3114,7 @@
 
             // Calculate new units based on whether it's a case product
             const newUnits = isCaseProduct ? (orderQuantity * caseUnits) : orderQuantity;
-            const afterStock = currentStock + newUnits;
+            const afterStock = currentStock + pendingDelivery + newUnits;
 
             // Calculate percentages for display (relative to product peak)
             const afterPct = productPeak > 0 ? (afterStock / productPeak) * 100 : 100;
@@ -3082,16 +3122,14 @@
             // Update Chart.js dataset points
             const chart = window.productCharts ? window.productCharts[itemId] : null;
             if (chart) {
-                const labelsLength = chart.data.labels.length;
-
                 const afterDataset = chart.data.datasets.find(dataset => dataset.label === 'After order');
                 if (afterDataset) {
-                    afterDataset.data[labelsLength - 1] = afterStock;
+                    afterDataset.data[chart.data.labels.indexOf('After order')] = afterStock;
                 }
 
                 const currentDataset = chart.data.datasets.find(dataset => dataset.label === 'Current stock');
                 if (currentDataset) {
-                    currentDataset.data[labelsLength - 2] = currentStock;
+                    currentDataset.data[chart.data.labels.indexOf('Current stock')] = currentStock;
                 }
 
                 chart.$currentStock = currentStock;
@@ -3109,7 +3147,7 @@
                 }, 0);
 
                 const averageBaseline = chart.$averageUnits || 0;
-                const axisMax = Math.max(salesMax, currentStock, afterStock, productPeak, averageBaseline, 1);
+                const axisMax = Math.max(salesMax, currentStock, currentStock + pendingDelivery, afterStock, productPeak, averageBaseline, 1);
                 const axisMin = Math.min(0, currentStock, afterStock);
 
                 chart.options.scales.y.min = axisMin < 0 ? axisMin * 1.1 : 0;
@@ -3131,6 +3169,12 @@
                     ? `${formatNumberForDisplay(currentStock / Math.max(caseUnits, 1), quantityPrecision || 3)} cases`
                     : `${Math.round(currentStock).toLocaleString()} units`;
                 currentSubtextEl.textContent = displayValue;
+                if (pendingDelivery > 0) {
+                    const incoming = document.createElement('span');
+                    incoming.className = 'text-blue-600 font-medium';
+                    incoming.textContent = ` (+${Math.round(pendingDelivery).toLocaleString()} incoming)`;
+                    currentSubtextEl.appendChild(incoming);
+                }
             }
 
             const barEl = document.getElementById(`stock-level-bar-${itemId}`);

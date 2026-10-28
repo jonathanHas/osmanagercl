@@ -18,6 +18,7 @@ class OrderSession extends Model
         'coverage_overrides',
         'christmas_comparison_enabled',
         'christmas_window_config',
+        'incoming_deliveries',
         'status',
         'total_items',
         'total_value',
@@ -31,6 +32,7 @@ class OrderSession extends Model
         'coverage_overrides' => 'array',
         'christmas_comparison_enabled' => 'boolean',
         'christmas_window_config' => 'array',
+        'incoming_deliveries' => 'array',
     ];
 
     /**

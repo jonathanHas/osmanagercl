@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **🚚 Late deliveries counted once as incoming stock** (2026-10-28)
+  - A delivery ticked **Include in Orders** (invoice in, goods not yet arrived) is now counted by the next order for its supplier and then unticked, so it no longer reduces every later order (deliveries are never marked completed in practice). Regenerating that order still counts it; tick it again to count it in another order
+  - `/orders/create` shows an amber note listing the ticked deliveries for the selected supplier; every order review layout shows a blue "Incoming stock counted in this order" note with units still to arrive; the delivery page shows "Counted as incoming stock in order #N"
+  - Products added to an order from search now also count the order's incoming deliveries
+  - Order review fix: changing a line's quantity no longer wipes its `(+N incoming)` label, and **After order** now includes incoming stock (current + incoming + ordered), matching what the suggestion was based on
+  - Each line's chart gains a blue **Incoming** point between Current stock and After order (stock once the late delivery arrives, with a tooltip), shown only on lines with something incoming; After order on the chart includes incoming too
+  - **Added**: `database/migrations/2026_10_28_000001_add_incoming_deliveries_to_order_sessions.php`, `resources/views/orders/partials/incoming-deliveries-note.blade.php`, `tests/Feature/OrderIncomingDeliveriesTest.php`
+  - **Modified**: `app/Services/OrderService.php`, `app/Http/Controllers/OrderController.php` (`create()`), `app/Models/{Delivery,OrderSession}.php`, `resources/views/orders/partials/review-table.blade.php`, `resources/views/orders/{create,show,show-christmas,show-layout-a2,show-layout-a2-dense,show-layout-a2-christmas}.blade.php`, `resources/views/deliveries/show.blade.php`, `docs/features/order-management/order-generation.md`
+
 - **🎁 Sponsorship activation for gift vouchers** (2026-10-23)
   - Vouchers given to charities, raffles and fundraisers are activated without a sale, and the accounts need to see them as sponsorship rather than voucher sales. An admin-only **Sponsor** button on `/vouchers/list` (inactive rows) opens a modal with the amount (pre-filled with the voucher's value), who it was given to (required) and a note; the voucher is activated at once and its till product dropped to €0.00 so it redeems like any other
   - The voucher records `sponsored_to` / `sponsored_at`; the issue transaction's note reads `Sponsorship: …`. Shown as a **Sponsored** badge on the list (with a `Sponsored (no sale)` filter), on the voucher's log page, in the till-screen history and on `/vouchers/activity`. Make for sale clears it
