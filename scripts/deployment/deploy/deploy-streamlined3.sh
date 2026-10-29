@@ -106,7 +106,8 @@ check_host_connectivity() {
 print_permission_repair() {
     echo "     sudo chown -R $PROD_USER:www-data $PROD_PATH"
     echo "     sudo find $PROD_PATH -type d -exec chmod 755 {} +"
-    echo "     sudo find $PROD_PATH -type f -exec chmod 644 {} +"
+    # The parser venv is pruned: its bin/ scripts (pip, …) need their executable bit.
+    echo "     sudo find $PROD_PATH -path $PROD_PATH/scripts/invoice-parser/venv -prune -o -type f -exec chmod 644 {} +"
     echo "     sudo chmod -R 775 $PROD_PATH/storage $PROD_PATH/bootstrap/cache"
     echo "     sudo find $PROD_PATH/storage $PROD_PATH/bootstrap/cache -type d -exec chmod g+s {} +"
     echo "     sudo chmod +x $PROD_PATH/artisan"
@@ -495,8 +496,14 @@ main() {
 
         echo "🐍 Installing Python parser dependencies..."
         cd scripts/invoice-parser
+        # Through the venv's python, not venv/bin/pip: a past `chmod 644` over the tree stripped the
+        # executable bit from venv/bin/*, and pip failed with "Permission denied" on every deploy.
         if [ -d "venv" ]; then
-            venv/bin/pip install -r requirements.txt --quiet
+            if venv/bin/python -m pip install -r requirements.txt --quiet --disable-pip-version-check; then
+                echo "✅ Python parser dependencies up to date"
+            else
+                echo "❌ Installing Python parser dependencies failed (see above)."
+            fi
         fi
         cd "$PROD_PATH"
 
@@ -511,11 +518,24 @@ main() {
         # group-writable. Ownership is a one-time setup (see print_permission_repair); all this does
         # per-deploy is re-assert group-write on the two runtime paths, which rsync can clear on
         # newly created files.
+        #
+        # Only what the deploying user owns: files the web server created (uploaded delivery PDFs,
+        # mode 644, owned by www-data) cannot be chmodded by $PROD_USER, and do not need to be, so a
+        # blanket `chmod -R` reported failure on every deploy. What matters is checked after.
         echo "🔐 Ensuring runtime paths are writable by the web server..."
-        if chmod -R g+w storage bootstrap/cache 2>/dev/null; then
+        find storage bootstrap/cache -user "$(id -un)" ! -perm -g+w -exec chmod g+w {} + 2>/dev/null
+        NOT_WRITABLE=""
+        for dir in storage storage/logs storage/app storage/framework storage/framework/cache \
+                   storage/framework/sessions storage/framework/views bootstrap/cache; do
+            [ -d "$dir" ] || continue
+            if [ "$(stat -c %G "$dir")" != "www-data" ] || [ -z "$(find "$dir" -maxdepth 0 -perm -g+w)" ]; then
+                NOT_WRITABLE="$NOT_WRITABLE $dir"
+            fi
+        done
+        if [ -z "$NOT_WRITABLE" ]; then
             echo "✅ storage and bootstrap/cache are group-writable"
         else
-            echo "❌ Could not set group-write on storage / bootstrap/cache."
+            echo "❌ Not writable by group www-data:$NOT_WRITABLE"
             echo "   The web server will fail to write sessions, caches and compiled views."
             echo "   Repair on the server:"
             echo "     sudo chown -R $(id -un):www-data $PROD_PATH"

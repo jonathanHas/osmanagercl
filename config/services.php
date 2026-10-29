@@ -63,4 +63,13 @@ return [
         'screen_tag' => env('BOOKSTACK_SCREEN_TAG', 'screen'),
     ],
 
+    'anthropic' => [
+        // Claude (AI provider "anthropic"); selected per feature at /tools/ai-diagnostics.
+        'api_key' => env('ANTHROPIC_API_KEY'),
+    ],
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+    ],
+
 ];

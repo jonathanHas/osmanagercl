@@ -1,6 +1,6 @@
 # AI Integration
 
-Multi-provider AI integration for invoice parsing, label translation, and future AI-powered features. Supports Google Gemini, Mistral (vision and OCR), and OpenAI-compatible APIs with per-feature configuration.
+Multi-provider AI integration for invoice parsing, label translation, and future AI-powered features. Supports Google Gemini, Mistral (vision and OCR), Anthropic Claude, and OpenAI-compatible APIs with per-feature configuration.
 
 ## Overview
 
@@ -21,6 +21,7 @@ The AI integration layer provides a unified interface for using different AI pro
 | Mistral Vision | `mistral` | Vision (pixtral models), text | `MISTRAL_API_KEY` |
 | Mistral OCR | `mistral-ocr` | Two-step: OCR text extraction + chat structuring. Best for handwritten/paper documents | `MISTRAL_API_KEY` |
 | OpenAI | `openai` | Vision, text | `OPENAI_API_KEY` |
+| Anthropic Claude | `anthropic` | Vision, PDFs read directly, text. Uses the official `anthropic-ai/sdk` package (`ClaudeAiService`) | `ANTHROPIC_API_KEY` |
 
 ## Features Using AI
 
@@ -42,8 +43,8 @@ Re-routes bulk-upload invoices that the Python parsers couldn't parse (status `f
 - **Feature key**: `invoice_ai_fallback`
 - **Default provider**: falls through to `invoice_parsing` (Camera Capture provider) when unset; can be overridden independently at `/tools/ai-diagnostics`
 - **Processing**: Reuses `ParseInvoiceCameraImage` queue job with a `featureKey` argument
-- **PDF support**: Only when provider is `mistral-ocr` -- uses Mistral's native `document_url` endpoint, no Ghostscript/Imagick dependency. For any other provider, PDFs return a structured error pointing users to `/tools/ai-diagnostics`
-- **Image support**: All four providers work identically to Camera Capture
+- **PDF support**: Only when provider is `mistral-ocr` (Mistral's native `document_url` endpoint) or `anthropic` (sent to Claude as a PDF document block) -- no Ghostscript/Imagick dependency. For any other provider, PDFs return a structured error pointing users to `/tools/ai-diagnostics`
+- **Image support**: All five providers work identically to Camera Capture
 - **Excluded**: Files flagged as duplicates (which keep their "Delete Duplicate" action)
 - **Data pipeline**: After AI extraction, output flows through the same `InvoiceParsingService::processParserOutput()` as every other parser -- confidence heuristics, duplicate detection, and auto-creation thresholds all apply unchanged
 - **Multi-invoice PDFs are not a candidate**: a file holding several invoices (Coolnagrower) is forced to `review`, which makes it eligible for "Send to AI" -- but the AI path has the same one-file-one-invoice limitation, so it cannot resolve one either. Split the PDF first; see *Files containing several invoices* in [the parser integration guide](./invoice-parser-integration.md)
@@ -66,6 +67,7 @@ Translates foreign food labels from photos. Extracts product name, ingredients (
 GEMINI_API_KEY=your_gemini_key
 MISTRAL_API_KEY=your_mistral_key
 OPENAI_API_KEY=your_openai_key      # Only if using OpenAI provider
+ANTHROPIC_API_KEY=your_claude_key   # Only if using Anthropic Claude provider
 ```
 
 After changing `.env`, run:
@@ -135,7 +137,8 @@ API keys always come from `.env` via `AiSettingsService::getApiKey()`, never fro
 ```php
 'gemini'      => config('gemini.api_key')           ?: env('GEMINI_API_KEY'),
 'mistral*'    => config('invoices.ai_parsing.api_key') ?: env('MISTRAL_API_KEY'),
-'openai'      => config('invoices.ai_parsing.api_key') ?: env('OPENAI_API_KEY'),
+'openai'      => config('services.openai.api_key')    ?: env('OPENAI_API_KEY'),
+'anthropic'   => config('services.anthropic.api_key') ?: env('ANTHROPIC_API_KEY'),
 ```
 
 This matters because once `php artisan config:cache` runs (standard on production deploys), Laravel unsets the Dotenv variables and `env()` returns `null` outside `config/*.php` files. Reading through `config(...)` keeps the key available because `config/invoices.php` and `config/gemini.php` baked the env values into the cached config.
@@ -153,6 +156,7 @@ InvoiceGeminiParsingService::parseImage($file, $featureKey = 'invoice_parsing')
         'mistral-ocr' -> HTTP POST /ocr with image_url or document_url
                          then HTTP POST /chat/completions (JSON structuring) [image + PDF]
         'openai'      -> HTTP POST /chat/completions with vision             [image only]
+        'anthropic'   -> ClaudeAiService (Messages API, official SDK)        [image + PDF]
 ```
 
 The same method serves both Camera Capture and the Failed-Parse Fallback -- the `$featureKey` argument selects which `app_settings` namespace to read.
@@ -185,6 +189,7 @@ LabelAreaController::uploadPhoto() / uploadPhoto2()
 **Services:**
 - `app/Services/AiSettingsService.php` -- Per-feature settings with DB/config fallback
 - `app/Services/InvoiceGeminiParsingService.php` -- Multi-provider invoice image parsing
+- `app/Services/ClaudeAiService.php` -- Anthropic Claude provider (image/PDF attachments, returns reply text)
 
 **Controllers:**
 - `app/Http/Controllers/AiDiagnosticsController.php` -- Diagnostics page, connection tests, settings management
@@ -228,3 +233,9 @@ Unmatched suppliers reduce confidence to 60% (below auto-create threshold), forc
 - **[Invoice Bulk Upload](./invoice-bulk-upload-system.md)** -- The base upload system that camera capture integrates with
 - **[Label Translation System](./label-translation-system.md)** -- AI-powered food label translation
 - **[RTD System](./rtd-system.md)** -- Uses parsed invoice data for reverse tax determination
+
+## Troubleshooting
+
+- **Gemini returns 402 `RESOURCE_EXHAUSTED` "Your prepayment credits are depleted"** -- the key is valid but the Google AI Studio project is out of prepaid credit. Top up at https://ai.studio/projects, or switch the features to another provider at `/tools/ai-diagnostics`. Seen on production 2026-10-29.
+- **The Test buttons on `/tools/ai-diagnostics`** call the provider the feature is set to (Gemini through the Gemini package, Claude through `ClaudeAiService`, everything else through `/chat/completions` at the Base URL). The OCR test is Mistral-only. Before 2026-10-29 every test went to the Base URL, so Gemini could not be tested from this page.
+

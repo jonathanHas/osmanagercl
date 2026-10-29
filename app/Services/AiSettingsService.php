@@ -92,7 +92,8 @@ class AiSettingsService
         return match (true) {
             str_starts_with($provider, 'gemini') => config('gemini.api_key') ?: env('GEMINI_API_KEY'),
             str_starts_with($provider, 'mistral') => config('invoices.ai_parsing.api_key') ?: env('MISTRAL_API_KEY'),
-            $provider === 'openai' => config('invoices.ai_parsing.api_key') ?: env('OPENAI_API_KEY'),
+            $provider === 'openai' => config('services.openai.api_key') ?: env('OPENAI_API_KEY'),
+            $provider === 'anthropic' => config('services.anthropic.api_key') ?: env('ANTHROPIC_API_KEY'),
             default => config('invoices.ai_parsing.api_key') ?: env('MISTRAL_API_KEY'),
         };
     }
@@ -158,6 +159,11 @@ class AiSettingsService
                 'label' => 'OpenAI',
                 'description' => 'OpenAI-compatible chat completions with vision. Requires OPENAI_API_KEY.',
                 'models' => ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+            ],
+            'anthropic' => [
+                'label' => 'Anthropic Claude',
+                'description' => 'Claude Messages API via the official SDK. Reads images and PDFs directly. Requires ANTHROPIC_API_KEY.',
+                'models' => ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'],
             ],
         ];
     }

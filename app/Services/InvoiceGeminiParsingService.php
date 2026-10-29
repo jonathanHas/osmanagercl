@@ -54,10 +54,10 @@ class InvoiceGeminiParsingService
         $isPdf = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION)) === 'pdf';
         $provider = AiSettingsService::get($featureKey, 'provider', 'mistral-ocr');
 
-        if ($isPdf && $provider !== 'mistral-ocr') {
+        if ($isPdf && ! in_array($provider, ['mistral-ocr', 'anthropic'], true)) {
             return [
                 'success' => false,
-                'errors' => [['message' => 'PDF AI fallback requires Mistral OCR. Configure it at /tools/ai-diagnostics.']],
+                'errors' => [['message' => 'PDF AI fallback requires Mistral OCR or Anthropic Claude. Configure it at /tools/ai-diagnostics.']],
             ];
         }
 
@@ -81,6 +81,7 @@ class InvoiceGeminiParsingService
                 'mistral' => $this->callMistralVision($fileData, $knownSuppliers, $featureKey),
                 'mistral-ocr' => $this->callMistralOcr($fileData, $knownSuppliers, $featureKey, $isPdf),
                 'openai' => $this->callOpenAiCompatible($fileData, $knownSuppliers, $featureKey),
+                'anthropic' => $this->callClaude($fileData, $knownSuppliers, $featureKey, $isPdf),
                 default => throw new \Exception("Unknown AI provider: {$provider}"),
             };
 
@@ -221,6 +222,18 @@ class InvoiceGeminiParsingService
     protected function callOpenAiCompatible(string $imageBase64, array $knownSuppliers, string $featureKey = 'invoice_parsing'): string
     {
         return $this->callChatCompletions($imageBase64, $knownSuppliers, $featureKey);
+    }
+
+    /**
+     * Anthropic Claude: reads the image or PDF directly.
+     */
+    protected function callClaude(string $fileBase64, array $knownSuppliers, string $featureKey = 'invoice_parsing', bool $isPdf = false): string
+    {
+        return app(ClaudeAiService::class)->complete(
+            $featureKey,
+            $this->buildPrompt($knownSuppliers),
+            [['data' => $fileBase64, 'mime' => $isPdf ? 'application/pdf' : 'image/jpeg']],
+        );
     }
 
     /**

@@ -80,6 +80,7 @@ class DynamisAiSuggesterService
 
         $raw = match (true) {
             str_starts_with($provider, 'gemini') => $this->callGemini($prompt),
+            $provider === 'anthropic' => app(ClaudeAiService::class)->complete(self::FEATURE_KEY, $prompt),
             default => $this->callChatCompletions($prompt),
         };
 

@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
 use App\Services\AiSettingsService;
+use App\Services\ClaudeAiService;
 use App\Services\ZebraPrintService;
 use App\Services\ZplGeneratorService;
 use Gemini\Data\Blob;
@@ -180,6 +181,12 @@ class LabelTranslationController extends Controller
                 }
                 $result = Gemini::generativeModel(model: $model)->generateContent($contents);
                 $text = $result->text();
+            } elseif ($provider === 'anthropic') {
+                $text = app(ClaudeAiService::class)->complete(
+                    'label_translation',
+                    $prompt,
+                    array_map(fn ($imageData) => ['data' => $imageData, 'mime' => 'image/jpeg'], $resizedImages),
+                );
             } else {
                 // OpenAI-compatible API (Mistral, OpenAI, etc.)
                 $apiKey = AiSettingsService::getApiKey('label_translation');

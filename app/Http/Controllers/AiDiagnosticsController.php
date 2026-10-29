@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Services\AiSettingsService;
+use App\Services\ClaudeAiService;
+use Gemini\Data\Blob;
+use Gemini\Enums\MimeType;
+use Gemini\Laravel\Facades\Gemini;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -100,9 +104,13 @@ class AiDiagnosticsController extends Controller
         $startTime = microtime(true);
 
         try {
-            $result = match ($testType) {
-                'vision' => $this->testVision($config),
-                'ocr' => $this->testOcr($config),
+            $provider = $config['provider'] ?? '';
+
+            $result = match (true) {
+                $testType === 'ocr' => $this->testOcr($config),
+                $provider === 'anthropic' => $this->testClaude($feature, $testType === 'vision'),
+                str_starts_with($provider, 'gemini') => $this->testGemini($config, $testType === 'vision'),
+                $testType === 'vision' => $this->testVision($config),
                 default => $this->testText($config),
             };
 
@@ -185,6 +193,33 @@ class AiDiagnosticsController extends Controller
             'response' => $response->json('choices.0.message.content', ''),
             'usage' => $response->json('usage'),
             'status_code' => $response->status(),
+        ];
+    }
+
+    protected function testClaude(string $feature, bool $vision): array
+    {
+        $attachments = $vision ? [['data' => $this->createTestImage(), 'mime' => 'image/jpeg']] : [];
+        $prompt = $vision
+            ? 'What text do you see in this image? Reply briefly.'
+            : 'Reply with exactly: "AI connection OK". Nothing else.';
+
+        return [
+            'response' => app(ClaudeAiService::class)->complete($feature, $prompt, $attachments, 2000),
+            'status_code' => 200,
+        ];
+    }
+
+    protected function testGemini(array $config, bool $vision): array
+    {
+        $contents = $vision
+            ? ['What text do you see in this image? Reply briefly.', new Blob(mimeType: MimeType::IMAGE_JPEG, data: $this->createTestImage())]
+            : ['Reply with exactly: "AI connection OK". Nothing else.'];
+
+        $result = Gemini::generativeModel(model: $config['model'] ?? 'gemini-2.5-flash')->generateContent($contents);
+
+        return [
+            'response' => $result->text(),
+            'status_code' => 200,
         ];
     }
 
@@ -273,7 +308,7 @@ class AiDiagnosticsController extends Controller
 
         $errors = [];
         foreach ($lines as $line) {
-            if (preg_match('/\[([\d-]+ [\d:]+)\].*(?:Mistral|Gemini|AI.*pars|invoice.*pars|camera.*fail|Bearer token|OCR)/i', $line, $matches)) {
+            if (preg_match('/\[([\d-]+ [\d:]+)\].*(?:Mistral|Gemini|Claude|AI.*pars|invoice.*pars|camera.*fail|Bearer token|OCR)/i', $line, $matches)) {
                 $errors[] = [
                     'timestamp' => $matches[1],
                     'message' => trim(substr($line, 0, 300)),

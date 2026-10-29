@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductTranslation;
 use App\Models\ZebraLabel;
 use App\Services\AiSettingsService;
+use App\Services\ClaudeAiService;
 use App\Services\LabelQueueService;
 use App\Services\LabelService;
 use App\Services\SupplierService;
@@ -1212,6 +1213,14 @@ class LabelAreaController extends Controller
      */
     protected function callLabelAi(string $prompt, string $imageBase64, string $provider, string $model): string
     {
+        if ($provider === 'anthropic') {
+            return app(ClaudeAiService::class)->complete(
+                'label_translation',
+                $prompt,
+                [['data' => $imageBase64, 'mime' => 'image/jpeg']],
+            );
+        }
+
         $apiKey = AiSettingsService::getApiKey('label_translation');
         $baseUrl = AiSettingsService::get('label_translation', 'base_url', 'https://api.mistral.ai/v1');
         $timeout = (int) AiSettingsService::get('label_translation', 'timeout', 120);

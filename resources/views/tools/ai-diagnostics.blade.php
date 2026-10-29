@@ -56,7 +56,7 @@
                     </div>
 
                     {{-- Base URL --}}
-                    <div x-show="provider !== 'gemini'">
+                    <div x-show="provider !== 'gemini' && provider !== 'anthropic'">
                         <label class="block text-sm font-medium text-gray-400 mb-1">Base URL</label>
                         <input type="text" x-model="baseUrl"
                                class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm font-mono focus:border-blue-500 focus:outline-none"
