@@ -9,14 +9,19 @@
     use App\Models\CustomerRequestItem as Line;
 
     $status = $item->status;
+    $held = $item->isHeldForCollection();
     $isStopped = in_array($status, [Line::STATUS_NOT_AVAILABLE, Line::STATUS_CANCELLED], true);
-    $isFinished = $isStopped || $status === Line::STATUS_COLLECTED;
+    $isFinished = $isStopped || in_array($status, [Line::STATUS_COLLECTED, Line::STATUS_DONE], true);
 
-    // How far along the Ordered → Put aside → Collected strip this line is.
+    // The lifecycle strip: Ordered → Put aside → Collected for a line held for
+    // the customer, Ordered → Done for one we just get in. A held line that was
+    // marked done anyway shows the short strip, fully lit.
+    $steps = array_values($item->lifecycleSteps());
     $reached = match ($status) {
         Line::STATUS_ORDERED => 1,
         Line::STATUS_PUT_ASIDE => 2,
         Line::STATUS_COLLECTED => 3,
+        Line::STATUS_DONE => count($steps),
         default => 0,
     };
 
@@ -27,11 +32,13 @@
     // when it is the last one.
     $urgent = $overdue || $dueToday;
 
-    $primary = match ($status) {
-        Line::STATUS_PENDING => ['status' => Line::STATUS_ORDERED, 'label' => 'Mark ordered', 'tone' => $urgent ? 'shop-btn--primary' : 'shop-btn--secondary'],
-        Line::STATUS_ORDERED => ['status' => Line::STATUS_PUT_ASIDE, 'label' => 'Put aside', 'tone' => $urgent ? 'shop-btn--primary' : 'shop-btn--secondary'],
-        Line::STATUS_PUT_ASIDE => ['status' => Line::STATUS_COLLECTED, 'label' => 'Collected', 'tone' => 'shop-btn--primary'],
-        Line::STATUS_NOT_AVAILABLE, Line::STATUS_CANCELLED => ['status' => Line::STATUS_PENDING, 'label' => 'Reopen', 'tone' => 'shop-btn--secondary'],
+    $primary = match (true) {
+        $status === Line::STATUS_PENDING && ! $held,
+        $status === Line::STATUS_ORDERED && ! $held => ['status' => Line::STATUS_DONE, 'label' => 'Done', 'tone' => 'shop-btn--primary'],
+        $status === Line::STATUS_PENDING => ['status' => Line::STATUS_ORDERED, 'label' => 'Mark ordered', 'tone' => $urgent ? 'shop-btn--primary' : 'shop-btn--secondary'],
+        $status === Line::STATUS_ORDERED => ['status' => Line::STATUS_PUT_ASIDE, 'label' => 'Put aside', 'tone' => $urgent ? 'shop-btn--primary' : 'shop-btn--secondary'],
+        $status === Line::STATUS_PUT_ASIDE => ['status' => Line::STATUS_COLLECTED, 'label' => 'Collected', 'tone' => 'shop-btn--primary'],
+        $isStopped => ['status' => Line::STATUS_PENDING, 'label' => 'Reopen', 'tone' => 'shop-btn--secondary'],
         default => null,
     };
 
@@ -39,6 +46,7 @@
         Line::STATUS_ORDERED => Line::STATUS_PENDING,
         Line::STATUS_PUT_ASIDE => Line::STATUS_ORDERED,
         Line::STATUS_COLLECTED => Line::STATUS_PUT_ASIDE,
+        Line::STATUS_DONE => Line::STATUS_ORDERED,
         default => null,
     };
 
@@ -95,6 +103,9 @@
                 <span class="shop-inline"><x-shop.icon name="phone" size="sm" />{{ $request->customer_phone }}</span>
             @endif
             <span class="shop-pill shop-pill--muted">{{ $item->isLinkedToProduct() ? 'Pre-order' : 'Sourcing' }}</span>
+            @unless ($held)
+                <span class="shop-pill shop-pill--muted">{{ $item->handlingLabel() }}</span>
+            @endunless
             @if ($status === Line::STATUS_NOT_AVAILABLE)
                 <span class="shop-pill shop-pill--bad">Not available</span>
             @elseif ($status === Line::STATUS_CANCELLED)
@@ -104,10 +115,15 @@
         @if ($item->notes ?: $request->notes)
             <span class="shop-meta">{{ $item->notes ?: $request->notes }}</span>
         @endif
+        {{-- When it was taken, and by whom: the date block is the due date, and
+             the two together say how long the customer has been waiting. --}}
+        <span class="shop-meta shop-req__taken">
+            Taken {{ $request->created_at->format('D j M') }}@if ($request->creator) by {{ $request->creator->name }}@endif
+        </span>
     </div>
 
-    <ol class="shop-steps {{ $isStopped ? 'is-stopped' : '' }}" aria-label="Status">
-        @foreach (['Ordered', 'Put aside', 'Collected'] as $i => $label)
+    <ol class="shop-steps {{ count($steps) === 2 ? 'shop-steps--2' : '' }} {{ $isStopped ? 'is-stopped' : '' }}" aria-label="Status">
+        @foreach ($steps as $i => $label)
             <li class="shop-step {{ $reached > $i ? 'is-done' : '' }} {{ $reached === $i + 1 ? 'is-current' : '' }}">{{ $label }}</li>
         @endforeach
     </ol>
@@ -140,12 +156,32 @@
                 <x-shop.icon name="pencil" />Edit
             </a>
 
-            @if ($status === Line::STATUS_PENDING)
+            @if ($status === Line::STATUS_PENDING && $held)
                 <form method="POST" action="{{ route('customer-requests.items.status', $item) }}">
                     @csrf
                     @method('PATCH')
                     <input type="hidden" name="status" value="{{ Line::STATUS_PUT_ASIDE }}">
                     <button class="shop-menu__item" type="submit"><x-shop.icon name="check" />Put aside now</button>
+                </form>
+            @endif
+
+            {{-- The step the primary button skips: Ordered for a just-get-it-in
+                 line, Done for a held one that turns out to need no holding. --}}
+            @if ($status === Line::STATUS_PENDING && ! $held)
+                <form method="POST" action="{{ route('customer-requests.items.status', $item) }}">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="{{ Line::STATUS_ORDERED }}">
+                    <button class="shop-menu__item" type="submit"><x-shop.icon name="package" />Mark ordered</button>
+                </form>
+            @endif
+
+            @if (in_array($status, [Line::STATUS_PENDING, Line::STATUS_ORDERED], true) && $held)
+                <form method="POST" action="{{ route('customer-requests.items.status', $item) }}">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="{{ Line::STATUS_DONE }}">
+                    <button class="shop-menu__item" type="submit"><x-shop.icon name="check" />Done, nothing to put aside</button>
                 </form>
             @endif
 

@@ -71,4 +71,42 @@ class CustomerRequestItemTransitionsTest extends TestCase
         $item->status = 'collected';
         $this->assertFalse($item->isOpen());
     }
+
+    public function test_done_is_the_short_road_for_a_line_that_is_not_held(): void
+    {
+        $item = new CustomerRequestItem(['status' => 'pending']);
+
+        // Allowed from any open line that has not been put aside, held or not.
+        $this->assertTrue($item->canTransitionTo('done'));
+        $item->status = 'ordered';
+        $this->assertTrue($item->canTransitionTo('done'));
+        $item->status = 'put_aside';
+        $this->assertFalse($item->canTransitionTo('done'), 'something put aside is collected, not just done');
+
+        $item->status = 'done';
+        $this->assertFalse($item->isOpen());
+        $this->assertContains('done', CustomerRequestItem::DONE_STATUSES);
+        $this->assertSame('Done', $item->statusLabel());
+        $this->assertEqualsCanonicalizing(['ordered', 'pending'], $item->nextStatuses(), 'done can only be undone');
+    }
+
+    public function test_a_line_is_held_for_collection_unless_told_otherwise(): void
+    {
+        $item = new CustomerRequestItem(['status' => 'pending']);
+
+        // Lines taken before the choice existed have no value and keep the old lifecycle.
+        $this->assertTrue($item->isHeldForCollection());
+        $this->assertSame(['ordered', 'put_aside', 'collected'], array_keys($item->lifecycleSteps()));
+        $this->assertSame('Put aside', $item->handlingLabel());
+
+        $item->hold_for_collection = false;
+        $this->assertFalse($item->isHeldForCollection());
+        $this->assertSame(['ordered', 'done'], array_keys($item->lifecycleSteps()));
+        $this->assertSame('Just get it in', $item->handlingLabel());
+
+        // A held line that was marked done anyway shows the short strip, finished.
+        $item->hold_for_collection = true;
+        $item->status = 'done';
+        $this->assertSame(['ordered', 'done'], array_keys($item->lifecycleSteps()));
+    }
 }

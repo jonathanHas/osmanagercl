@@ -33,54 +33,14 @@
                     [
                         'type' => 'link',
                         'route' => 'deliveries.index',
-                        'label' => 'Back to Deliveries',
+                        'label' => 'Back to Dockets',
                         'color' => 'gray',
                         'class' => 'inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200',
                         'icon' => 'M10 19l-7-7m0 0l7-7m-7 7h18'
                     ]
                 ];
                 
-                if($delivery->status === 'draft') {
-                    $deliveryActions[] = [
-                        'type' => 'link',
-                        'route' => 'deliveries.scan',
-                        'params' => $delivery,
-                        'label' => 'Start Scanning',
-                        'color' => 'green',
-                        'class' => 'inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors duration-200',
-                        'icon' => 'M12 4v16m8-8H4'
-                    ];
-                } elseif($delivery->status === 'receiving') {
-                    $deliveryActions[] = [
-                        'type' => 'link',
-                        'route' => 'deliveries.scan',
-                        'params' => $delivery,
-                        'label' => 'Continue Scanning',
-                        'color' => 'blue',
-                        'class' => 'inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md transition-colors duration-200',
-                        'icon' => 'M13 10V3L4 14h7v7l9-11h-7z'
-                    ];
-                    $deliveryActions[] = [
-                        'type' => 'link',
-                        'route' => 'deliveries.summary',
-                        'params' => $delivery,
-                        'label' => 'View Summary',
-                        'color' => 'info',
-                        'class' => 'inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md transition-colors duration-200',
-                        'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
-                    ];
-                } elseif($delivery->status === 'completed') {
-                    $deliveryActions[] = [
-                        'type' => 'link',
-                        'route' => 'deliveries.summary',
-                        'params' => $delivery,
-                        'label' => 'View Final Report',
-                        'color' => 'indigo',
-                        'class' => 'inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md transition-colors duration-200',
-                        'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'
-                    ];
-                }
-                
+
                 // Add toggle for including delivery in order stock calculations (non-completed only)
                 if (!in_array($delivery->status, ['completed', 'cancelled'])) {
                     $deliveryActions[] = [
@@ -97,18 +57,6 @@
                     ];
                 }
 
-                // Add sync to legacy action for comparing with scanned items
-                $deliveryActions[] = [
-                    'type' => 'form',
-                    'method' => 'POST',
-                    'route' => 'deliveries.sync-legacy',
-                    'params' => $delivery,
-                    'label' => 'Sync to Legacy',
-                    'color' => 'purple',
-                    'class' => 'inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-md transition-colors duration-200',
-                    'icon' => 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4',
-                    'onclick' => "return confirm('This will replace all data in the legacy delivery table. Continue?')"
-                ];
 
                 // Add delete action for non-completed deliveries
                 if (in_array($delivery->status, ['draft', 'cancelled'])) {
@@ -133,14 +81,6 @@
             {{-- Mobile compact actions --}}
             <div class="flex flex-wrap gap-2 sm:hidden" x-data="{ moreOpen: false }">
                 <a href="{{ route('deliveries.index') }}" class="px-2 py-1 bg-gray-600 text-white text-xs font-medium rounded">Back</a>
-                @if($delivery->status === 'draft')
-                    <a href="{{ route('deliveries.scan', $delivery) }}" class="px-2 py-1 bg-green-600 text-white text-xs font-medium rounded">Start Scanning</a>
-                @elseif($delivery->status === 'receiving')
-                    <a href="{{ route('deliveries.scan', $delivery) }}" class="px-2 py-1 bg-blue-600 text-white text-xs font-medium rounded">Continue</a>
-                    <a href="{{ route('deliveries.summary', $delivery) }}" class="px-2 py-1 bg-purple-600 text-white text-xs font-medium rounded">Summary</a>
-                @elseif($delivery->status === 'completed')
-                    <a href="{{ route('deliveries.summary', $delivery) }}" class="px-2 py-1 bg-indigo-600 text-white text-xs font-medium rounded">Report</a>
-                @endif
                 <div class="relative">
                     <button @click="moreOpen = !moreOpen" class="px-2 py-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-medium rounded">More...</button>
                     <div x-show="moreOpen" @click.away="moreOpen = false" x-transition class="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-md py-1 z-50">
@@ -152,10 +92,6 @@
                                 </button>
                             </form>
                         @endif
-                        <form method="POST" action="{{ route('deliveries.sync-legacy', $delivery) }}" class="block" onsubmit="return confirm('This will replace all data in the legacy delivery table. Continue?')">
-                            @csrf
-                            <button type="submit" class="w-full text-left px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700">Sync to Legacy</button>
-                        </form>
                         @if(in_array($delivery->status, ['draft', 'cancelled']))
                             <form method="POST" action="{{ route('deliveries.destroy', $delivery) }}" class="block" onsubmit="return confirm('Are you sure you want to delete this delivery?')">
                                 @csrf
@@ -188,6 +124,54 @@
                     @endif
                 </div>
             @endif
+
+            {{-- Receiving: the scan session this docket is received through (ReceivingService) --}}
+            <div class="mb-4 p-4 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg" id="receiving-card">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="text-sm text-purple-900 dark:text-purple-100">
+                        <span class="font-semibold">Receiving</span>
+                        @if($receivingSession)
+                            · session <span class="font-mono">#{{ Str::limit($receivingSession->ID, 8, '') }}</span>
+                            @if($receivingSession->dateUpload)
+                                started {{ \Illuminate\Support\Carbon::parse($receivingSession->dateUpload)->format('D j M, H:i') }}
+                            @endif
+                            · {{ $receivingScanCount }} {{ Str::plural('item', $receivingScanCount) }} scanned
+                            @if((int) $receivingSession->status === 1)
+                                <span class="ml-1 px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Received{{ $delivery->received_at ? ' '.$delivery->received_at->format('j M Y, H:i') : '' }}</span>
+                            @else
+                                <span class="ml-1 px-2 py-0.5 text-xs rounded-full bg-yellow-100 text-yellow-800">In progress</span>
+                            @endif
+                        @else
+                            · not yet sent. Send the docket lines so the scan can be checked against them; completing the session in Receiving marks this docket received.
+                        @endif
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        @if($receivingSession)
+                            <a href="{{ route('delivery-legacy.match', ['delID' => $receivingSession->ID, 'supplierID' => $receivingSession->supID]) }}"
+                               class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md">Open in Receiving</a>
+                            @if((int) $receivingSession->status !== 1)
+                                <form method="POST" action="{{ route('deliveries.sync-legacy', $delivery) }}"
+                                      onsubmit="return confirm('Re-send this docket\'s lines to its Receiving session? The session\'s current lines are replaced; scans are kept.')">
+                                    @csrf
+                                    <input type="hidden" name="scan_session_id" value="{{ $receivingSession->ID }}">
+                                    <button type="submit" class="px-3 py-1.5 bg-white dark:bg-gray-800 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-200 text-xs font-medium rounded-md hover:bg-purple-100 dark:hover:bg-purple-900">Re-send lines</button>
+                                </form>
+                            @endif
+                        @elseif($delivery->status !== 'cancelled')
+                            <form method="POST" action="{{ route('deliveries.sync-legacy', $delivery) }}" class="flex items-center gap-2 flex-wrap">
+                                @csrf
+                                <select name="scan_session_id" class="text-xs rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 py-1.5">
+                                    <option value="new">Start a new scan session</option>
+                                    @foreach($openSessions as $session)
+                                        <option value="{{ $session->ID }}">Open session #{{ Str::limit($session->ID, 8, '') }}@if($session->dateUpload) · {{ \Illuminate\Support\Carbon::parse($session->dateUpload)->format('D j M, H:i') }}@endif · {{ $session->item_count }} scanned</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded-md">Send to Receiving</button>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
 
             {{-- Import Summary (shown after PDF import) --}}
             @if(session('import_summary'))
@@ -1694,70 +1678,6 @@
                     </table>
                 </div>
             </div>
-
-            @if($delivery->scans->where('matched', false)->count() > 0)
-                <!-- Unmatched Scans -->
-                <div class="mt-8 bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Unmatched Scans</h3>
-                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            Products scanned but not found in the delivery manifest
-                        </p>
-                    </div>
-                    
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                            <thead class="bg-gray-50 dark:bg-gray-700">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Barcode
-                                    </th>
-                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Quantity
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Scanned By
-                                    </th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Time
-                                    </th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                @foreach($delivery->scans->where('matched', false) as $scan)
-                                    <tr>
-                                        <td class="px-6 py-4 text-sm">
-                                            <code class="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded text-xs">
-                                                {{ $scan->barcode }}
-                                            </code>
-                                        </td>
-                                        <td class="px-6 py-4 text-center text-sm text-gray-900 dark:text-gray-100">
-                                            {{ $scan->quantity }}
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
-                                            {{ $scan->scanned_by }}
-                                        </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                            {{ $scan->created_at->format('H:i:s') }}
-                                        </td>
-                                        <td class="px-6 py-4 text-right text-sm font-medium">
-                                            @if($delivery->status !== 'completed')
-                                                <button onclick="convertScanToProduct('{{ $scan->barcode }}', {{ $scan->quantity }})" 
-                                                        class="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 text-xs">
-                                                    Convert to Product
-                                                </button>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            @endif
         </div>
     </div>
 
@@ -2124,61 +2044,6 @@
 
             // Re-append sorted rows
             rows.forEach(row => tbody.appendChild(row));
-        }
-
-        // Convert unmatched scan to product
-        function convertScanToProduct(barcode, quantity) {
-            const deliveryId = {{ $delivery->id }};
-            const supplier = '{{ $delivery->supplier->Supplier ?? "Unknown" }}';
-            
-            // Pre-populate product data from scan
-            const description = prompt('Enter product description:', 'Product for barcode ' + barcode);
-            if (!description) return;
-            
-            const supplierCode = prompt('Enter supplier code:', '');
-            if (!supplierCode) return;
-            
-            const unitCost = parseFloat(prompt('Enter unit cost (€):', '0.00'));
-            if (isNaN(unitCost) || unitCost < 0) {
-                alert('Please enter a valid unit cost');
-                return;
-            }
-            
-            // Create the product
-            createProductFromScan(deliveryId, {
-                supplier_code: supplierCode,
-                description: description,
-                barcode: barcode,
-                ordered_quantity: quantity,
-                unit_cost: unitCost,
-                units_per_case: 1
-            });
-        }
-        
-        async function createProductFromScan(deliveryId, productData) {
-            try {
-                const response = await fetch(`/api/deliveries/${deliveryId}/items`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify(productData)
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showMessage('Product created successfully! Refreshing page...', 'success');
-                    setTimeout(() => window.location.reload(), 2000);
-                } else {
-                    showMessage(data.message || 'Failed to create product', 'error');
-                }
-            } catch (error) {
-                console.error('Failed to create product from scan:', error);
-                showMessage('Network error - please try again', 'error');
-            }
         }
 
         // Auto update costs functionality

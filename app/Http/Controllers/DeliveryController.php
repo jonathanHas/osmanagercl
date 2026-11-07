@@ -7,7 +7,6 @@ use App\Models\DeliveryDocument;
 use App\Models\DeliveryItem;
 use App\Models\DynamisProductLink;
 use App\Models\LabelLog;
-use App\Models\LegacyDelivery;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierImageCache;
@@ -17,6 +16,7 @@ use App\Services\Deposits\DepositEvidenceService;
 use App\Services\DynamisAiSuggesterService;
 use App\Services\DynamisMatcherService;
 use App\Services\DynamisXlsxParserService;
+use App\Services\ReceivingService;
 use App\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -49,7 +49,8 @@ class DeliveryController extends Controller
         DynamisXlsxParserService $dynamisParser,
         DynamisMatcherService $dynamisMatcher,
         DynamisAiSuggesterService $dynamisAiSuggester,
-        DepositEvidenceService $depositEvidenceService
+        DepositEvidenceService $depositEvidenceService,
+        private ReceivingService $receiving
     ) {
         $this->deliveryService = $deliveryService;
         $this->supplierService = $supplierService;
@@ -666,11 +667,6 @@ class DeliveryController extends Controller
                     $line
                 ), $unmatchedLines);
 
-                session()->flash('import_warnings', [
-                    'unmatched_count' => count($unmatchedLines),
-                    'unmatched_lines' => $unmatchedLines,
-                ]);
-
                 // Persist to delivery model so they survive page refresh
                 $delivery->update(['unparsed_lines' => $unmatchedLines]);
             }
@@ -1005,9 +1001,7 @@ class DeliveryController extends Controller
      */
     public function show(Delivery $delivery, Request $request)
     {
-        $delivery->load(['supplier', 'items.product.supplier', 'items.product.supplierLink', 'items.product.taxCategory.primaryTax', 'scans', 'documents']);
-
-        $summary = $this->deliveryService->getDeliverySummary($delivery->id);
+        $delivery->load(['supplier', 'items.product.supplier', 'items.product.supplierLink', 'items.product.taxCategory.primaryTax', 'documents']);
 
         // Handle AJAX requests for auto-refresh
         if ($request->wantsJson()) {
@@ -1083,96 +1077,15 @@ class DeliveryController extends Controller
                 ]);
         }
 
-        return view('deliveries.show', compact('delivery', 'summary', 'unresolvedItems'))
+        // Receiving card: the linked scan session, or the open sessions this docket could join.
+        $receivingSession = $delivery->scan_session_id ? $this->receiving->session($delivery->scan_session_id) : null;
+        $receivingScanCount = $receivingSession
+            ? ($this->receiving->scanCounts([$receivingSession->ID])[$receivingSession->ID] ?? 0)
+            : 0;
+        $openSessions = $receivingSession ? collect() : $this->receiving->openSessionsWithoutDocket((int) $delivery->supplier_id);
+
+        return view('deliveries.show', compact('delivery', 'unresolvedItems', 'receivingSession', 'receivingScanCount', 'openSessions'))
             ->with('supplierService', $this->supplierService);
-    }
-
-    /**
-     * Show the scanning interface for delivery
-     */
-    public function scan(Delivery $delivery): View
-    {
-        $delivery->load(['supplier', 'items.product.supplier']);
-
-        // Update delivery status to receiving if still draft
-        if ($delivery->status === 'draft') {
-            $delivery->update(['status' => 'receiving']);
-        }
-
-        // Process items with supplier integration data
-        $processedItems = $delivery->items->map(fn ($item) => $this->formatDeliveryItem($item, $delivery));
-
-        return view('deliveries.scan', compact('delivery', 'processedItems'));
-    }
-
-    /**
-     * Process a barcode scan
-     */
-    public function processScan(Request $request, Delivery $delivery): JsonResponse
-    {
-        $request->validate([
-            'barcode' => 'required|string',
-            'quantity' => 'integer|min:1|max:9999',
-        ]);
-
-        $result = $this->deliveryService->processScan(
-            $delivery->id,
-            $request->barcode,
-            $request->quantity ?? 1,
-            auth()->user()->name ?? 'System'
-        );
-
-        // Format the item data if scan was successful
-        if ($result['success'] && isset($result['item'])) {
-            $item = \App\Models\DeliveryItem::find($result['item']['id']);
-            if ($item) {
-                $item->load('product.supplier');
-                $result['item'] = $this->formatDeliveryItem($item, $delivery);
-            }
-        }
-
-        return response()->json($result);
-    }
-
-    /**
-     * Manually adjust item quantity
-     */
-    public function adjustQuantity(Request $request, Delivery $delivery, DeliveryItem $item): JsonResponse
-    {
-        $request->validate([
-            'quantity' => 'required|integer|min:0|max:9999',
-        ]);
-
-        $newQuantity = $request->quantity;
-
-        // Update the new quantity fields based on quantity type
-        if ($item->quantity_type === 'case' && $item->getEffectiveCaseUnits() > 1) {
-            // For case-based items, convert total units to cases and units
-            $caseUnits = $item->getEffectiveCaseUnits();
-            $cases = intval($newQuantity / $caseUnits);
-            $units = $newQuantity % $caseUnits;
-
-            $item->update([
-                'case_received_quantity' => $cases,
-                'unit_received_quantity' => $units,
-            ]);
-        } else {
-            // For unit-based items, update unit quantity directly
-            $item->update([
-                'unit_received_quantity' => $newQuantity,
-                'case_received_quantity' => 0,
-            ]);
-        }
-
-        // Update legacy fields and status
-        $item->updateLegacyQuantities();
-        $item->updateStatus();
-
-        return response()->json([
-            'success' => true,
-            'item' => $this->formatDeliveryItem($item->fresh(['product.supplier']), $delivery),
-            'message' => 'Quantity updated successfully',
-        ]);
     }
 
     /**
@@ -1252,64 +1165,6 @@ class DeliveryController extends Controller
     }
 
     /**
-     * Get delivery statistics
-     */
-    public function getStats(Delivery $delivery): JsonResponse
-    {
-        $summary = $this->deliveryService->getDeliverySummary($delivery->id);
-
-        return response()->json($summary);
-    }
-
-    /**
-     * Show delivery summary with discrepancies
-     */
-    public function summary(Delivery $delivery): View
-    {
-        $delivery->load(['supplier', 'items.product.supplier', 'items.product.supplierLink', 'scans']);
-        $summary = $this->deliveryService->getDeliverySummary($delivery->id);
-
-        return view('deliveries.summary', compact('delivery', 'summary'))->with('supplierService', $this->supplierService);
-    }
-
-    /**
-     * Complete the delivery and update stock
-     */
-    public function complete(Request $request, Delivery $delivery): RedirectResponse
-    {
-        if ($delivery->status !== 'receiving') {
-            return back()->withErrors(['delivery' => 'Only deliveries in receiving status can be completed.']);
-        }
-
-        try {
-            $this->deliveryService->completeDelivery($delivery->id);
-
-            return redirect()
-                ->route('deliveries.show', $delivery)
-                ->with('success', 'Delivery completed successfully. Stock levels have been updated.');
-
-        } catch (\Exception $e) {
-            return back()->withErrors(['delivery' => 'Failed to complete delivery: '.$e->getMessage()]);
-        }
-    }
-
-    /**
-     * Cancel a delivery
-     */
-    public function cancel(Delivery $delivery): RedirectResponse
-    {
-        if ($delivery->status === 'completed') {
-            return back()->withErrors(['delivery' => 'Cannot cancel a completed delivery.']);
-        }
-
-        $delivery->update(['status' => 'cancelled']);
-
-        return redirect()
-            ->route('deliveries.index')
-            ->with('success', 'Delivery cancelled successfully.');
-    }
-
-    /**
      * Toggle whether delivery quantities are included in order stock calculations
      */
     public function toggleOrderStock(Delivery $delivery): RedirectResponse
@@ -1339,8 +1194,9 @@ class DeliveryController extends Controller
             // Get delivery number for success message before deletion
             $deliveryNumber = $delivery->delivery_number;
 
-            // Delete related records explicitly to ensure clean deletion
-            $delivery->scans()->delete();
+            // Delete related records explicitly to ensure clean deletion.
+            // Documents go one by one so the model's deleting hook removes the file.
+            $delivery->documents->each->delete();
             $delivery->items()->delete();
 
             // Delete the delivery itself
@@ -1353,25 +1209,6 @@ class DeliveryController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['delivery' => 'Failed to delete delivery: '.$e->getMessage()]);
         }
-    }
-
-    /**
-     * Export discrepancy report
-     */
-    public function exportDiscrepancies(Delivery $delivery): JsonResponse
-    {
-        $summary = $this->deliveryService->getDeliverySummary($delivery->id);
-
-        return response()->json([
-            'delivery' => $delivery->only(['delivery_number', 'delivery_date']),
-            'supplier' => $delivery->supplier->only(['Supplier']),
-            'discrepancies' => $summary['discrepancies'],
-            'totals' => [
-                'expected_value' => $summary['total_expected_value'],
-                'received_value' => $summary['total_received_value'],
-                'difference' => $summary['total_expected_value'] - $summary['total_received_value'],
-            ],
-        ]);
     }
 
     /**
@@ -1542,46 +1379,6 @@ class DeliveryController extends Controller
                 'message' => 'Failed to create product: '.$e->getMessage(),
             ], 500);
         }
-    }
-
-    /**
-     * Format delivery item with consistent supplier integration data
-     */
-    private function formatDeliveryItem($item, $delivery)
-    {
-        $itemData = $item->toArray();
-
-        // Add enhanced quantity information
-        $itemData['total_ordered_units'] = $item->total_ordered_units;
-        $itemData['total_received_units'] = $item->total_received_units;
-        $itemData['effective_case_units'] = $item->getEffectiveCaseUnits();
-        $itemData['has_case_barcode'] = $item->hasCaseBarcode();
-        $itemData['formatted_ordered_quantity'] = $item->formatted_ordered_quantity;
-        $itemData['formatted_received_quantity'] = $item->formatted_received_quantity;
-
-        if ($item->product && $item->product->supplier) {
-            $itemData['has_external_integration'] = $this->supplierService->hasExternalIntegration($item->product->supplier->SupplierID);
-            $itemData['external_image_url'] = $this->supplierService->getExternalImageUrl($item->product);
-            $itemData['product'] = [
-                'id' => $item->product->ID,
-                'name' => $item->product->NAME,
-                'supplier' => $item->product->supplier ? $item->product->supplier->toArray() : null,
-            ];
-        } else {
-            // For new products, check if we have barcode and supplier integration
-            if ($item->barcode && $item->is_new_product) {
-                // Use delivery supplier ID for integration check
-                $supplierId = $delivery->supplier_id;
-                $itemData['has_external_integration'] = $this->supplierService->hasExternalIntegration($supplierId);
-                $itemData['external_image_url'] = $this->supplierService->getExternalImageUrlByBarcode($supplierId, $item->barcode);
-            } else {
-                $itemData['has_external_integration'] = false;
-                $itemData['external_image_url'] = null;
-            }
-            $itemData['product'] = null;
-        }
-
-        return $itemData;
     }
 
     /**
@@ -1775,94 +1572,33 @@ class DeliveryController extends Controller
     }
 
     /**
-     * Sync delivery items to the legacy POS delivery table.
-     * This clears existing data and populates with current delivery items.
+     * Send the docket's lines to Receiving: into a new scan session for its
+     * supplier, or an open one chosen on the page. Receiving compares the scan
+     * against these lines and, on Complete, marks the docket received.
      */
-    public function syncToLegacy(Delivery $delivery): RedirectResponse
+    public function syncToLegacy(Request $request, Delivery $delivery): RedirectResponse
     {
+        $validated = $request->validate([
+            'scan_session_id' => 'nullable|string|max:64',
+        ]);
+
+        $choice = $validated['scan_session_id'] ?? $delivery->scan_session_id ?? 'new';
+
         try {
-            $itemCount = $delivery->items->count();
+            $sessionId = $choice === 'new'
+                ? $this->receiving->createSession((int) $delivery->supplier_id)
+                : $choice;
 
-            if ($itemCount === 0) {
-                return back()->withErrors(['sync' => 'Cannot sync empty delivery to legacy system.']);
-            }
-
-            DB::connection('pos')->transaction(function () use ($delivery) {
-                // Clear existing legacy delivery data
-                LegacyDelivery::truncate();
-
-                // Helper function to sync a single item to legacy
-                $syncItemToLegacy = function ($item, $isOOS = false) {
-                    // Weight-based products: use total_weight as myOrder
-                    if ($item->is_weight_based && $item->total_weight) {
-                        $syncCaseUnits = 1;
-                        $syncMyOrder = $item->total_weight;
-                    } else {
-                        // Regular products: base the legacy quantity on the DELIVERED amount
-                        // (the invoice "Amount" column = invoice_delivered_quantity), not what was
-                        // ordered. Preserve case structure when the delivered units divide evenly
-                        // into full cases; otherwise store as loose units.
-                        $unitsPerCase = $item->units_per_case ?? 1;
-                        $deliveredUnits = $item->invoice_delivered_quantity ?? 0;
-
-                        if ($unitsPerCase > 1 && $deliveredUnits > 0 && $deliveredUnits % $unitsPerCase === 0) {
-                            // Full cases delivered - preserve case structure
-                            $syncCaseUnits = $unitsPerCase;
-                            $syncMyOrder = intdiv($deliveredUnits, $unitsPerCase);
-                        } else {
-                            // Loose / partial-case delivery - store as units
-                            $syncCaseUnits = 1;
-                            $syncMyOrder = $deliveredUnits;
-                        }
-                    }
-
-                    // For OOS items, set myOrder to 0 (but keep correct caseUnits)
-                    if ($isOOS) {
-                        $syncMyOrder = 0;
-                    }
-
-                    LegacyDelivery::create([
-                        'prodName' => $item->description,
-                        'supCode' => $item->supplier_code,
-                        'cost' => $item->unit_cost,
-                        'caseUnits' => $syncCaseUnits,
-                        'myOrder' => $syncMyOrder,
-                        'rrPrice' => $item->sale_price ?? 0,
-                        'orderNumber' => $item->order_number,
-                    ]);
-                };
-
-                // First pass: Sync items that were delivered (non-OOS)
-                foreach ($delivery->items as $item) {
-                    // Skip OOS items in first pass (ordered but not delivered by supplier)
-                    if ($item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0) {
-                        continue;
-                    }
-                    $syncItemToLegacy($item);
-                }
-
-                // Second pass: Sync OOS items (grouped at bottom) with myOrder=0
-                foreach ($delivery->items as $item) {
-                    // Only process OOS items in second pass
-                    if (! ($item->ordered_quantity > 0 && $item->invoice_delivered_quantity == 0)) {
-                        continue;
-                    }
-                    $syncItemToLegacy($item, true);
-                }
-            });
-
-            // Store the synced delivery ID so legacy pages can access documents
-            // Using database table instead of cache to survive cache clears during deployment
-            DB::table('app_settings')->updateOrInsert(
-                ['key' => 'legacy_synced_delivery_id'],
-                ['value' => $delivery->id, 'updated_at' => now()]
-            );
-
-            return redirect()->route('delivery-legacy.index')
-                ->with('success', "Synced {$itemCount} items to legacy. Select a scan session to compare.");
+            $itemCount = $this->receiving->sendDocket($delivery, $sessionId);
+        } catch (\InvalidArgumentException $e) {
+            return back()->withErrors(['sync' => $e->getMessage()]);
         } catch (\Exception $e) {
-            return back()->withErrors(['sync' => 'Failed to sync to legacy: '.$e->getMessage()]);
+            return back()->withErrors(['sync' => 'Failed to send to Receiving: '.$e->getMessage()]);
         }
+
+        return redirect()
+            ->route('delivery-legacy.match', ['delID' => $sessionId, 'supplierID' => $delivery->supplier_id])
+            ->with('success', "Sent {$itemCount} docket lines to Receiving.");
     }
 
     /**

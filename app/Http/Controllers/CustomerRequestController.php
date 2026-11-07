@@ -236,6 +236,7 @@ class CustomerRequestController extends Controller
                 'quantity' => $i['quantity'] ?? 1,
                 'unit' => $i['unit'] ?? CustomerRequestItem::UNIT_UNIT,
                 'notes' => $i['notes'] ?? '',
+                'hold_for_collection' => ($i['hold_for_collection'] ?? '1') !== '0',
                 'status' => $i['status'] ?? null,
                 'product' => $this->seedProduct($i['product_code'] ?? null, $urls, $caseUnits),
             ], $old));
@@ -258,6 +259,7 @@ class CustomerRequestController extends Controller
             'unit' => $i->unit,
             'case_units' => $i->case_units,
             'notes' => $i->notes ?? '',
+            'hold_for_collection' => $i->isHeldForCollection(),
             'status' => $i->status,
             'product' => $this->seedProduct($i->product_code, $urls, $caseUnits),
         ])->values()->all();

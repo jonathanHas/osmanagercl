@@ -16,6 +16,8 @@ class Delivery extends Model
         'supplier_id',
         'delivery_date',
         'status',
+        'scan_session_id',
+        'received_at',
         'include_in_order_stock',
         'counted_in_order_session_id',
         'counted_in_order_at',
@@ -41,6 +43,7 @@ class Delivery extends Model
         'unparsed_lines' => 'array',
         'include_in_order_stock' => 'boolean',
         'counted_in_order_at' => 'datetime',
+        'received_at' => 'datetime',
         // Totals verification casts
         'invoice_stated_total' => 'decimal:2',
         'calculated_total' => 'decimal:2',
@@ -66,11 +69,6 @@ class Delivery extends Model
     public function countedInOrder(): BelongsTo
     {
         return $this->belongsTo(OrderSession::class, 'counted_in_order_session_id');
-    }
-
-    public function scans(): HasMany
-    {
-        return $this->hasMany(DeliveryScan::class);
     }
 
     public function barrels(): HasMany

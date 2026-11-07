@@ -29,6 +29,9 @@ const withKey = (line) => ({
     unit: line.unit === 'case' ? 'case' : 'unit',
     case_units: line.case_units ?? line.product?.case_units ?? null,
     notes: line.notes ?? '',
+    // '1' (put aside for the customer) or '0' (just get it in), kept as the
+    // string the radios post.
+    hold_for_collection: [false, 0, '0'].includes(line.hold_for_collection) ? '0' : '1',
     status: line.status ?? null,
     product: line.product ?? null,
     _key: `line-${nextKey++}`,

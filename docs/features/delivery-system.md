@@ -1,32 +1,32 @@
-# Delivery Verification System
+# Delivery Dockets (`/deliveries`)
 
-This document covers the comprehensive delivery verification system for processing supplier deliveries, scanning products, and managing discrepancies.
+This document covers the docket-intake side of deliveries: importing supplier dockets (PDF / CSV / XLSX), keeping their documents, resolving unparsed lines, creating new products, updating costs and prices, and handing the docket to Receiving.
+
+> **Where stock is received.** `/deliveries` never writes POS stock. Scanning a delivery in and adding it to `STOCKCURRENT` happens in **Receiving** (`/delivery-legacy`, office) and the Shop **Receive delivery** screens (`/shop/deliveries`), which share the same scan sessions on the POS tables. The **Send to Receiving** button on a docket copies its lines into Receiving's invoice table for the scan comparison. The old `/deliveries/{id}/scan` → summary → complete path (whose "stock update" was a logging stub) was removed on 2026-11-07; see `docs/deliveries/README.md` for how the two sides fit together.
 
 ## Overview
 
-The delivery verification system provides a complete workflow for handling supplier deliveries from initial CSV import through scanning verification to stock updates. It includes real-time scanning interfaces, discrepancy tracking, and supplier image integration.
+The docket module takes a supplier docket from upload to a priced, product-linked record: parse, store the documents, flag discrepancies against the invoice total, create missing products, push cost and sell-price changes to the POS, and mark the docket as incoming stock for order generation.
 
 ## System Architecture
 
 ### Core Components
 
 1. **DeliveryService** (`app/Services/DeliveryService.php`)
-   - CSV import and parsing
-   - Barcode scanning logic
-   - Delivery completion and stock updates
-   - Summary generation and discrepancy reporting
+   - CSV import and PDF-data import
+   - Product linking through `supplier_link`, barcode retrieval jobs
+   - Deposit reconciliation, parser warnings and barrel lines on the docket
 
 2. **Models** (`app/Models/`)
    - `Delivery` - Main delivery tracking
    - `DeliveryItem` - Individual product items
-   - `DeliveryScan` - Scan history and matching
    - `DeliveryBarrel` - Barrel deposit line items (see [Barrel Deposit Tracking](./barrel-deposit-tracking.md))
    - `BarrelCode` - Barrel type reference data
 
 3. **Controllers** (`app/Http/Controllers/DeliveryController.php`)
-   - RESTful delivery management
-   - Real-time scanning API endpoints
-   - Summary and reporting views
+   - Docket list, import (PDF / CSV / XLSX) and detail page
+   - Cost, sell-price, barcode and unparsed-line endpoints
+   - Send to Receiving (`syncToLegacy`)
 
 4. **Views** (`resources/views/deliveries/`)
    - `index.blade.php` - Delivery overview with progress tracking
@@ -202,23 +202,8 @@ The delivery verification system provides a complete workflow for handling suppl
    - **Smart Sorting**: Margin sorts by percentage values, Actions prioritizes "New Product" items
    - **Direction Toggle**: Click to reverse sort order with visual feedback
 
-### 5. Verification & Completion
-1. **Summary Generation**: Comprehensive discrepancy analysis
-   - Route: `GET /deliveries/{delivery}/summary`
-   - Complete vs partial vs missing items breakdown
-   - Unmatched scans (products not in manifest)
-   - Value difference calculations
-
-2. **Discrepancy Export**: Structured reporting
-   - Route: `GET /deliveries/{delivery}/export-discrepancies`
-   - JSON export for supplier reconciliation
-   - Includes value impacts and item details
-
-3. **Stock Updates**: Final completion process
-   - Route: `POST /deliveries/{delivery}/complete`
-   - Updates POS system stock levels
-   - Adjusts product costs if different from expected
-   - Marks delivery as completed
+### 5. Receiving (outside this module)
+Receiving a docket — scanning, comparing against the invoice lines, and adding the counted units to `STOCKCURRENT` — is done in Receiving (`/delivery-legacy/match`) or the Shop screens. The **Receiving** card on the docket page (`POST /deliveries/{delivery}/sync-legacy`, field `scan_session_id` = `new` or an open session id) sends the docket lines to a scan session and records it on `deliveries.scan_session_id`; the card then links to the session, shows its scan count, and offers **Re-send lines** after the docket is edited. Completing the session is the only place stock is written; it also writes the scanned units onto the docket lines and sets the docket to `completed` (`received_at`). Undo reverses both. See `App\Services\ReceivingService` and `docs/deliveries/README.md`.
 
 ## Supplier Image Integration
 

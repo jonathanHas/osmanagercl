@@ -150,7 +150,7 @@ For a complete list of all features with detailed descriptions, see **[Features 
 
 **Supplier Management**
 - Supplier Integration
-- Delivery Verification
+- Delivery Dockets (`/deliveries`: docket import, new products, cost/price updates) & Receiving (`/delivery-legacy` + Shop *Receive delivery*: scan sessions, the only POS stock write; see `docs/deliveries/README.md`)
 - Unified Supplier Management
 - Udea Pallet Volumes (pallet-space data + running pallet fill on Udea orders)
 

@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DeliveryItem extends Model
 {
@@ -80,11 +79,6 @@ class DeliveryItem extends Model
         return $this->belongsTo(Product::class, 'product_id', 'ID');
     }
 
-    public function scans(): HasMany
-    {
-        return $this->hasMany(DeliveryScan::class);
-    }
-
     public function getQuantityDifferenceAttribute(): int
     {
         return $this->received_quantity - $this->invoice_delivered_quantity;
@@ -114,21 +108,6 @@ class DeliveryItem extends Model
         }
 
         return min(100, ($this->received_quantity / $this->invoice_delivered_quantity) * 100);
-    }
-
-    public function addScan(int $quantity, ?string $scannedBy = null): void
-    {
-        $this->increment('received_quantity', $quantity);
-
-        $scanHistory = $this->scan_history ?? [];
-        $scanHistory[] = [
-            'quantity' => $quantity,
-            'scanned_by' => $scannedBy,
-            'scanned_at' => now()->toISOString(),
-        ];
-
-        $this->update(['scan_history' => $scanHistory]);
-        $this->updateStatus();
     }
 
     public function scopeForBarcode($query, string $barcode)
@@ -295,50 +274,6 @@ class DeliveryItem extends Model
             $this->ordered_quantity = $this->total_ordered_units;
             $this->received_quantity = $this->total_received_units;
         }
-    }
-
-    /**
-     * Add a case scan to this item
-     */
-    public function addCaseScan(int $caseQuantity = 1, ?string $scannedBy = null): void
-    {
-        $this->increment('case_received_quantity', $caseQuantity);
-        $this->updateLegacyQuantities();
-        $this->updateStatus();
-
-        // Add to scan history
-        $scanHistory = $this->scan_history ?? [];
-        $scanHistory[] = [
-            'type' => 'case',
-            'quantity' => $caseQuantity,
-            'units_equivalent' => $this->casesToUnits($caseQuantity),
-            'scanned_by' => $scannedBy,
-            'scanned_at' => now()->toISOString(),
-        ];
-
-        $this->update(['scan_history' => $scanHistory]);
-    }
-
-    /**
-     * Add a unit scan to this item
-     */
-    public function addUnitScan(int $unitQuantity = 1, ?string $scannedBy = null): void
-    {
-        $this->increment('unit_received_quantity', $unitQuantity);
-        $this->updateLegacyQuantities();
-        $this->updateStatus();
-
-        // Add to scan history
-        $scanHistory = $this->scan_history ?? [];
-        $scanHistory[] = [
-            'type' => 'unit',
-            'quantity' => $unitQuantity,
-            'units_equivalent' => $unitQuantity,
-            'scanned_by' => $scannedBy,
-            'scanned_at' => now()->toISOString(),
-        ];
-
-        $this->update(['scan_history' => $scanHistory]);
     }
 
     /**

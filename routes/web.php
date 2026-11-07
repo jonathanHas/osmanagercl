@@ -675,24 +675,16 @@ Route::middleware('auth')->group(function () {
 
     // Delivery management routes
     Route::middleware('permission:deliveries.manage')->group(function () {
-        Route::resource('deliveries', DeliveryController::class);
+        Route::resource('deliveries', DeliveryController::class)->except(['edit', 'update']);
         Route::post('/deliveries/detect-supplier', [DeliveryController::class, 'detectSupplier'])->name('deliveries.detect-supplier');
         Route::post('/deliveries/parse-pdf', [DeliveryController::class, 'parsePdf'])->name('deliveries.parse-pdf');
         Route::post('/deliveries/store-pdf', [DeliveryController::class, 'storePdf'])->name('deliveries.store-pdf');
         Route::post('/deliveries/parse-xlsx', [DeliveryController::class, 'parseXlsx'])->name('deliveries.parse-xlsx');
         Route::post('/deliveries/ai-suggest-xlsx', [DeliveryController::class, 'aiSuggestXlsx'])->name('deliveries.ai-suggest-xlsx');
         Route::post('/deliveries/store-xlsx', [DeliveryController::class, 'storeXlsx'])->name('deliveries.store-xlsx');
-        Route::get('/deliveries/{delivery}/scan', [DeliveryController::class, 'scan'])->name('deliveries.scan');
-        Route::post('/deliveries/{delivery}/scan', [DeliveryController::class, 'processScan'])->name('deliveries.process-scan');
-        Route::patch('/deliveries/{delivery}/items/{item}/quantity', [DeliveryController::class, 'adjustQuantity'])->name('deliveries.adjust-quantity');
         Route::patch('/deliveries/{delivery}/items/{item}/price', [DeliveryController::class, 'updateItemPrice'])->name('deliveries.update-item-price');
         Route::patch('/deliveries/{delivery}/items/{item}/barcode', [DeliveryController::class, 'updateItemBarcode'])->name('deliveries.update-item-barcode');
-        Route::get('/deliveries/{delivery}/stats', [DeliveryController::class, 'getStats'])->name('deliveries.stats');
-        Route::get('/deliveries/{delivery}/summary', [DeliveryController::class, 'summary'])->name('deliveries.summary');
-        Route::post('/deliveries/{delivery}/complete', [DeliveryController::class, 'complete'])->name('deliveries.complete');
-        Route::post('/deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel'])->name('deliveries.cancel');
         Route::post('/deliveries/{delivery}/toggle-order-stock', [DeliveryController::class, 'toggleOrderStock'])->name('deliveries.toggle-order-stock');
-        Route::get('/deliveries/{delivery}/export-discrepancies', [DeliveryController::class, 'exportDiscrepancies'])->name('deliveries.export-discrepancies');
         Route::post('/deliveries/{delivery}/update-costs', [DeliveryController::class, 'updateCosts'])->name('deliveries.update-costs');
         Route::post('/deliveries/{delivery}/sync-legacy', [DeliveryController::class, 'syncToLegacy'])->name('deliveries.sync-legacy');
         Route::get('/deliveries/{delivery}/lookup-supplier-code/{code}', [DeliveryController::class, 'lookupSupplierCode'])->name('deliveries.lookup-supplier-code');

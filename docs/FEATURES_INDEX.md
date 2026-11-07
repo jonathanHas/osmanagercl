@@ -360,8 +360,8 @@ Captures Udea's per-product pallet-space figures and shows a running pallet-fill
 
 📖 [Udea Pallet Volumes Documentation](./features/udea-pallet-volumes.md)
 
-### Delivery Verification
-Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
+### Delivery Dockets & Receiving
+Two pages, one flow (renamed 2026-11-07): **Delivery Dockets** (`/deliveries`) imports supplier dockets (PDF / CSV / XLSX), keeps the documents, creates new products and pushes cost / sell-price changes; **Receiving** (`/delivery-legacy`, plus the Shop *Receive delivery* screens) scans the goods in against the docket and is the only place POS stock is written. **Send to Receiving** on a docket hands its lines to Receiving. The docket module's own scan/complete path (which never updated stock) was removed.
 - **Print Translated Labels** (UPDATED! 2026-09-09): Bulk-print translated labels for the products scanned into a delivery, one label per unit still outstanding. Backed by a print ledger, so a second press prints only what has been scanned since the last one instead of the whole delivery again. 📖 [Label Translation System Documentation](./features/label-translation-system.md)
 - **Udea Deviation Report Generator** (NEW! 2026-06-16): On the delivery match page, tick missing/short Udea items in the **Qty Mismatches** and **Missing – Not Scanned** tables and generate a pre-filled Udea deviation report `.xlsx` (order number, article code, product name, amount, deviation reason). Udea-only, desktop-only; values re-queried server-side and written into the official template via PhpSpreadsheet. 📖 [Udea Deviation Report Documentation](./features/udea-deviation-report.md)
 - **IIHF (Independent) Goods Return Sheet Generator** (NEW! 2026-06-16): PDF counterpart to the Udea report for Independent (IIHF, supplier 37). Tick missing/short items and generate a pre-filled official "Goods Return Record" `.pdf` — data overlaid onto the flat PDF form via FPDI/FPDF (Invoice No., Product Code, Description, Quantity, Value, VAT, reason A; plus account name/no, contact name and date). Independent-only, desktop-only. 📖 [IIHF Goods Return Sheet Documentation](./features/iihf-goods-return-sheet.md)
@@ -431,7 +431,7 @@ Comprehensive delivery processing with barcode scanning and PDF invoice parsing.
   - Per-file status reporting in preview
   - Item merging with aggregated totals
   - Confidence scoring across files
-- **Sync to Legacy** (NEW! 2026-01-19): One-click sync from `/deliveries` to POS `delivery` table for invoice matching with scanned items
+- **Send to Receiving** (2026-01-19; reworked 2026-11-07): The Receiving card on a docket sends its lines into a new or open scan session (POS `delivery` rows tagged with the session, no more truncating), links the two (`deliveries.scan_session_id`), and when Receiving completes the session the docket's lines get their received quantities and the docket becomes **Completed**; undo puts it back to Draft. Receiving and the Shop list show the docket number per session
 - **Mobile Card Layouts** (NEW! 2026-04-01): Fully mobile-friendly delivery-legacy pages
   - Index page: scan sessions as compact cards with touch-friendly action buttons
   - Match page: all 7 table sections render as color-coded cards on mobile with product images, stock, and inline editing

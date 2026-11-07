@@ -15,12 +15,36 @@ Two delivery interfaces exist and both are live:
   rules in `docs/shop_new/README.md` apply to every change here. The screens
   are thin: rows come from, and writes go to, the `delivery-legacy.*` JSON
   endpoints.
-- **Office pages**: the legacy match page (`/delivery-legacy/match`, one
-  Blade file with inline Alpine, ~3,300 lines) that the Shop screens
-  replaced on the floor but which still owns case units, outer barcodes,
-  translations, deviation reports and goods-return sheets; and the newer
-  verification flow at `/deliveries` (CSV / PDF / XLSX import, documents,
-  label printing, `DeliveryService`).
+- **Office pages**: **Receiving** (`/delivery-legacy/match`, labelled
+  "Receiving" in the sidebar since 2026-11-07; one Blade file with inline
+  Alpine, ~3,500 lines) that the Shop screens replaced on the floor but which
+  still owns case units, outer barcodes, translated labels, deviation reports
+  and goods-return sheets, and is **the only place stock is written**
+  (`completeDelivery()` → `STOCKCURRENT`, `undoComplete()` reverses it); and
+  **Delivery Dockets** (`/deliveries`, `DeliveryService`): CSV / PDF / XLSX
+  import, documents, unparsed lines, deposits, new products, cost and
+  sell-price updates, Include in Orders, and **Send to Receiving**. `/deliveries`
+  never writes stock; its old scan → summary → complete path (a logging stub)
+  was removed on 2026-11-07.
+
+**How the two sides are linked** (`app/Services/ReceivingService.php`, 2026-11-07):
+a docket is received through one scan session, kept on
+`deliveries.scan_session_id` (the POS `deliveriesScan.ID`; no cross-engine
+FK). **Send to Receiving** on the docket page creates a session for the
+docket's supplier (or joins an open one that has no docket yet) and writes
+the docket lines into the POS `delivery` table tagged with that session
+(`delivery.delID`, migration `2026_11_07_000004`); the four Receiving queries
+read only their own session's rows, so several dockets can be in Receiving at
+once and nothing is truncated any more. Re-sending replaces that session's
+lines only. When Receiving **completes** the session, the scanned units are
+written onto the docket's lines (`unit_/case_received_quantity`,
+`received_quantity`, status) and the docket becomes `completed` with
+`received_at`; **undo** puts it back to `draft` with nothing received.
+Deleting a session removes its lines and unlinks the docket; merging moves
+the lines and the link to the kept session (a kept session that already has
+its own docket keeps it, the source's docket is unlinked). Rows with a NULL
+`delID` are the pre-change global scratch copy and are ignored: the docket in
+flight at deploy time needs one re-send from its page.
 
 Feature docs: `docs/features/shop-mode.md` (Shop screens, camera scanning,
 find by name), `docs/features/delivery-system.md` (the `/deliveries` flow),

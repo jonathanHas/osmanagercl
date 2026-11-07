@@ -50,6 +50,7 @@ CREATE TABLE customer_request_items (
     unit                VARCHAR(8) NOT NULL DEFAULT 'unit', -- 'unit' | 'case'
     case_units          SMALLINT UNSIGNED NULL,     -- supplier case size snapshotted when taken by the case
     notes               VARCHAR(500) NULL,
+    hold_for_collection TINYINT(1) NOT NULL DEFAULT 1,  -- 1: put aside for the customer; 0: just get it in, mark done
     position            INT UNSIGNED NOT NULL DEFAULT 0,
     status              VARCHAR(20) NOT NULL DEFAULT 'pending',
     status_changed_at   TIMESTAMP NULL,
@@ -77,10 +78,13 @@ CREATE TABLE customer_request_status_logs (        -- append-only audit trail (s
 | `ordered` | On a supplier order | yes |
 | `put_aside` | Arrived and physically set aside | yes (awaiting collection) |
 | `collected` | Customer has it | no |
+| `done` | Finished without a collection: got in and put on the shelf, or simply dealt with (requests cycle 2) | no |
 | `not_available` | Could not be sourced | no |
 | `cancelled` | Customer no longer wants it | no |
 
-Allowed moves (`CustomerRequestItem::ALLOWED_TRANSITIONS`): `pending → ordered | put_aside | not_available | cancelled`; `ordered → put_aside | not_available | cancelled | pending`; `put_aside → collected | ordered | cancelled`; `collected → put_aside`; `not_available → pending`; `cancelled → pending`. The backwards moves exist to undo a mis-tap on the tablet. Anything else throws a `DomainException`, which the controller turns into a flash error or a 422 JSON response.
+Allowed moves (`CustomerRequestItem::ALLOWED_TRANSITIONS`): `pending → ordered | put_aside | done | not_available | cancelled`; `ordered → put_aside | done | not_available | cancelled | pending`; `put_aside → collected | ordered | cancelled`; `collected → put_aside`; `done → ordered | pending`; `not_available → pending`; `cancelled → pending`. The backwards moves exist to undo a mis-tap on the tablet. Anything else throws a `DomainException`, which the controller turns into a flash error or a 422 JSON response.
+
+`done` is allowed from any pending or ordered line, held or not, so a request taken as "put aside" that turns out to need no holding is still cleared in one tap (the row's **Done, nothing to put aside** menu item). Something already put aside is *collected*, never *done*.
 
 A request's `closed_at` is recomputed by `CustomerRequest::refreshClosedState()` after every line change: it closes when no line is `pending` / `ordered` / `put_aside` and reopens when a line is added or moved back. **All status writes must go through `CustomerRequestService::changeItemStatus()`** so this and the log stay correct.
 
@@ -161,6 +165,40 @@ same choice per product line.
   scan flag all use it; the delivery JSON carries `unit`, `case_units` and
   `quantity_label` next to `quantity`.
 
+## Put aside, or just get it in
+
+Not every request is held for the customer. Many are a customer asking us to get
+something in: it arrives, goes on the shelf, and there is nothing to put aside and
+nobody to wait for. Until requests cycle 2 (2026-11-07) those lines had to be walked
+through Put aside → Collected to get them off the board.
+
+Each line now carries **`hold_for_collection`**:
+
+- **Put aside** (`1`, the default, and what every line taken before the choice
+  existed reads as): the lifecycle is unchanged — Ordered → Put aside → Collected,
+  the delivery screens say **Put aside for …**, the dashboard counts it once put aside.
+- **Just get it in** (`0`): the strip is Ordered → Done. The row's primary button is
+  **Done** from pending or ordered (Mark ordered moves to the more menu); the row
+  carries a *Just get it in* pill; the delivery badge reads **Requested by …** and the
+  scanner prompt's button is **Mark done** (it PATCHes `done` instead of `put_aside`);
+  the Shop delivery scan flag says *Requested by* for these and *Put aside for* for
+  held lines.
+
+The choice is made on the **New request** sheet (a two-card choice under the item,
+"When it arrives": *Put aside — hold it for them to collect* / *Just get it in — onto
+the shelf, mark done*) and can be changed per line on the edit screen. The server
+reads `items.*.hold_for_collection` (`boolean`); a payload without it leaves a new
+line held and an edited line as it was, so the JSON callers and older forms behave
+as before. Helpers: `CustomerRequestItem::isHeldForCollection()`,
+`lifecycleSteps()` (the strip, in order) and `handlingLabel()`. Factory state:
+`justGetItIn()`.
+
+**When the request was taken** is shown next to the due date since the same cycle:
+*Taken Mon 3 Nov by Jon* under the row's meta on the staff board (the date block is
+the due date), *Taken Mon 3 Nov* on the guest card, *taken …* in the delivery badge's
+tooltip, and `taken_on` in the scan-increment JSON next to `wanted_on`. It is the
+request's `created_at`; nothing new is stored.
+
 ## Usage
 
 ### User Perspective
@@ -169,7 +207,7 @@ same choice per product line.
 
 **Taking a request** — sign in, **New request**, fill in the customer and date, scan or search for products (Enter adds the highlighted match, so a barcode scanner adds a product in one go), or **+ Source a new product** for something we don't stock. Save.
 
-**Progressing a request** — on the board each line shows buttons for its allowed next statuses (Ordered, Put aside, Collected, Not available, Cancel). **Cancel request** on the card cancels every open line. **Edit** changes details and lines but never a status; lines that have moved past pending cannot be removed there.
+**Progressing a request** — on the board each line shows buttons for its allowed next statuses (Ordered, Put aside, Collected, Not available, Cancel). A line taken as *Just get it in* shows **Done** instead of Put aside / Collected; a held line that needs no holding after all has **Done, nothing to put aside** in its more menu. **Cancel request** on the card cancels every open line. **Edit** changes details and lines (including the put-aside choice) but never a status; lines that have moved past pending cannot be removed there.
 
 **On a delivery** — on `/delivery-legacy/match` look for the pink **Put aside for …** badges and the "Put aside for customer requests" card above the filters. In the scanner, a scanned product on an open request shows a pink prompt with **Mark put aside**.
 
@@ -222,7 +260,8 @@ $byBarcode = $service->awaitingArrivalByBarcode(['5000000000017', '5000000000024
 - `tests/Feature/CustomerRequestTest.php` — public board (guest vs staff), auth and permission gates, create with snapshot and log, validation and `old()` repopulation, update sync rules, the status lifecycle and auto-close/reopen, cancel, product search, the barcode lookup, the show page.
 - `tests/Feature/CustomerRequestDashboardTest.php` — banner hidden at zero, correct counts otherwise.
 - `tests/Feature/CustomerRequestDeliveryFlagTest.php` — the match page badge and summary card, and the scan-increment JSON carrying `customerRequests` (builds every POS table the legacy raw queries touch in sqlite).
-- `tests/Unit/CustomerRequestItemTransitionsTest.php` — the transition matrix.
+- `tests/Unit/CustomerRequestItemTransitionsTest.php` — the transition matrix, `done`, and the held / just-get-it-in lifecycle steps.
+- `tests/Feature/Shop/ShopRequestsTest.php` — the Shop board, the just-get-it-in row, the Done menu item on a held row, the taken date, the sheet's and the edit screen's put-aside choice.
 
 ```bash
 php artisan test --filter=CustomerRequest
@@ -236,6 +275,8 @@ php artisan test --filter=CustomerRequest
 
 ## Known Issues & Limitations
 
+- **Alpine names unnamed radios after their `x-model` expression.** Radios in different `x-for` rows bound to the same expression (`item.unit`, `item.hold_for_collection`) therefore form one browser radio group, and only one row's choice shows as selected (found in requests cycle 2; the Units/Case cards on the edit screen had it). Give such radios a per-row `:name`. The sheet's single-line radios are unaffected.
+
 - No automatic status change on scan or on completing a delivery — staff confirm the item is physically set aside with the button. Marking on scan could be added to `incrementScanQuantity()` if it proves too fiddly in practice.
 - The Laravel-native delivery scan screen (`/deliveries/{id}/scan`) does not show the flag; only the legacy match screen that shop staff use does. The hook point there would be `DeliveryController::formatDeliveryItem()`.
 - No email or push reminder; the board, the dashboard and the delivery screen are the reminders.
@@ -244,6 +285,7 @@ php artisan test --filter=CustomerRequest
 
 - **2026-09-10**: Initial release.
 - **2026-10-07**: Lines can be taken by the case or by the unit; the New request sheet shows case size, stock and price for the picked product (requests cycle 1).
+- **2026-11-07**: "Put aside" or "Just get it in" per line (`hold_for_collection`), the `done` status with a one-tap Done on the board, and the taken date shown next to the due date (requests cycle 2).
 
 ## Staff board v2 (cycle 13)
 

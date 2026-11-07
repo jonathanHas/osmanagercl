@@ -712,4 +712,112 @@ class ShopRequestsTest extends TestCase
         // attribute, because the description input is x-model bound.
         $response->assertSee('Kept line', false);
     }
+
+    public function test_a_just_get_it_in_row_is_finished_with_one_tap(): void
+    {
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Shelf Sam', 'wanted_on' => today()->addWeek()]);
+        $item = CustomerRequestItem::factory()->for($request, 'request')->justGetItIn()->create(['description' => 'Rye crackers']);
+
+        $response = $this->actingAs($this->employee())->get('/customer-requests')->assertOk();
+
+        // Done is the primary step; Ordered moves to the menu; nothing to put aside.
+        $response->assertSee('shop-btn shop-btn--primary" type="submit">Done', false);
+        $response->assertSee('Mark ordered');
+        $response->assertDontSee('Put aside now');
+        $response->assertDontSee('Done, nothing to put aside');
+        $response->assertSee('Just get it in');
+
+        // The two-step strip.
+        $response->assertSee('shop-steps shop-steps--2', false);
+        $response->assertDontSee('>Collected</li>', false);
+
+        $this->actingAs($this->employee())
+            ->from('/customer-requests')
+            ->patch(route('customer-requests.items.status', $item), ['status' => CustomerRequestItem::STATUS_DONE])
+            ->assertRedirect('/customer-requests')
+            ->assertSessionHas('status');
+
+        $this->assertSame(CustomerRequestItem::STATUS_DONE, $item->fresh()->status);
+        $this->assertNotNull($request->fresh()->closed_at, 'a done line closes a one-line request');
+
+        // It is finished, so it is on the Done view with an undo, not on Open.
+        // (Drop the flash first: the toast repeats the line's name.)
+        $this->flushSession();
+        $this->actingAs($this->employee())->get('/customer-requests')->assertOk()->assertDontSee('Rye crackers');
+        $this->actingAs($this->employee())
+            ->get(route('customer-requests.index', ['show' => 'done']))
+            ->assertOk()
+            ->assertSee('Rye crackers')
+            ->assertSee('Undo last step');
+    }
+
+    public function test_a_held_row_can_still_be_cleared_from_the_menu(): void
+    {
+        $item = $this->seedDueRequest();
+
+        $response = $this->actingAs($this->employee())->get('/customer-requests')->assertOk();
+
+        // The old lifecycle is untouched for a held line …
+        $response->assertSee('Mark ordered');
+        $response->assertSee('Put aside now');
+        $response->assertSee('>Collected</li>', false);
+        // No "just get it in" pill on the row (the sheet's choice still says it).
+        $response->assertDontSee('shop-pill--muted">Just get it in', false);
+        // … but a request that turns out to need no holding goes in one tap.
+        $response->assertSee('Done, nothing to put aside');
+
+        $this->actingAs($this->employee())
+            ->patch(route('customer-requests.items.status', $item), ['status' => CustomerRequestItem::STATUS_DONE])
+            ->assertSessionHas('status');
+
+        $this->assertSame(CustomerRequestItem::STATUS_DONE, $item->fresh()->status);
+    }
+
+    public function test_rows_show_when_the_request_was_taken(): void
+    {
+        $taker = $this->employee();
+        $request = CustomerRequest::factory()->create([
+            'customer_name' => 'Patient Pat', 'wanted_on' => today()->addDays(3), 'created_by' => $taker->id,
+        ]);
+        $request->forceFill(['created_at' => now()->subDays(4)])->save();
+        CustomerRequestItem::factory()->for($request, 'request')->create(['description' => 'Waiting a while']);
+
+        // The guest board shows the date, without the name.
+        $this->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('Taken '.now()->subDays(4)->format('D j M'))
+            ->assertDontSee($taker->name);
+
+        $this->actingAs($this->employee())
+            ->get('/customer-requests')
+            ->assertOk()
+            ->assertSee('Taken '.now()->subDays(4)->format('D j M').' by '.$taker->name);
+    }
+
+    public function test_the_new_request_sheet_offers_the_put_aside_choice(): void
+    {
+        $response = $this->actingAs($this->employee())->get('/customer-requests')->assertOk();
+
+        $response->assertSee('name="items[0][hold_for_collection]" value="1" checked', false);
+        $response->assertSee('name="items[0][hold_for_collection]" value="0"', false);
+        $response->assertSee('hold it for them to collect');
+        $response->assertSee('onto the shelf, mark done');
+    }
+
+    public function test_the_edit_page_seeds_the_put_aside_choice(): void
+    {
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Edit Ed']);
+        CustomerRequestItem::factory()->for($request, 'request')->justGetItIn()->create(['description' => 'Shelf line']);
+
+        $response = $this->actingAs($this->employee())
+            ->get(route('customer-requests.edit', $request))
+            ->assertOk();
+
+        // @js() hex-escapes quotes, so build the fragment the same way.
+        $expected = trim((string) \Illuminate\Support\Js::from(['hold_for_collection' => false]));
+        $expected = trim(str_replace(["JSON.parse('", "')"], '', $expected), '{}');
+        $response->assertSee($expected, false);
+        $response->assertSee(':name="`items[${idx}][hold_for_collection]`"', false);
+        $response->assertSee('x-model="item.hold_for_collection"', false);
+    }
 }

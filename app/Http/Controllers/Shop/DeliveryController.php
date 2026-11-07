@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
+use App\Services\ReceivingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -20,7 +21,7 @@ use Illuminate\View\View;
  */
 class DeliveryController extends Controller
 {
-    public function index(): View
+    public function index(ReceivingService $receiving): View
     {
         $suppliers = DB::connection('pos')
             ->table('suppliers')
@@ -43,7 +44,10 @@ class DeliveryController extends Controller
             ->pluck('item_count', 'delID')
             ->toArray();
 
-        return view('shop.deliveries', compact('suppliers', 'open', 'completed', 'counts'));
+        // Docket number per session, when one was sent from Delivery Dockets
+        $dockets = $receiving->docketsForSessions($open->pluck('ID')->merge($completed->pluck('ID'))->all());
+
+        return view('shop.deliveries', compact('suppliers', 'open', 'completed', 'counts', 'dockets'));
     }
 
     /**

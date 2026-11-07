@@ -585,4 +585,90 @@ class CustomerRequestTest extends TestCase
         $response->assertSee('Udea order #123');
         $response->assertSee($user->name);
     }
+
+    // ------------------------------------------------- put aside or just get it in
+
+    public function test_a_line_is_held_for_collection_unless_the_form_says_otherwise(): void
+    {
+        $user = $this->employee();
+
+        $this->actingAs($user)
+            ->post(route('customer-requests.store'), $this->payload([
+                ['description' => 'Held by default', 'quantity' => 1],
+                ['description' => 'Held on purpose', 'quantity' => 1, 'hold_for_collection' => '1'],
+                ['description' => 'Just get it in', 'quantity' => 1, 'hold_for_collection' => '0'],
+            ]))
+            ->assertRedirect(route('customer-requests.index'));
+
+        $request = CustomerRequest::query()->latest('id')->firstOrFail();
+
+        $this->assertSame(
+            ['Held by default' => true, 'Held on purpose' => true, 'Just get it in' => false],
+            $request->items->mapWithKeys(fn (CustomerRequestItem $i) => [$i->description => $i->isHeldForCollection()])->all()
+        );
+
+        $this->actingAs($user)
+            ->post(route('customer-requests.store'), $this->payload([
+                ['description' => 'Bad flag', 'quantity' => 1, 'hold_for_collection' => 'maybe'],
+            ]))
+            ->assertSessionHasErrors(['items.0.hold_for_collection']);
+    }
+
+    public function test_update_keeps_the_choice_unless_it_is_sent(): void
+    {
+        $user = $this->employee();
+        $request = CustomerRequest::factory()->create();
+        $shelf = CustomerRequestItem::factory()->for($request, 'request')->justGetItIn()->create(['description' => 'Shelf line']);
+        $held = CustomerRequestItem::factory()->for($request, 'request')->create(['description' => 'Held line', 'position' => 1]);
+
+        // No flag in the payload: nothing changes.
+        $this->actingAs($user)
+            ->put(route('customer-requests.update', $request), $this->payload([
+                ['id' => $shelf->id, 'description' => 'Shelf line', 'quantity' => 1],
+                ['id' => $held->id, 'description' => 'Held line', 'quantity' => 1],
+            ]))
+            ->assertRedirect(route('customer-requests.index'));
+
+        $this->assertFalse($shelf->fresh()->isHeldForCollection());
+        $this->assertTrue($held->fresh()->isHeldForCollection());
+
+        // Flags sent: both flip.
+        $this->actingAs($user)
+            ->put(route('customer-requests.update', $request), $this->payload([
+                ['id' => $shelf->id, 'description' => 'Shelf line', 'quantity' => 1, 'hold_for_collection' => '1'],
+                ['id' => $held->id, 'description' => 'Held line', 'quantity' => 1, 'hold_for_collection' => '0'],
+            ]))
+            ->assertRedirect(route('customer-requests.index'));
+
+        $this->assertTrue($shelf->fresh()->isHeldForCollection());
+        $this->assertFalse($held->fresh()->isHeldForCollection());
+    }
+
+    public function test_done_finishes_a_line_and_can_be_undone(): void
+    {
+        $user = $this->employee();
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Jane Doe']);
+        $item = CustomerRequestItem::factory()->for($request, 'request')->justGetItIn()->create();
+
+        $this->actingAs($user)
+            ->patchJson(route('customer-requests.items.status', $item), ['status' => 'done'])
+            ->assertOk()
+            ->assertJson(['ok' => true, 'status' => 'done', 'label' => 'Done', 'request_closed' => true]);
+
+        $this->assertSame(['done'], $item->statusLogs()->pluck('to_status')->all());
+        $this->assertNotNull($request->fresh()->closed_at);
+
+        // Undo reopens the request.
+        $this->actingAs($user)
+            ->patchJson(route('customer-requests.items.status', $item), ['status' => 'ordered'])
+            ->assertOk()
+            ->assertJson(['ok' => true, 'status' => 'ordered', 'request_closed' => false]);
+
+        $this->assertNull($request->fresh()->closed_at);
+
+        // Done is the Done view's business, not the delivery screen's.
+        $service = app(CustomerRequestService::class);
+        $shelf = CustomerRequestItem::factory()->for($request, 'request')->forProduct('5000000000024', 'Almond Butter 250g')->status('done')->create();
+        $this->assertTrue($service->awaitingArrivalByBarcode(['5000000000024'])->isEmpty());
+    }
 }

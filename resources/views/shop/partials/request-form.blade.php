@@ -92,6 +92,28 @@
         <span class="shop-pill shop-pill--bad">{{ $message }}</span>
     @enderror
 
+    {{-- Held for the customer to collect, or just got in and marked done when it
+         arrives. Plain radios: nothing to post from Alpine. --}}
+    @php($hold = old('items.0.hold_for_collection', '1') !== '0')
+    <div class="shop-field">
+        <span class="shop-field__label" id="hold-label">When it arrives</span>
+        <div class="shop-choices" role="radiogroup" aria-labelledby="hold-label">
+            <label class="shop-choice">
+                <input type="radio" name="items[0][hold_for_collection]" value="1" @checked($hold)>
+                Put aside
+                <small>hold it for them to collect</small>
+            </label>
+            <label class="shop-choice">
+                <input type="radio" name="items[0][hold_for_collection]" value="0" @checked(! $hold)>
+                Just get it in
+                <small>onto the shelf, mark done</small>
+            </label>
+        </div>
+        @error('items.0.hold_for_collection')
+            <span class="shop-pill shop-pill--bad">{{ $message }}</span>
+        @enderror
+    </div>
+
     <div class="shop-field">
         <label class="shop-field__label" for="customer_name">Customer</label>
         <input class="shop-input" id="customer_name" name="customer_name" type="text"

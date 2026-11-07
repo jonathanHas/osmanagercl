@@ -37,6 +37,9 @@
                                 <span class="shop-row__title">{{ $session->Supplier ?? 'Unknown supplier' }}</span>
                                 <span class="shop-row__meta shop-code">{{ substr($session->ID, 0, 8) }} · {{ $session->dateUpload ? \Illuminate\Support\Carbon::parse($session->dateUpload)->format('D j M, H:i') : 'no date' }}</span>
                                 <span class="shop-row__meta">{{ $items }} items scanned</span>
+                                @if (isset($dockets[$session->ID]))
+                                    <span class="shop-row__meta">Docket {{ $dockets[$session->ID]->delivery_number }}</span>
+                                @endif
                             </div>
                             <div class="shop-row__aside">
                                 <span class="shop-pill {{ $items > 0 ? 'shop-pill--sage' : 'shop-pill--muted' }}">{{ $items > 0 ? 'In progress' : 'Not started' }}</span>
@@ -64,6 +67,9 @@
                             <div class="shop-row__main">
                                 <span class="shop-row__title">{{ $session->Supplier ?? 'Unknown supplier' }}</span>
                                 <span class="shop-row__meta shop-code">{{ substr($session->ID, 0, 8) }} · {{ $counts[$session->ID] ?? 0 }} items</span>
+                                @if (isset($dockets[$session->ID]))
+                                    <span class="shop-row__meta">Docket {{ $dockets[$session->ID]->delivery_number }}</span>
+                                @endif
                             </div>
                             <div class="shop-row__aside">
                                 <span class="shop-pill shop-pill--ok">Completed</span>

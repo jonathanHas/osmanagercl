@@ -94,17 +94,33 @@
                                            :data-line-idx="idx" maxlength="255" required autocomplete="off">
                                 </div>
 
-                                {{-- Only for a product the supplier sells by the case. The radios have no name: the hidden input posts. --}}
+                                {{-- Only for a product the supplier sells by the case. The hidden input posts;
+                                     the radios are named per line because Alpine gives an unnamed radio its
+                                     x-model expression as its name, which put every line's radios in one group. --}}
                                 <div class="shop-choices" role="radiogroup" aria-label="Order by" x-show="item.product_code && item.case_units">
                                     <label class="shop-choice">
-                                        <input type="radio" value="unit" x-model="item.unit">
+                                        <input type="radio" :name="`unit-choice-${item._key}`" value="unit" x-model="item.unit">
                                         Units
                                         <small>single items</small>
                                     </label>
                                     <label class="shop-choice">
-                                        <input type="radio" value="case" x-model="item.unit">
+                                        <input type="radio" :name="`unit-choice-${item._key}`" value="case" x-model="item.unit">
                                         Case
                                         <small x-text="`${item?.case_units} per case`"></small>
+                                    </label>
+                                </div>
+
+                                {{-- Held for the customer or just got in. These radios post directly. --}}
+                                <div class="shop-choices" role="radiogroup" aria-label="When it arrives">
+                                    <label class="shop-choice">
+                                        <input type="radio" :name="`items[${idx}][hold_for_collection]`" value="1" x-model="item.hold_for_collection">
+                                        Put aside
+                                        <small>hold it for them to collect</small>
+                                    </label>
+                                    <label class="shop-choice">
+                                        <input type="radio" :name="`items[${idx}][hold_for_collection]`" value="0" x-model="item.hold_for_collection">
+                                        Just get it in
+                                        <small>onto the shelf, mark done</small>
                                     </label>
                                 </div>
 

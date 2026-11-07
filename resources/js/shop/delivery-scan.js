@@ -386,9 +386,15 @@ export default () => mix(productImages(), productTypeahead(), deliveryCorrection
 
             this.latest = data.product?.barcode ?? item.code;
             this.remember(this.latest);
-            this.flag = data.customerRequests?.length
-                ? 'Put aside for ' + data.customerRequests.map((c) => c.customer_name + ' (' + c.quantity_label + ')').join(', ')
-                : null;
+            // "Put aside for" the customers waiting to collect; "requested by" the
+            // ones whose item just goes on the shelf.
+            const who = (list) => list.map((c) => c.customer_name + ' (' + c.quantity_label + ')').join(', ');
+            const held = (data.customerRequests ?? []).filter((c) => c.hold_for_collection !== false);
+            const shelf = (data.customerRequests ?? []).filter((c) => c.hold_for_collection === false);
+            this.flag = [
+                held.length ? 'Put aside for ' + who(held) : null,
+                shelf.length ? 'Requested by ' + who(shelf) : null,
+            ].filter(Boolean).join(' · ') || null;
             this.pending = null;
 
             await this.load();

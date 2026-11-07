@@ -26,6 +26,7 @@ class CustomerRequestItemFactory extends Factory
             'unit' => CustomerRequestItem::UNIT_UNIT,
             'case_units' => null,
             'notes' => null,
+            'hold_for_collection' => true,
             'position' => 0,
             'status' => CustomerRequestItem::STATUS_PENDING,
             'status_changed_at' => now(),
@@ -47,6 +48,12 @@ class CustomerRequestItemFactory extends Factory
             'unit' => CustomerRequestItem::UNIT_CASE,
             'case_units' => $caseUnits,
         ]);
+    }
+
+    /** A general request: nothing to put aside, marked done when it is in. */
+    public function justGetItIn(): static
+    {
+        return $this->state(fn () => ['hold_for_collection' => false]);
     }
 
     public function status(string $status): static

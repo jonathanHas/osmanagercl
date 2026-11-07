@@ -10,6 +10,7 @@ use App\Models\StockCurrent;
 use App\Models\ZebraLabel;
 use App\Services\CustomerRequestService;
 use App\Services\IihfGoodsReturnPdfService;
+use App\Services\ReceivingService;
 use App\Services\Shop\ProductImageUrls;
 use App\Services\SupplierService;
 use App\Services\ZebraPrintService;
@@ -33,9 +34,12 @@ class DeliveryLegacyController extends Controller
 
     private ProductImageUrls $images;
 
-    public function __construct(SupplierService $supplierService, ZebraPrintService $zebraPrint, CustomerRequestService $customerRequests, ProductImageUrls $images)
+    private ReceivingService $receiving;
+
+    public function __construct(SupplierService $supplierService, ZebraPrintService $zebraPrint, CustomerRequestService $customerRequests, ProductImageUrls $images, ReceivingService $receiving)
     {
         $this->images = $images;
+        $this->receiving = $receiving;
         $this->supplierService = $supplierService;
         $this->zebraPrint = $zebraPrint;
         $this->customerRequests = $customerRequests;
@@ -81,15 +85,8 @@ class DeliveryLegacyController extends Controller
             ->pluck('item_count', 'delID')
             ->toArray();
 
-        // Get synced delivery with documents (if any)
-        // Using database table instead of cache to survive cache clears during deployment
-        $syncedDelivery = null;
-        $syncedDeliveryId = DB::table('app_settings')
-            ->where('key', 'legacy_synced_delivery_id')
-            ->value('value');
-        if ($syncedDeliveryId) {
-            $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
-        }
+        // The docket (Delivery Dockets page) each session is receiving, if any
+        $dockets = $this->receiving->docketsForSessions($scanSessions->pluck('ID')->all());
 
         // Get supplier IDs that have pending scan sessions (for duplicate warning)
         $pendingSupplierIds = DB::connection('pos')
@@ -100,7 +97,7 @@ class DeliveryLegacyController extends Controller
             ->values()
             ->toArray();
 
-        return view('delivery-legacy.index', compact('suppliers', 'scanSessions', 'scanItemCounts', 'syncedDelivery', 'pendingSupplierIds'));
+        return view('delivery-legacy.index', compact('suppliers', 'scanSessions', 'scanItemCounts', 'dockets', 'pendingSupplierIds'));
     }
 
     /**
@@ -154,15 +151,8 @@ class DeliveryLegacyController extends Controller
         // Only completed sessions can be undone, so only they need the undo preview.
         $undoPreview = $isCompleted ? $this->calculateUndoPreview($deliveryId, $supplierId) : null;
 
-        // Get synced delivery with documents (if any)
-        // Using database table instead of cache to survive cache clears during deployment
-        $syncedDelivery = null;
-        $syncedDeliveryId = DB::table('app_settings')
-            ->where('key', 'legacy_synced_delivery_id')
-            ->value('value');
-        if ($syncedDeliveryId) {
-            $syncedDelivery = Delivery::with(['documents', 'supplier'])->find($syncedDeliveryId);
-        }
+        // The docket this session is receiving (sent from Delivery Dockets), with its documents
+        $syncedDelivery = $this->receiving->linkedDocket($deliveryId);
 
         // Determine which supplier codes need image resolution (only for {SUPPLIER_CODE} suppliers like Independent)
         $unresolvedCodes = collect();
@@ -860,12 +850,13 @@ class DeliveryLegacyController extends Controller
                     WHERE delID = ?
                     GROUP BY barcode
                 ) b ON b.barcode = supplier_link.Barcode
-                WHERE supplier_link.SupplierID = ?
+                WHERE delivery.delID = ?
+                  AND supplier_link.SupplierID = ?
                 GROUP BY prodName, supCode, supplier_link.Barcode, rrPrice, PRICEBUY, PRICESELL,
                          RATE, delivery.caseUnits, supplier_link.CaseUnits, b.barcode, b.scanned, UNITS, PRODUCTS.ID, PRODUCTS.NAME, CATEGORIES.NAME
                 ORDER BY scanned DESC, margin ASC';
 
-        $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $supplierId]);
+        $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $deliveryId, $supplierId]);
 
         return $results;
     }
@@ -1033,6 +1024,7 @@ class DeliveryLegacyController extends Controller
                 $join->on('delivery.supCode', '=', 'supplier_link.SupplierCode')
                     ->where('supplier_link.SupplierID', '=', $supplierId);
             })
+            ->where('delivery.delID', $deliveryId)
             ->whereNotNull('supplier_link.Barcode')
             ->distinct()
             ->pluck('supplier_link.Barcode')
@@ -1133,7 +1125,8 @@ class DeliveryLegacyController extends Controller
                     AND supplier_link.SupplierID = ?
                 LEFT JOIN PRODUCTS ON supplier_link.Barcode = PRODUCTS.CODE
                 LEFT JOIN TAXES ON PRODUCTS.TAXCAT = TAXES.ID
-                WHERE supplier_link.Barcode NOT IN (
+                WHERE delivery.delID = ?
+                  AND supplier_link.Barcode NOT IN (
                     SELECT barcode
                     FROM deliveriesScanItems
                     WHERE delID = ?
@@ -1142,7 +1135,7 @@ class DeliveryLegacyController extends Controller
                 HAVING SUM(delivery.myOrder) > 0
                 ORDER BY delivery.prodName ASC';
 
-        $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId]);
+        $results = DB::connection('pos')->select($sql, [$supplierId, $deliveryId, $deliveryId]);
 
         return $results;
     }
@@ -1253,12 +1246,13 @@ class DeliveryLegacyController extends Controller
      * Work out what undoComplete() would remove, and whether that is actually correct.
      *
      * Completing a delivery leaves no record of what it added, so the undo has to recompute the
-     * amounts from getMatchedItems()/getScannedNotOnInvoice(). Those read the POS `delivery`
-     * table, which is a global scratch table with no delivery id: DeliveryController::syncToLegacy()
-     * truncates and repopulates it on every sync. If that has happened since completion, a barcode
-     * reachable from two supplier codes can yield a different number of rows than it did before —
-     * and since getMatchedItems() groups by supCode with each row carrying the same scanned value,
-     * the undo would decrement a different amount than the completion incremented.
+     * amounts from getMatchedItems()/getScannedNotOnInvoice(). Those read the session's own rows in
+     * the POS `delivery` table (ReceivingService::sendDocket() writes them per session, so another
+     * docket being sent no longer disturbs them), but a re-send of this docket after an edit, or a
+     * supplier_link change, can still alter the rows: a barcode reachable from two supplier codes
+     * can yield a different number of rows than it did before — and since getMatchedItems() groups
+     * by supCode with each row carrying the same scanned value, the undo would decrement a different
+     * amount than the completion incremented.
      *
      * So we compare the planned decrements against deliveriesScanItems, which is scoped to this
      * delID and is never touched by completion, and is therefore the ground truth for what should
@@ -1516,9 +1510,10 @@ class DeliveryLegacyController extends Controller
                 FROM delivery
                 INNER JOIN supplier_link ON delivery.supCode = supplier_link.SupplierCode
                     AND supplier_link.SupplierID = ?
-                WHERE supplier_link.Barcode = ?
+                WHERE delivery.delID = ?
+                  AND supplier_link.Barcode = ?
                 GROUP BY delivery.supCode, delivery.caseUnits',
-                [$supplierID, $resolvedBarcode]
+                [$supplierID, $delID, $resolvedBarcode]
             );
 
             if ($invoiceRow) {
@@ -1725,18 +1720,27 @@ class DeliveryLegacyController extends Controller
                 ->update(['status' => 1]);
         });
 
+        // The docket this session is receiving (if one was sent) takes the scanned
+        // quantities and becomes completed. Stock is already written above, so a
+        // failure here is logged rather than thrown.
+        $docket = $this->receiving->safely(
+            fn () => $this->receiving->applyCompletion($delID, $matchedItems),
+            "mark docket received for session {$delID}"
+        );
+        $docketNote = $docket ? " Docket {$docket->delivery_number} marked received." : '';
+
         // Shop mode posts return=shop so staff land back on the shop-floor list with
         // the figures they just committed. The office form sends nothing, so its
         // behaviour is unchanged.
         if ($request->input('return') === 'shop') {
             return redirect()
                 ->route('shop.deliveries')
-                ->with('success', "Delivery completed. {$updateResults['unitsAdded']} units added to stock for {$updateResults['productsUpdated']} products.");
+                ->with('success', "Delivery completed. {$updateResults['unitsAdded']} units added to stock for {$updateResults['productsUpdated']} products.{$docketNote}");
         }
 
         return redirect()
             ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
-            ->with('success', 'Stock updated successfully. Delivery marked as complete.')
+            ->with('success', 'Stock updated successfully. Delivery marked as complete.'.$docketNote)
             ->with('updateResults', $updateResults);
     }
 
@@ -1830,8 +1834,8 @@ class DeliveryLegacyController extends Controller
                 ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
                 ->with('error', 'Undo blocked: the stock amounts no longer match the scan record for '
                     .count($preview['discrepancies']).' product(s), so undoing would remove the wrong '
-                    .'quantities. This usually means another invoice has been synced to the legacy '
-                    .'delivery table since this delivery was completed. See the details on this page.');
+                    .'quantities. This usually means the docket was re-sent to Receiving, or a product '
+                    .'link changed, since this delivery was completed. See the details on this page.');
         }
 
         // Recompute the same items the completion used so the amounts match exactly.
@@ -1866,9 +1870,16 @@ class DeliveryLegacyController extends Controller
                 ->update(['status' => 0]);
         });
 
+        // The linked docket goes back to draft with nothing received.
+        $docket = $this->receiving->safely(
+            fn () => $this->receiving->revertCompletion($delID),
+            "reopen docket for session {$delID}"
+        );
+
         return redirect()
             ->route('delivery-legacy.match', ['delID' => $delID, 'supplierID' => $supplierID])
-            ->with('success', 'Stock update reversed. Delivery reopened — you can continue scanning.')
+            ->with('success', 'Stock update reversed. Delivery reopened — you can continue scanning.'
+                .($docket ? " Docket {$docket->delivery_number} is back to draft." : ''))
             ->with('undoResults', $undoResults);
     }
 
@@ -1928,6 +1939,10 @@ class DeliveryLegacyController extends Controller
             DB::connection('pos')->table('deliveriesScanItems')
                 ->where('delID', $sourceId)
                 ->delete();
+
+            // The kept session takes the source's docket lines and docket link,
+            // unless it already has a docket of its own.
+            $this->receiving->moveDocket($sourceId, $targetId);
 
             // Delete the source session
             DB::connection('pos')->table('deliveriesScan')
@@ -2016,6 +2031,9 @@ class DeliveryLegacyController extends Controller
                 ->where('delID', $sessionId)
                 ->delete();
 
+            // Its invoice lines go too; the docket itself stays on Delivery Dockets, unlinked.
+            $this->receiving->detachSession($sessionId);
+
             DB::connection('pos')->table('deliveriesScan')
                 ->where('ID', $sessionId)
                 ->delete();
@@ -2044,16 +2062,7 @@ class DeliveryLegacyController extends Controller
 
         $supplierId = $validated['supplierID'];
 
-        // Generate a UUID for the session ID
-        $sessionId = (string) \Illuminate\Support\Str::uuid();
-
-        // Create the scan session
-        DB::connection('pos')->table('deliveriesScan')->insert([
-            'ID' => $sessionId,
-            'supID' => $supplierId,
-            'dateUpload' => now(),
-            'status' => 0,
-        ]);
+        $sessionId = $this->receiving->createSession($supplierId);
 
         // Get supplier name for message
         $supplier = DB::connection('pos')

@@ -88,12 +88,4 @@ class DeliveryScanItem extends Model
             }
         });
     }
-
-    /**
-     * Get the scan session this item belongs to.
-     */
-    public function scanSession()
-    {
-        return $this->belongsTo(DeliveryScan::class, 'delID', 'ID');
-    }
 }

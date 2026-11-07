@@ -10,6 +10,7 @@
         \App\Models\CustomerRequestItem::STATUS_ORDERED => 'shop-pill--sage',
         \App\Models\CustomerRequestItem::STATUS_PUT_ASIDE => 'shop-pill--ok',
         \App\Models\CustomerRequestItem::STATUS_COLLECTED => 'shop-pill--ok',
+        \App\Models\CustomerRequestItem::STATUS_DONE => 'shop-pill--ok',
         \App\Models\CustomerRequestItem::STATUS_NOT_AVAILABLE => 'shop-pill--bad',
         \App\Models\CustomerRequestItem::STATUS_CANCELLED => 'shop-pill--muted',
     ];
@@ -22,6 +23,7 @@
         <div class="shop-stack shop-stack--tight">
             <span class="shop-request__item">{{ $item->label() }}</span>
             <span class="shop-request__who">{{ $request->customer_name }} &middot; {{ $item->quantityLabel() }}</span>
+            <span class="shop-meta">Taken {{ $request->created_at->format('D j M') }}</span>
         </div>
     </div>
 

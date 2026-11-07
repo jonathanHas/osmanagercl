@@ -85,6 +85,7 @@ class CustomerRequestDeliveryFlagTest extends TestCase
         });
         $pos->create('delivery', function (Blueprint $table) {
             $table->increments('id');
+            $table->string('delID', 64)->nullable();
             $table->string('prodName')->nullable();
             $table->string('supCode')->nullable();
             $table->decimal('rrPrice', 10, 2)->nullable();
@@ -116,7 +117,7 @@ class CustomerRequestDeliveryFlagTest extends TestCase
             'Barcode' => self::BARCODE, 'SupplierCode' => 'SUP-OAT', 'SupplierID' => self::SUPPLIER_ID, 'CaseUnits' => 6,
         ]);
         DB::connection('pos')->table('delivery')->insert([
-            'prodName' => 'OAT MILK ORG 1L', 'supCode' => 'SUP-OAT', 'rrPrice' => 2.1, 'cost' => 1.2, 'myOrder' => 1, 'caseUnits' => 6,
+            'delID' => self::DELIVERY_ID, 'prodName' => 'OAT MILK ORG 1L', 'supCode' => 'SUP-OAT', 'rrPrice' => 2.1, 'cost' => 1.2, 'myOrder' => 1, 'caseUnits' => 6,
         ]);
         DB::connection('pos')->table('deliveriesScan')->insert(['ID' => self::DELIVERY_ID, 'status' => 0]);
 
@@ -217,5 +218,31 @@ class CustomerRequestDeliveryFlagTest extends TestCase
             'quantity' => 1,
             'supplierID' => self::SUPPLIER_ID,
         ])->assertOk()->assertJsonCount(0, 'customerRequests');
+    }
+
+    public function test_a_line_that_is_just_to_be_got_in_is_not_flagged_for_putting_aside(): void
+    {
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Shelf Sam', 'wanted_on' => today()->addDays(2)]);
+        $request->forceFill(['created_at' => now()->subDays(3)])->save();
+        CustomerRequestItem::factory()
+            ->for($request, 'request')
+            ->forProduct(self::BARCODE, 'Organic Oat Milk 1L')
+            ->justGetItIn()
+            ->status(CustomerRequestItem::STATUS_ORDERED)
+            ->create();
+
+        $this->matchPage()->assertOk()
+            ->assertSee('Requested by Shelf Sam')
+            ->assertDontSee('Put aside for Shelf Sam')
+            ->assertSee('taken '.now()->subDays(3)->format('D j M'));
+
+        $this->postJson(route('delivery-legacy.scan-increment'), [
+            'delID' => self::DELIVERY_ID,
+            'barcode' => self::BARCODE,
+            'quantity' => 1,
+            'supplierID' => self::SUPPLIER_ID,
+        ])->assertOk()
+            ->assertJsonPath('customerRequests.0.hold_for_collection', false)
+            ->assertJsonPath('customerRequests.0.taken_on', now()->subDays(3)->toDateString());
     }
 }

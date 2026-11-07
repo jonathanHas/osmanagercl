@@ -39,7 +39,7 @@ class CustomerRequestService
      * the product is later renamed or removed.
      *
      * @param  array<string, mixed>  $data  customer_name, customer_phone, wanted_on, notes
-     * @param  array<int, array<string, mixed>>  $items  product_code?, product_name?, description, quantity, notes?
+     * @param  array<int, array<string, mixed>>  $items  product_code?, product_name?, description, quantity, notes?, hold_for_collection?
      */
     public function create(array $data, array $items, User $user): CustomerRequest
     {
@@ -402,7 +402,9 @@ class CustomerRequestService
                 'unit' => $item->unit,
                 'case_units' => $item->case_units,
                 'quantity_label' => $item->quantityLabel(),
+                'hold_for_collection' => $item->isHeldForCollection(),
                 'wanted_on' => $item->request?->wanted_on?->toDateString(),
+                'taken_on' => $item->request?->created_at?->toDateString(),
                 'status' => $item->status,
                 'status_label' => $item->statusLabel(),
             ])
@@ -440,7 +442,7 @@ class CustomerRequestService
             $description = $name ?? $code ?? '';
         }
 
-        return [
+        $fields = [
             'product_code' => $code,
             'product_name' => $code !== null ? $name : null,
             'description' => $description,
@@ -452,6 +454,15 @@ class CustomerRequestService
             'notes' => self::nullIfBlank($item['notes'] ?? null),
             'position' => $position,
         ];
+
+        // Put aside for the customer, or just got in and marked done. Left out
+        // of the payload, a new line takes the default (held) and an edited line
+        // keeps what it was taken with.
+        if (self::nullIfBlank($item['hold_for_collection'] ?? null) !== null) {
+            $fields['hold_for_collection'] = filter_var($item['hold_for_collection'], FILTER_VALIDATE_BOOL);
+        }
+
+        return $fields;
     }
 
     private function createItem(CustomerRequest $request, array $item, int $position, User $user): CustomerRequestItem

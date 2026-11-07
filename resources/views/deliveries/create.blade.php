@@ -1,7 +1,7 @@
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex justify-between items-center">
-            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Import New Delivery</h2>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Import Delivery Docket</h2>
             <a href="{{ route('deliveries.index') }}"
                class="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-md transition-colors duration-200">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

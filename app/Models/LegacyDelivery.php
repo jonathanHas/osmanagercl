@@ -33,6 +33,7 @@ class LegacyDelivery extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'delID',
         'prodName',
         'supCode',
         'cost',

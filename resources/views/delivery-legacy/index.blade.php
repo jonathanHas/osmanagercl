@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                Delivery Legacy - Invoice Match
+                Receiving - Scan Sessions
             </h2>
         </div>
     </x-slot>
@@ -21,47 +21,6 @@
                 </div>
             @endif
 
-            {{-- Synced Delivery Documents --}}
-            @if($syncedDelivery && $syncedDelivery->documents->count() > 0)
-                <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-lg font-medium text-blue-900 flex items-center">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                            Synced Delivery Documents
-                        </h3>
-                        <span class="text-sm text-blue-600">
-                            From: {{ $syncedDelivery->supplier->Supplier ?? 'Unknown' }} - {{ $syncedDelivery->delivery_date->format('d/m/Y') }}
-                        </span>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                        @foreach($syncedDelivery->documents as $document)
-                            <div class="flex items-center bg-white rounded-lg px-3 py-2 shadow-sm border border-blue-100">
-                                @if($document->isPdf())
-                                    <svg class="w-5 h-5 text-red-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                                    </svg>
-                                @else
-                                    <svg class="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
-                                    </svg>
-                                @endif
-                                <span class="text-sm text-gray-700 mr-3">{{ $document->original_filename }}</span>
-                                <a href="{{ $document->viewer_minimal_url }}"
-                                   onclick="window.open(this.href, 'documentViewer', 'width=900,height=700,scrollbars=yes,resizable=yes'); return false;"
-                                   class="text-blue-600 hover:text-blue-800 text-sm font-medium mr-2">
-                                    View
-                                </a>
-                                <a href="{{ $document->download_url }}"
-                                   class="text-gray-500 hover:text-gray-700 text-sm">
-                                    Download
-                                </a>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
@@ -136,6 +95,9 @@
                                                 class="rounded border-gray-300 text-amber-600 focus:ring-amber-500 mt-0.5">
                                         @endif
                                         <span class="text-sm font-medium text-gray-900">#{{ Str::limit($session->ID, 8, '...') }}</span>
+                                        @if(isset($dockets[$session->ID]))
+                                            <a href="{{ route('deliveries.show', $dockets[$session->ID]) }}" class="text-xs text-indigo-600 hover:text-indigo-800">Docket {{ $dockets[$session->ID]->delivery_number }}</a>
+                                        @endif
                                     </div>
                                     @if($session->status)
                                         <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Completed</span>
@@ -158,7 +120,7 @@
                                         @if($isPending)
                                             <form x-show="editing" x-cloak @click.away="editing = false"
                                                 action="{{ route('delivery-legacy.change-supplier') }}" method="POST"
-                                                @submit="return confirm('Change supplier from {{ addslashes($session->Supplier ?? 'Unknown') }} to ' + $el.querySelector('select').selectedOptions[0].text + '?')"
+                                                @submit="if (! confirm('Change supplier from {{ addslashes($session->Supplier ?? 'Unknown') }} to ' + $el.querySelector('select').selectedOptions[0].text + '?')) $event.preventDefault()"
                                                 class="flex items-center gap-1">
                                                 @csrf
                                                 @method('PATCH')
@@ -238,6 +200,13 @@
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                             #{{ Str::limit($session->ID, 8, '...') }}
+                                            @if(isset($dockets[$session->ID]))
+                                                <div class="mt-0.5 text-xs font-normal">
+                                                    <a href="{{ route('deliveries.show', $dockets[$session->ID]) }}" class="text-indigo-600 hover:text-indigo-800">Docket {{ $dockets[$session->ID]->delivery_number }}</a>
+                                                </div>
+                                            @else
+                                                <div class="mt-0.5 text-xs font-normal text-gray-400">No docket sent</div>
+                                            @endif
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             <div x-data="{ editing: false }" class="flex items-center gap-1">
@@ -253,7 +222,7 @@
                                                     </button>
                                                     <form x-show="editing" x-cloak @click.away="editing = false"
                                                         action="{{ route('delivery-legacy.change-supplier') }}" method="POST"
-                                                        @submit="return confirm('Change supplier from {{ addslashes($session->Supplier ?? 'Unknown') }} to ' + $el.querySelector('select').selectedOptions[0].text + '?')"
+                                                        @submit="if (! confirm('Change supplier from {{ addslashes($session->Supplier ?? 'Unknown') }} to ' + $el.querySelector('select').selectedOptions[0].text + '?')) $event.preventDefault()"
                                                         class="flex items-center gap-1">
                                                         @csrf
                                                         @method('PATCH')

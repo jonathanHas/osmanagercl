@@ -1,7 +1,7 @@
 <x-admin-layout>
     <x-slot name="header">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-            <h2 class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Deliveries</h2>
+            <h2 class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Delivery Dockets</h2>
             <div class="flex items-center space-x-2 sm:space-x-4">
                 <a href="{{ route('barrel-codes.index') }}"
                    class="inline-flex items-center px-2 py-1.5 sm:px-4 sm:py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-md transition-colors duration-200">
@@ -93,7 +93,7 @@
             <!-- Deliveries Table -->
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Deliveries</h3>
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Dockets</h3>
                 </div>
                 
                 @if($deliveries->count() > 0)
@@ -193,12 +193,6 @@
                                                 $actions = [
                                                     ['type' => 'link', 'route' => 'deliveries.show', 'params' => $delivery, 'label' => 'View', 'color' => 'primary']
                                                 ];
-                                                
-                                                if ($delivery->status === 'draft') {
-                                                    $actions[] = ['type' => 'link', 'route' => 'deliveries.scan', 'params' => $delivery, 'label' => 'Start', 'color' => 'success'];
-                                                } elseif ($delivery->status === 'receiving') {
-                                                    $actions[] = ['type' => 'link', 'route' => 'deliveries.scan', 'params' => $delivery, 'label' => 'Continue', 'color' => 'info'];
-                                                }
                                                 
                                                 // Add delete button for non-completed deliveries
                                                 if (in_array($delivery->status, ['draft', 'cancelled'])) {

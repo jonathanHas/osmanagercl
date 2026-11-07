@@ -3,6 +3,7 @@
 This document tracks known issues that have been identified and resolved in the OSManager CL application. Understanding these past issues helps prevent similar problems in the future.
 
 **Quick Navigation:**
+- [Delivery Issues](#delivery-issues)
 - [Label & Printing Issues](#label--printing-issues)
 - [Frontend Issues](#frontend-issues)
 - [Database & Transaction Issues](#database--transaction-issues)
@@ -13,6 +14,20 @@ This document tracks known issues that have been identified and resolved in the 
 - [Invoice Parsing Issues](#invoice-parsing-issues)
 - [Environment & Mail Issues](#environment--mail-issues)
 - [Queue Worker Issues](#bulk-upload-batch-stuck-at-processing-forever)
+
+---
+
+## Delivery Issues
+
+### `/deliveries` "Complete" Never Updated Stock (removed 2026-11-07)
+
+**Symptom**: Completing a delivery on `/deliveries/{id}/summary` reported "Stock levels have been updated", but `STOCKCURRENT` never changed. All deliveries stayed Draft or Receiving.
+
+**Cause**: `DeliveryService::completeDelivery()` called `updateProductStock()`, a placeholder that only wrote a log line. The module had been built as a second receiving flow in July 2025, used for two days in August 2025, and then superseded by Receiving (`/delivery-legacy`, January 2026) and the Shop *Receive delivery* screens, which share the POS scan-session tables and do write stock.
+
+**Resolution**: The scan → summary → complete path, its `delivery_scans` table, `DeliveryScan` model and `/api/deliveries/*` routes were removed (migration `2026_11_07_000002`, which also resets the 12 `receiving` deliveries to `draft`). `/deliveries` is docket intake only; **Send to Receiving** hands a docket to the flow that receives it. The pages were renamed **Delivery Dockets** and **Receiving** in the sidebar. Same day, the two were linked properly: a docket is sent to one scan session (`deliveries.scan_session_id`, POS `delivery.delID`, migrations `2026_11_07_000003/4`) and Receiving's Complete marks it `completed` with the scanned quantities (`App\Services\ReceivingService`). See `docs/deliveries/README.md`.
+
+**After deploying**: the docket that was in Receiving at deploy time was sent the old way (its POS rows have no `delID`) and shows no invoice lines until it is re-sent once from its docket page.
 
 ---
 

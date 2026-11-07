@@ -24,6 +24,9 @@ class CustomerRequestItem extends Model
 
     public const STATUS_COLLECTED = 'collected';
 
+    /** Finished without a collection: arrived and went on the shelf, or simply dealt with. */
+    public const STATUS_DONE = 'done';
+
     public const STATUS_NOT_AVAILABLE = 'not_available';
 
     public const STATUS_CANCELLED = 'cancelled';
@@ -33,6 +36,7 @@ class CustomerRequestItem extends Model
         self::STATUS_ORDERED,
         self::STATUS_PUT_ASIDE,
         self::STATUS_COLLECTED,
+        self::STATUS_DONE,
         self::STATUS_NOT_AVAILABLE,
         self::STATUS_CANCELLED,
     ];
@@ -55,6 +59,7 @@ class CustomerRequestItem extends Model
         self::STATUS_ORDERED => 'Ordered',
         self::STATUS_PUT_ASIDE => 'Put aside',
         self::STATUS_COLLECTED => 'Collected',
+        self::STATUS_DONE => 'Done',
         self::STATUS_NOT_AVAILABLE => 'Not available',
         self::STATUS_CANCELLED => 'Cancelled',
     ];
@@ -65,6 +70,7 @@ class CustomerRequestItem extends Model
      */
     public const DONE_STATUSES = [
         self::STATUS_COLLECTED,
+        self::STATUS_DONE,
         self::STATUS_NOT_AVAILABLE,
         self::STATUS_CANCELLED,
     ];
@@ -72,12 +78,18 @@ class CustomerRequestItem extends Model
     /**
      * Which statuses a line may move to from each status. The "backwards"
      * moves exist to undo a mis-tap on the shop-floor tablet.
+     *
+     * `done` is the short road for a line that is not held for collection:
+     * pending or ordered straight to finished. It is allowed from any line, so a
+     * request taken as "put aside" can still be cleared in one tap when it turns
+     * out nothing needed holding.
      */
     public const ALLOWED_TRANSITIONS = [
-        self::STATUS_PENDING => [self::STATUS_ORDERED, self::STATUS_PUT_ASIDE, self::STATUS_NOT_AVAILABLE, self::STATUS_CANCELLED],
-        self::STATUS_ORDERED => [self::STATUS_PUT_ASIDE, self::STATUS_NOT_AVAILABLE, self::STATUS_CANCELLED, self::STATUS_PENDING],
+        self::STATUS_PENDING => [self::STATUS_ORDERED, self::STATUS_PUT_ASIDE, self::STATUS_DONE, self::STATUS_NOT_AVAILABLE, self::STATUS_CANCELLED],
+        self::STATUS_ORDERED => [self::STATUS_PUT_ASIDE, self::STATUS_DONE, self::STATUS_NOT_AVAILABLE, self::STATUS_CANCELLED, self::STATUS_PENDING],
         self::STATUS_PUT_ASIDE => [self::STATUS_COLLECTED, self::STATUS_ORDERED, self::STATUS_CANCELLED],
         self::STATUS_COLLECTED => [self::STATUS_PUT_ASIDE],
+        self::STATUS_DONE => [self::STATUS_ORDERED, self::STATUS_PENDING],
         self::STATUS_NOT_AVAILABLE => [self::STATUS_PENDING],
         self::STATUS_CANCELLED => [self::STATUS_PENDING],
     ];
@@ -102,6 +114,7 @@ class CustomerRequestItem extends Model
         'unit',
         'case_units',
         'notes',
+        'hold_for_collection',
         'position',
         'status',
         'status_changed_at',
@@ -113,6 +126,7 @@ class CustomerRequestItem extends Model
         return [
             'quantity' => 'decimal:2',
             'case_units' => 'integer',
+            'hold_for_collection' => 'boolean',
             'position' => 'integer',
             'status_changed_at' => 'datetime',
         ];
@@ -203,6 +217,44 @@ class CustomerRequestItem extends Model
     public function isByTheCase(): bool
     {
         return $this->unit === self::UNIT_CASE;
+    }
+
+    /**
+     * Is this line held for the customer to collect (Ordered → Put aside →
+     * Collected), or just got in and marked done? Unset reads as held, which is
+     * how every line taken before the choice existed behaves.
+     */
+    public function isHeldForCollection(): bool
+    {
+        return $this->hold_for_collection ?? true;
+    }
+
+    /**
+     * The lifecycle strip for this line, in order. The last entry is the status
+     * that finishes it.
+     *
+     * @return array<string, string> status => label
+     */
+    public function lifecycleSteps(): array
+    {
+        if ($this->isHeldForCollection() && $this->status !== self::STATUS_DONE) {
+            return [
+                self::STATUS_ORDERED => 'Ordered',
+                self::STATUS_PUT_ASIDE => 'Put aside',
+                self::STATUS_COLLECTED => 'Collected',
+            ];
+        }
+
+        return [
+            self::STATUS_ORDERED => 'Ordered',
+            self::STATUS_DONE => 'Done',
+        ];
+    }
+
+    /** Short wording for the choice made when the request was taken. */
+    public function handlingLabel(): string
+    {
+        return $this->isHeldForCollection() ? 'Put aside' : 'Just get it in';
     }
 
     /**

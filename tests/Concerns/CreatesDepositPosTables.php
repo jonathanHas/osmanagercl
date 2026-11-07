@@ -67,6 +67,20 @@ trait CreatesDepositPosTables
             $table->integer('SupplierID')->primary();
             $table->string('Supplier');
         });
+        // Receiving scan sessions: the docket page looks these up for its Receiving card.
+        $pos->create('deliveriesScan', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('supID')->nullable();
+            $table->dateTime('dateUpload')->nullable();
+            $table->integer('status')->default(0);
+        });
+        $pos->create('deliveriesScanItems', function (Blueprint $table) {
+            $table->string('ID')->primary();
+            $table->string('delID');
+            $table->string('barcode');
+            $table->decimal('quantity', 10, 3)->default(0);
+            $table->dateTime('dateScan')->nullable();
+        });
         $pos->create('RESOURCES', function (Blueprint $table) {
             $table->string('ID')->primary();
             $table->string('NAME')->unique();

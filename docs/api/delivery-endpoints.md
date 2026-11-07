@@ -133,99 +133,7 @@ GET /deliveries/{delivery}
 
 ## Scanning Operations
 
-### Process Barcode Scan
-
-Process a barcode scan and update delivery item quantities.
-
-```http
-POST /deliveries/{delivery}/scan
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-  "barcode": "8711521021925",
-  "quantity": 1,
-  "scanned_by": "User Name"
-}
-```
-
-**Success Response:**
-```json
-{
-  "success": true,
-  "item": {
-    "id": 156,
-    "supplier_code": "19990B",
-    "description": "Suma Hemp Oil & Vitamin E Soap 12x90g",
-    "received_quantity": 1,
-    "ordered_quantity": 1,
-    "status": "complete"
-  },
-  "message": "Scanned: Suma Hemp Oil & Vitamin E Soap 12x90g (Total: 1/1)"
-}
-```
-
-**Unknown Product Response:**
-```json
-{
-  "success": false,
-  "message": "Unknown product: 8711521021925",
-  "barcode": "8711521021925"
-}
-```
-
-### Adjust Item Quantity
-
-Manually adjust received quantity for a delivery item.
-
-```http
-PATCH /deliveries/{delivery}/items/{item}/quantity
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-  "quantity": 5,
-  "action": "set"  // "set", "add", or "subtract"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "item": {
-    "id": 156,
-    "received_quantity": 5,
-    "status": "excess"
-  }
-}
-```
-
-### Get Delivery Statistics
-
-Get real-time delivery progress statistics.
-
-```http
-GET /deliveries/{delivery}/stats
-```
-
-**Response:**
-```json
-{
-  "total_items": 45,
-  "complete_items": 38,
-  "partial_items": 3,
-  "missing_items": 4,
-  "excess_items": 2,
-  "completion_percentage": 85.5,
-  "total_expected_value": 245.67,
-  "total_received_value": 210.43
-}
-```
+Removed 2026-11-07. `/deliveries` no longer has scan, stats, adjust-quantity, summary, complete, cancel or export-discrepancies endpoints (its completion never wrote stock). Receiving uses the `delivery-legacy.*` routes documented in `docs/features/shop-mode.md` and `docs/features/delivery-system.md`.
 
 ## Product Creation Integration
 
@@ -263,92 +171,7 @@ units_per_case: 12
 delivery_item_id: 156
 ```
 
-## Completion Operations
-
-### Get Delivery Summary
-
-Get comprehensive delivery summary with discrepancies.
-
-```http
-GET /deliveries/{delivery}/summary
-```
-
-**Response:**
-```json
-{
-  "summary": {
-    "total_items": 45,
-    "complete_items": 38,
-    "partial_items": 3,
-    "missing_items": 4,
-    "excess_items": 2,
-    "unmatched_scans": 1,
-    "total_expected_value": 245.67,
-    "total_received_value": 210.43,
-    "discrepancies": [
-      {
-        "code": "ABC123",
-        "description": "Product Name",
-        "ordered": 5,
-        "received": 3,
-        "difference": -2,
-        "value_difference": -15.50
-      }
-    ]
-  }
-}
-```
-
-### Complete Delivery
-
-Mark delivery as completed and update POS stock levels.
-
-```http
-POST /deliveries/{delivery}/complete
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Delivery completed successfully",
-  "processed_items": 38,
-  "skipped_new_products": 7
-}
-```
-
-### Export Discrepancies
-
-Export delivery discrepancies for supplier reconciliation.
-
-```http
-GET /deliveries/{delivery}/export-discrepancies
-```
-
-**Response:**
-```json
-{
-  "delivery_number": "DEL-20250804-142301",
-  "supplier": "Independent Irish Health Foods",
-  "export_date": "2025-08-04T15:30:00Z",
-  "discrepancies": [
-    {
-      "supplier_code": "ABC123",
-      "description": "Product Name",
-      "ordered_quantity": 5,
-      "received_quantity": 3,
-      "difference": -2,
-      "unit_cost": 7.75,
-      "value_impact": -15.50,
-      "status": "partial"
-    }
-  ],
-  "summary": {
-    "total_discrepancies": 7,
-    "total_value_impact": -45.75
-  }
-}
-```
+## Docket Operations
 
 ### Detect Supplier from PDF
 
@@ -406,7 +229,10 @@ pdf_file: file (required) - PDF file to analyze
 
 ---
 
-### Sync to Legacy
+### Send to Receiving (`sync-legacy`)
+
+Since 2026-11-07 the request takes `scan_session_id`: `new` (default) starts a scan session for the docket's supplier; an open session's id joins it. The lines are written to the POS `delivery` table tagged with that session (`delID`) instead of truncating the table, the docket records the session on `deliveries.scan_session_id`, and the response redirects to that session's Receiving match page. Re-posting without a session re-sends to the docket's own session. A completed session is refused (undo it first). The older description below predates this.
+
 
 Sync delivery items to the POS `delivery` table for invoice comparison with scanned items.
 

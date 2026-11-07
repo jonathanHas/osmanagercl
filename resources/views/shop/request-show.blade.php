@@ -5,6 +5,7 @@
         Line::STATUS_ORDERED => 'shop-pill--sage',
         Line::STATUS_PUT_ASIDE => 'shop-pill--ok',
         Line::STATUS_COLLECTED => 'shop-pill--ok',
+        Line::STATUS_DONE => 'shop-pill--ok',
         Line::STATUS_NOT_AVAILABLE => 'shop-pill--bad',
         Line::STATUS_CANCELLED => 'shop-pill--muted',
     ];
@@ -86,6 +87,7 @@
                                     · <span class="shop-code">{{ $item->product_code }}</span>
                                 @endif
                                 · {{ $item->isLinkedToProduct() ? 'Pre-order' : 'Sourcing' }}
+                                · {{ $item->handlingLabel() }}
                                 @if ($item->notes)
                                     · {{ $item->notes }}
                                 @endif

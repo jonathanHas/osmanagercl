@@ -85,6 +85,7 @@ trait CreatesLegacyDeliveryPosTables
         });
         $pos->create('delivery', function (Blueprint $table) {
             $table->increments('id');
+            $table->string('delID', 64)->nullable()->index();
             $table->string('prodName')->nullable();
             $table->string('supCode')->nullable();
             $table->decimal('rrPrice', 10, 2)->nullable();
@@ -143,8 +144,8 @@ trait CreatesLegacyDeliveryPosTables
         ]);
 
         $pos->table('delivery')->insert([
-            ['prodName' => 'OAT DRINK ORG 1L', 'supCode' => 'S1', 'rrPrice' => 2.1, 'cost' => 1.2, 'myOrder' => 2, 'caseUnits' => 6, 'orderNumber' => 'INV-1'],
-            ['prodName' => 'LEEKS ORG', 'supCode' => 'S2', 'rrPrice' => 1.5, 'cost' => 0.8, 'myOrder' => 8, 'caseUnits' => 1, 'orderNumber' => 'INV-1'],
+            ['delID' => 'd-1', 'prodName' => 'OAT DRINK ORG 1L', 'supCode' => 'S1', 'rrPrice' => 2.1, 'cost' => 1.2, 'myOrder' => 2, 'caseUnits' => 6, 'orderNumber' => 'INV-1'],
+            ['delID' => 'd-1', 'prodName' => 'LEEKS ORG', 'supCode' => 'S2', 'rrPrice' => 1.5, 'cost' => 0.8, 'myOrder' => 8, 'caseUnits' => 1, 'orderNumber' => 'INV-1'],
         ]);
 
         $pos->table('deliveriesScan')->insert([

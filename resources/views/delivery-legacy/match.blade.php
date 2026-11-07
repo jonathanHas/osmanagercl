@@ -3,11 +3,16 @@
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <div class="min-w-0">
                 <h2 class="font-semibold text-lg sm:text-xl text-gray-800 leading-tight">
-                    Delivery Verification
+                    Receiving - Invoice Match
                 </h2>
                 <p class="text-xs sm:text-sm text-gray-600 mt-0.5">
                     <span class="font-medium">{{ $supplier->Supplier ?? 'Unknown' }}</span>
                     <span class="hidden sm:inline"> | Scan Session: <span class="font-medium">#{{ $deliveryId }}</span></span>
+                    @if($syncedDelivery)
+                        | Docket <a href="{{ route('deliveries.show', $syncedDelivery) }}" class="font-medium text-indigo-600 hover:text-indigo-800">{{ $syncedDelivery->delivery_number }}</a>
+                    @else
+                        | <span class="text-amber-700">No docket sent to this session</span>
+                    @endif
                 </p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
@@ -365,10 +370,12 @@
                                     <template x-if="scanner.lastResult?.matchStatus === 'over'">
                                         <p class="text-orange-400 text-sm mt-1 font-medium" x-text="(scanner.lastResult?.newQuantity - scanner.lastResult?.expectedQty) + ' over expected'"></p>
                                     </template>
-                                    {{-- Customer request prompt: this product is on an open request, so it needs putting aside --}}
+                                    {{-- Customer request prompt: this product is on an open request, so it needs putting
+                                         aside — or, for a line that is just to be got in, marking done. --}}
                                     <template x-if="(scanner.lastResult?.customerRequests || []).length > 0">
                                         <div class="mt-3 rounded-md bg-pink-600 text-white p-3">
-                                            <p class="text-xs font-bold uppercase tracking-wide mb-1">Put aside &mdash; customer request</p>
+                                            <p class="text-xs font-bold uppercase tracking-wide mb-1"
+                                               x-text="scanner.lastResult.customerRequests.some(cr => cr.hold_for_collection !== false) ? 'Put aside — customer request' : 'Customer request — just get it in'"></p>
                                             <template x-for="cr in scanner.lastResult.customerRequests" :key="cr.id">
                                                 <div class="flex items-center justify-between gap-2 py-1">
                                                     <div class="min-w-0">
@@ -378,13 +385,14 @@
                                                         <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase bg-pink-800 text-pink-100" x-text="cr.status_label"></span>
                                                     </div>
                                                     <button type="button"
-                                                            x-show="cr.status !== 'put_aside'"
+                                                            x-show="cr.status !== 'put_aside' && cr.status !== 'done'"
                                                             @click="markCustomerRequestPutAside(cr)"
                                                             :disabled="cr._saving"
                                                             class="flex-shrink-0 px-2.5 py-1.5 rounded bg-white text-pink-700 text-xs font-bold hover:bg-pink-50 disabled:opacity-50 touch-manipulation">
-                                                        <span x-text="cr._saving ? 'Saving…' : 'Mark put aside'"></span>
+                                                        <span x-text="cr._saving ? 'Saving…' : (cr.hold_for_collection === false ? 'Mark done' : 'Mark put aside')"></span>
                                                     </button>
                                                     <span x-show="cr.status === 'put_aside'" class="text-xs font-bold text-pink-100">&#10003; Put aside</span>
+                                                    <span x-show="cr.status === 'done'" class="text-xs font-bold text-pink-100">&#10003; Done</span>
                                                 </div>
                                             </template>
                                             <p x-show="scanner.lastResult?.customerRequestError" class="text-xs text-pink-100 mt-1" x-text="scanner.lastResult?.customerRequestError"></p>
@@ -3027,9 +3035,10 @@
                         location.reload();
                     }
                 },
-                // "Mark put aside" on the scanner's customer-request prompt. Moves the
-                // request line to put_aside via the customer requests API; the badge
-                // flips in place and the board picks it up on its next refresh.
+                // "Mark put aside" (or "Mark done" for a line that is just to be got in)
+                // on the scanner's customer-request prompt. Moves the request line via
+                // the customer requests API; the badge flips in place and the board
+                // picks it up on its next refresh.
                 async markCustomerRequestPutAside(cr) {
                     if (cr._saving) return;
                     cr._saving = true;
@@ -3043,7 +3052,7 @@
                                 'X-CSRF-TOKEN': '{{ csrf_token() }}',
                                 'Accept': 'application/json'
                             },
-                            body: JSON.stringify({ status: 'put_aside' })
+                            body: JSON.stringify({ status: cr.hold_for_collection === false ? 'done' : 'put_aside' })
                         });
                         const data = await response.json().catch(() => ({}));
                         if (response.ok && data.ok) {
