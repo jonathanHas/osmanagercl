@@ -445,4 +445,5 @@ is HTTPS.
   plan and the implementation report for each cycle.
 - **Screens with their own docs**: [Customer Requests](./customer-requests.md),
   [Fruit & Veg](./fruit-veg-system.md), [Vouchers](./voucher-management.md),
+  [Till count](./cash-reconciliation.md) (end-of-day cash; the same form is embedded in the office page),
   [Order Generation](./order-management/order-generation.md) (Shop order review).

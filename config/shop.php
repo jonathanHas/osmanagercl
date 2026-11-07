@@ -20,6 +20,7 @@ return [
         ['key' => 'orders', 'label' => 'Orders', 'hint' => 'Review supplier orders', 'icon' => 'chart', 'route' => 'shop.orders', 'permissions' => ['orders.review'], 'badge' => null],
         ['key' => 'requests', 'label' => 'Customer requests', 'hint' => 'Pre-orders and sourcing', 'icon' => 'requests', 'route' => 'customer-requests.index', 'permissions' => ['customer-requests.manage'], 'badge' => 'requests'],
         ['key' => 'vouchers', 'label' => 'Vouchers', 'hint' => 'Balance and redeem', 'icon' => 'gift', 'route' => 'shop.vouchers', 'permissions' => ['vouchers.redeem'], 'badge' => null],
+        ['key' => 'till-count', 'label' => 'Till count', 'hint' => 'End of day cash', 'icon' => 'cash', 'route' => 'shop.till-count', 'permissions' => ['cash_reconciliation.create'], 'badge' => 'till-count'],
         ['key' => 'fruit-veg', 'label' => 'Fruit & veg', 'hint' => 'Waste and harvest logs', 'icon' => 'carrot', 'route' => 'shop.fv.waste', 'permissions' => ['fruit_veg.operate'], 'badge' => null, 'tone' => 'sage'],
     ],
 
@@ -96,6 +97,8 @@ return [
         'labels.translate.print',
         'stocking.lookup',
         'stocking.update-stock',
+        // The till count's identify / forget / store endpoints.
+        'till-count.*',
         'vouchers.activate',
         'vouchers.deduct',
         'vouchers.lookup',

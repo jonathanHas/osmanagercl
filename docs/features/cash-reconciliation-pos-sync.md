@@ -1,4 +1,10 @@
-# Cash Reconciliation — Sync from POS
+# Cash Reconciliation — Import from old system (formerly "Sync from POS")
+
+> **Since 2026-11-07** the count is entered in the app itself (see
+> [Cash Reconciliation](./cash-reconciliation.md)) and the automatic import on page
+> view is gone. The button, now labelled **Import from old system** and limited to
+> managers, remains only for days before the cut-over. The rest of this page
+> describes the problem it was built for.
 
 ## Overview
 

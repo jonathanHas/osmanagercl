@@ -180,7 +180,7 @@ For a complete list of all features with detailed descriptions, see **[Features 
 **Analytics & Reporting**
 - Sales Accounting Reports
 - Bank Statement Analysis
-- Cash Reconciliation
+- Cash Reconciliation / Till count (`/shop/till-count` and `/cash-reconciliation`: one form, PIN or password identifies the counter, stable `tills`, one variance formula in `TillCountService`)
 
 **AI & Automation**
 - Multi-Provider AI Integration (Gemini, Mistral, OpenAI)

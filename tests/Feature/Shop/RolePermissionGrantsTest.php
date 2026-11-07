@@ -40,6 +40,9 @@ class RolePermissionGrantsTest extends TestCase
         'kitchen.manage',
     ];
 
+    /** Till count rewrite (2026-11-07): employees count the till. */
+    private const TILL_COUNT_MIGRATION = 'database/migrations/2026_11_07_000003_grant_cash_reconciliation_to_employees.php';
+
     private function role(string $name): Role
     {
         return Role::where('name', $name)->firstOrFail();
@@ -337,5 +340,40 @@ class RolePermissionGrantsTest extends TestCase
 
         $this->assertDatabaseMissing('permissions', ['name' => 'orders.review']);
         $this->assertFalse($this->role('employee')->fresh()->hasPermission('orders.review'));
+    }
+
+    // --- till count (2026-11-07): cash_reconciliation.view / .create for employees
+
+    public function test_seeder_lets_employees_count_the_till_but_not_export(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        $employee = $this->role('employee');
+        $this->assertTrue($employee->hasPermission('cash_reconciliation.view'));
+        $this->assertTrue($employee->hasPermission('cash_reconciliation.create'));
+        $this->assertFalse($employee->hasPermission('cash_reconciliation.export'));
+
+        $this->assertTrue($this->role('manager')->hasPermission('cash_reconciliation.export'));
+    }
+
+    public function test_till_count_migration_grants_employees_on_an_existing_database(): void
+    {
+        foreach (['admin', 'manager', 'employee', 'barista'] as $name) {
+            Role::firstOrCreate(['name' => $name], ['display_name' => ucfirst($name)]);
+        }
+        // The live database: the permissions exist (2025-08-11) and only managers hold them.
+        $ids = Permission::whereIn('name', ['cash_reconciliation.view', 'cash_reconciliation.create'])->pluck('id');
+        $this->role('employee')->permissions()->detach($ids);
+        $this->assertFalse($this->role('employee')->fresh()->hasPermission('cash_reconciliation.create'));
+
+        $migration = require base_path(self::TILL_COUNT_MIGRATION);
+        $migration->up();
+        $migration->up();
+
+        $employee = $this->role('employee')->fresh();
+        $this->assertTrue($employee->hasPermission('cash_reconciliation.view'));
+        $this->assertTrue($employee->hasPermission('cash_reconciliation.create'));
+        $this->assertSame(2, $employee->permissions()->whereIn('permissions.id', Permission::whereIn('name', ['cash_reconciliation.view', 'cash_reconciliation.create'])->pluck('id'))->count());
+        $this->assertSame([], $this->role('barista')->permissions->pluck('name')->all());
     }
 }

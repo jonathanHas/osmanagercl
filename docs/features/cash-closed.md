@@ -8,7 +8,7 @@ This feature is implemented as the **Cash Reconciliation** module and integrates
 
 ## Related Documentation
 
-- **[Cash Reconciliation (Technical)](./cash-reconciliation.md)** -- Models, repository, controller, API, database schema
+- **[Cash Reconciliation (Till Count)](./cash-reconciliation.md)** -- The count: screens, identity, arithmetic, data, commands
 - **[POS Integration](./pos-integration.md)** -- How the POS database connection works
 
 ## Data Flow
@@ -32,115 +32,28 @@ Bank Statement Match (verify the deposit appeared on the statement)
 > so the end-of-day denomination count already reflects those payments.
 > The available-to-lodge calculation only subtracts the float.
 
-## User Interface Layout
+## The count
 
-The page is designed for employees doing the end-of-day count. It has three columns:
-
-### Navigation Bar
-- **Prev/Next arrows** -- Jump to previous/next actual closed cash date for that till (skips days the till wasn't closed)
-- **Till selector** -- Auto-submits on change. Only shows tills with activity in the last 6 months (cached 5 min). New tills appear automatically once they have a CLOSEDCASH record
-- **Date picker** -- Manual date entry with Go button
-- **Current date display** -- Full day name, date, and till name centred below
-
-### Column 1: Cash Count
-- **Notes section**: EUR50, EUR20, EUR10, EUR5 -- input count, shows euro total beside each
-- **Coins section**: EUR2, EUR1, 50c, 20c, 10c -- same pattern
-- **Subtotals**: Notes subtotal, Coins subtotal, Total Cash
-
-### Column 2: Float, Card & Extras
-- **Always visible**:
-  - Note Float (manual entry, required daily)
-  - Coin Float (auto-populated from coin total since all coins usually stay in till; user can override by typing; double-click to reset to auto)
-  - Card inc cashback (required daily)
-- **Collapsed "Cashback, Cheques, Debt & Other"** -- auto-opens if any field has data:
-  - Cashback, Cheque, Money Added, Free, Voucher Used
-  - Debt, Debt Paid Cash, Debt Paid Cheque, Debt Paid Card
-- **Collapsed "Supplier Payments"** -- starts with 1 row, "Add another" button for more. Shows total on header when > 0
-- **Collapsed "Notes"** -- blue dot indicator when a note exists
-
-### Column 3: Summary (sticky on desktop)
-- Total Cash Counted
-- Previous Float (-EUR)
-- Cashback (+EUR, shown only when > 0)
-- Supplier Payments (+EUR, shown only when > 0)
-- Money Added (-EUR, shown only when > 0)
-- **Day's Cash Taking** (bold subtotal)
-- POS Cash Total
-- **Cash Variance** (coloured: green/red)
-- Card Entered (card minus cashback)
-- POS Card
-- **Card Variance** (coloured: green/red)
-- Cash + Card total
-- Total Sales (POS)
-- **Total Variance** (the bottom-line number, large and coloured)
-- **Save button** (full-width)
-
-### Role-Based UI
-- **Lodgements button** in header: only visible to admin/manager roles
-- The page itself is accessible to employees with `cash_reconciliation.view` permission
-
-## Calculations
-
-### Day's Cash Taking (matches legacy formula)
-```
-Day's Cash Taking = Total Cash + Cashback + Supplier Payments - Previous Float - Money Added
-```
-
-Supplier payments are added because cash was taken out of the till to pay suppliers -- the actual day's takings were higher than what remains in the till.
-
-### Cash Variance
-```
-Cash Variance = Day's Cash Taking - POS Cash Total
-```
-
-### Card Variance
-```
-Card Variance = (Card Entered - Cashback) - POS Card Total
-```
-
-Useful for spotting when a card payment was accidentally entered as cash in the POS, or vice versa.
-
-### Total Variance
-```
-Total Variance = Cash Variance + Card Variance
-```
-
-### Coin Float Auto-Calculation
-Coins are usually not removed from the till. The coin float field auto-populates with the total of all coins counted (EUR2 + EUR1 + 50c + 20c + 10c). If the user manually edits the field, auto mode is disabled. Double-clicking the field resets to auto.
-
-## Previous Float Logic
-
-The previous day's float is fetched via AJAX on page load. It checks:
-1. **Laravel `cash_reconciliations` table** first (most recent record before the selected date for the same till)
-2. **Falls back to POS legacy data** (`CLOSEDCASH JOIN money`) if no Laravel record exists
-
-This ensures correct float values even when records haven't been imported to Laravel yet.
-
-## POS Summary Cards
-
-Three cards at the top show read-only POS figures:
-- **POS Cash** -- total cash payments from POS
-- **POS Card** -- total card payments from POS (magcard)
-- **Total Sales** -- combined
+The count itself (screens, who-is-counting, arithmetic, data columns, tills) is
+documented in [Cash Reconciliation (Till Count)](./cash-reconciliation.md). Since
+2026-11-07 it is one form rendered on the Shop tablet (`/shop/till-count`) and in the
+office (`/cash-reconciliation`), with the figures computed by
+`App\Services\Cash\TillCountService`.
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| `resources/views/management/cash-reconciliation/index.blade.php` | Main view (Blade + Alpine.js) |
-| `app/Http/Controllers/Management/CashReconciliationController.php` | Controller (index, store, getPreviousFloat, export) |
-| `app/Repositories/CashReconciliationRepository.php` | Business logic (POS queries, float lookup, save, import) |
-| `app/Models/CashReconciliation.php` | Model with calculation methods |
-| `app/Models/CashReconciliationPayment.php` | Supplier payment records |
-| `app/Models/CashReconciliationNote.php` | Daily notes |
-
-## Till Management
-
-- Tills are sourced from `CLOSEDCASH.HOST` in the POS database
-- Only tills with activity in the last 6 months are shown (cached for 5 minutes)
-- New tills appear automatically -- no manual configuration needed
-- Navigation arrows skip to the next/previous actual closed date for the selected till
-- Active tills as of Sept 2025: **OrgStore**, **Till 2**
+| `resources/views/shop/partials/till-count.blade.php` | The count form (Shop and office) |
+| `resources/views/shop/till-count.blade.php` | Shop screen |
+| `resources/views/management/cash-reconciliation/index.blade.php` | Office page: the form, history, legacy re-import, export |
+| `resources/js/shop/till-count.js` | Alpine component (`shopTillCount`) |
+| `app/Services/Cash/TillCountService.php` | POS totals, previous float, save, variance, legacy import |
+| `app/Services/Cash/TillCountPage.php`, `CountIdentity.php` | Page data; the "counting as" session token |
+| `app/Services/Shop/IdentityVerifier.php` | PIN / password check without signing in |
+| `app/Http/Controllers/Cash/TillCountController.php` | identify / forget / store endpoints |
+| `app/Repositories/CashReconciliationRepository.php` | Compatibility facade (till picker, legacy import, export) |
+| `app/Models/Till.php`, `CashReconciliation.php`, `CashReconciliationPayment.php`, `CashReconciliationNote.php` | Models |
 
 ## Legacy Migration
 
@@ -164,32 +77,31 @@ The legacy system stored **total values** in the money table (e.g., `cash50 = 40
 ### Import Commands
 
 ```bash
-# Delete existing Laravel records and reimport fresh
-php artisan tinker --execute="
-    \App\Models\CashReconciliationNote::query()->delete();
-    \App\Models\CashReconciliationPayment::query()->delete();
-    \App\Models\CashReconciliation::query()->delete();
-"
-
-# Import historical reconciliation data
-php artisan cash:import-legacy-reconciliations --from=2024-01-01 --to=2025-12-31
+# Backfill the old system's counts (skips rows that already exist; oldest first)
+php artisan cash:import-legacy-reconciliations --from=2024-01-01 --to=2025-12-31 --dry-run
 
 # Import historical lodgement data
 php artisan cash:import-legacy-lodgements --from=2024-01-01 --to=2025-12-31
 
 # Auto-match lodgements to reconciliations
 php artisan cash:auto-match-money-ids
+
+# Re-resolve previous floats and recompute every stored variance (once, after 2026-11-07)
+php artisan cash:recalculate-variances --dry-run
 ```
 
-Records also re-import automatically on first visit to `/cash-reconciliation` for any date -- the `getOrCreateReconciliation` method pulls fresh from legacy if no Laravel record exists.
+Do not delete and re-import reconciliations: `cash_bag_verifications` and
+`cash_lodgement_matches` cascade on delete. Visiting a page no longer creates rows;
+the lodgements page imports the old system's count for a recent close that has none,
+and otherwise lists the close as needing a count.
 
 ## Bag Verification & Lodgement Workflow
 
 ### The Process
 1. **Employee** closes the till daily, stores cash (minus float) in a sealed bag — one bag per till per day
 2. **Manager** visits `/management/cash-lodgements` every few days
-3. **Auto-creation**: On page load, the system auto-creates `CashReconciliation` records for any POS till closes that don't have one yet, importing legacy denomination data from the POS `money` table. This ensures all recent days appear without needing to visit the cash-reconciliation page first.
-4. **Needs Cash Reconciliation** section shows days where the till was closed but no denomination data exists (no legacy money record and no manual count). Each row links to the cash-reconciliation page for that date.
+3. **Legacy import**: On page load, any till close in the last 60 days without a reconciliation is imported from the old system's `money` table if it has a row there; nothing is created otherwise.
+4. **Needs Cash Count** section shows closes with no counted reconciliation. Each row links to the office count page for that date and till.
 5. **Pending Bags** section shows reconciliations with cash available (denominations counted) but no bag verification yet. Each row includes a **"View Recon"** link (opens in new tab) to help investigate discrepancies.
 6. Manager clicks **"Count Bag"** — an inline denomination counting form expands. Empty fields are treated as 0.
 7. Manager counts notes and coins, system calculates total and compares against expected (available-to-lodge from reconciliation)

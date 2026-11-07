@@ -756,4 +756,41 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
    before the meta text. */
 .shop .shop-row__meta--icon { display: inline-flex; align-items: center; gap: 4px; }
 .shop .shop-row__meta--icon > .shop-ico { width: 16px; height: 16px; color: var(--shop-ink-3); }
+/* Till count (end-of-day cash). One form, shown in the Shop shell and embedded
+   in the office page inside .shop.shop--embed. */
+.shop .shop-count { display: flex; flex-direction: column; overflow: hidden; background: var(--shop-surface); border-radius: var(--shop-radius-lg); box-shadow: var(--shop-shadow-sm); }
+.shop .shop-count__row { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) 6.5rem; align-items: center; gap: var(--shop-space-3); min-height: 68px; padding: 6px var(--shop-space-4); }
+.shop .shop-count__row + .shop-count__row { border-top: 1px solid var(--shop-line); }
+.shop .shop-count__row.is-set { background: var(--shop-accent-tint); }
+.shop .shop-count__face { font-size: var(--shop-fs-md); font-weight: var(--shop-fw-heavy); font-variant-numeric: tabular-nums; }
+.shop .shop-count__face small { display: block; font-size: var(--shop-fs-xs); font-weight: var(--shop-fw-medium); color: var(--shop-ink-2); }
+.shop .shop-count__qty { display: grid; grid-template-columns: var(--shop-tap) minmax(0, 1fr) var(--shop-tap); align-items: center; gap: 6px; }
+.shop .shop-count__value { display: grid; place-items: center; min-height: var(--shop-tap); border-radius: var(--shop-radius-pill); border: 2px solid var(--shop-line-strong); background: var(--shop-surface); font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); font-variant-numeric: tabular-nums; cursor: pointer; }
+.shop .shop-count__value:hover { border-color: var(--shop-ink-3); }
+.shop .shop-count__value:disabled { cursor: not-allowed; opacity: 0.6; }
+.shop .shop-count__sub { text-align: right; font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); color: var(--shop-ink-2); font-variant-numeric: tabular-nums; }
+.shop .shop-count__row.is-set .shop-count__sub { color: var(--shop-ink); }
+/* A tappable money field: label on the left, the amount as a pill button. */
+.shop .shop-amount { display: flex; align-items: center; justify-content: space-between; gap: var(--shop-space-3); min-height: var(--shop-tap-lg); padding: 0 var(--shop-space-4); border-radius: var(--shop-radius-md); background: var(--shop-surface-2); }
+.shop .shop-amount__label { display: flex; flex-direction: column; gap: 2px; font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); color: var(--shop-ink-2); }
+.shop .shop-amount__label small { font-weight: var(--shop-fw-medium); }
+.shop .shop-amount__value { min-width: 8ch; padding: 0 18px; min-height: var(--shop-tap); border-radius: var(--shop-radius-pill); border: 2px solid var(--shop-line-strong); background: var(--shop-surface); font-size: var(--shop-fs-lg); font-weight: var(--shop-fw-heavy); font-variant-numeric: tabular-nums; text-align: right; }
+.shop .shop-amount__value:hover { border-color: var(--shop-ink-3); }
+.shop .shop-amount__value:disabled { cursor: not-allowed; opacity: 0.6; }
+.shop .shop-amount--static .shop-amount__value { border-color: transparent; background: transparent; }
+/* The breakdown under the totals: label left, amount right. */
+.shop .shop-ledger { display: flex; flex-direction: column; gap: 6px; font-size: var(--shop-fs-sm); color: var(--shop-ink-2); font-variant-numeric: tabular-nums; }
+.shop .shop-ledger__line { display: flex; justify-content: space-between; gap: var(--shop-space-3); }
+.shop .shop-ledger__line.is-total { padding-top: 6px; border-top: 1px solid var(--shop-line); color: var(--shop-ink); font-weight: var(--shop-fw-heavy); }
+/* Who is counting: the chosen person. */
+.shop .shop-person.is-chosen { background: var(--shop-accent-tint); border-color: var(--shop-accent); }
+.shop .shop-person__role { font-size: var(--shop-fs-xs); font-weight: var(--shop-fw-medium); color: var(--shop-ink-2); }
+.shop .shop-count-sheet .shop-numpad { max-width: 420px; margin-inline: auto; width: 100%; }
+.shop .shop-count-sheet .shop-numpad__display span:last-child { font-size: var(--shop-fs-2xl); font-weight: var(--shop-fw-heavy); font-variant-numeric: tabular-nums; }
+.shop .shop-count-sheet .shop-sheet { max-width: 560px; margin-inline: auto; }
+/* The sticky action bar's summary text. */
+.shop .shop-actions__summary { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; justify-content: center; font-size: var(--shop-fs-sm); font-weight: var(--shop-fw-bold); color: var(--shop-ink-2); font-variant-numeric: tabular-nums; }
+.shop .shop-actions__summary strong { font-size: var(--shop-fs-md); color: var(--shop-ink); }
+.shop .shop-actions > .shop-btn.shop-btn--fit { flex: 0 0 auto; }
+@media (min-width: 900px) { .shop .shop-count-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--shop-space-4); align-items: start; } }
 /* === APP ADDITIONS END === */

@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Shop\IdentityVerifier;
 use App\Services\Shop\ShopDeviceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\View\View;
 
 /**
@@ -24,7 +24,10 @@ use Illuminate\View\View;
  */
 class SwitchUserController extends Controller
 {
-    public function __construct(private readonly ShopDeviceService $devices) {}
+    public function __construct(
+        private readonly ShopDeviceService $devices,
+        private readonly IdentityVerifier $identity,
+    ) {}
 
     /**
      * The people grid — "Who is working?".
@@ -82,28 +85,17 @@ class SwitchUserController extends Controller
     {
         $this->abortUnlessPinnable($request, $user);
 
-        $key = $this->limiterKey($user);
-        $attempts = (int) config('shop.pin_attempts', 5);
-        $minutes = (int) config('shop.pin_lockout_minutes', 15);
-
-        if (RateLimiter::tooManyAttempts($key, $attempts)) {
-            $this->devices->log($this->devices->current($request), $user, 'switch_blocked', $request);
-
-            return back()->with('pinError', "Too many tries — wait {$minutes} minutes.");
-        }
-
         $request->validate(['pin' => ['required', 'digits_between:4,6']]);
 
-        $device = $this->devices->current($request);
+        // The check, the per-user rate limit and the log line are shared with the
+        // till count's "who is counting?" step (IdentityVerifier).
+        $result = $this->identity->verifyPin($user, $request->input('pin'), $request, 'switch');
 
-        if (! $user->checkPin($request->input('pin'))) {
-            RateLimiter::hit($key, $minutes * 60);
-            $this->devices->log($device, $user, 'switch_failed', $request);
-
-            return back()->with('pinError', 'Wrong PIN, try again.');
+        if (! $result['ok']) {
+            return back()->with('pinError', $result['error']);
         }
 
-        RateLimiter::clear($key);
+        $device = $this->devices->current($request);
 
         // A new session for a new person: nothing of the previous shift's
         // flashes, intended URLs or CSRF token carries over.
@@ -166,22 +158,6 @@ class SwitchUserController extends Controller
     {
         abort_unless($this->devices->current($request), 404);
         abort_unless($user->canUsePin() && $user->hasPin(), 404);
-    }
-
-    /**
-     * Keyed per user, not per device: one person fumbling must not lock the
-     * tablet for everybody else on the shift.
-     *
-     * The limiting is done here rather than with `throttle:pin` on the route
-     * because the named-limiter middleware stores its counter under
-     * md5($limiterName.$key), which no public API can clear — so a correct PIN
-     * could never reset it, and a legitimate run of sign-ins would lock the
-     * person out. The limiter registered in AppServiceProvider stays as the
-     * single source of the numbers.
-     */
-    private function limiterKey(User $user): string
-    {
-        return 'pin:'.$user->id;
     }
 
     /**

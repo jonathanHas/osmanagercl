@@ -122,6 +122,12 @@ Route::middleware('auth')->group(function () {
             ->middleware('permission:vouchers.redeem')
             ->name('vouchers');
 
+        // End-of-day till count (cash reconciliation). The JSON endpoints it calls
+        // are the till-count.* routes further down.
+        Route::get('/till-count', [\App\Http\Controllers\Shop\TillCountController::class, 'index'])
+            ->middleware('permission:cash_reconciliation.create')
+            ->name('till-count');
+
         Route::middleware('permission:fruit_veg.operate')->group(function () {
             Route::get('/fv/waste', [\App\Http\Controllers\Shop\FruitVegController::class, 'waste'])->name('fv.waste');
             Route::get('/fv/harvest', [\App\Http\Controllers\Shop\FruitVegController::class, 'harvest'])->name('fv.harvest');
@@ -1004,20 +1010,23 @@ Route::middleware('auth')->group(function () {
         Route::get('/export', [\App\Http\Controllers\TillReviewController::class, 'export'])->name('export');
     });
 
-    // Cash Reconciliation routes
+    // Cash Reconciliation (till count rewrite, 2026-11-07): the office page, the
+    // legacy re-import for pre-cut-over days, and the CSV export.
     Route::prefix('cash-reconciliation')->name('cash-reconciliation.')->middleware('permission:cash_reconciliation.view')->group(function () {
         Route::get('/', [\App\Http\Controllers\Management\CashReconciliationController::class, 'index'])->name('index');
-        Route::post('/store', [\App\Http\Controllers\Management\CashReconciliationController::class, 'store'])
-            ->middleware('permission:cash_reconciliation.create')
-            ->name('store');
         Route::post('/sync', [\App\Http\Controllers\Management\CashReconciliationController::class, 'sync'])
-            ->middleware('permission:cash_reconciliation.create')
+            ->middleware('role:admin,manager')
             ->name('sync');
-        Route::get('/previous-float', [\App\Http\Controllers\Management\CashReconciliationController::class, 'getPreviousFloat'])->name('previous-float');
-        Route::get('/reconciliation', [\App\Http\Controllers\Management\CashReconciliationController::class, 'getReconciliation'])->name('get-reconciliation');
         Route::get('/export', [\App\Http\Controllers\Management\CashReconciliationController::class, 'export'])
             ->middleware('permission:cash_reconciliation.export')
             ->name('export');
+    });
+
+    // The till count's JSON endpoints, shared by the Shop screen and the office page.
+    Route::prefix('till-count')->name('till-count.')->middleware('permission:cash_reconciliation.create')->group(function () {
+        Route::post('/identify', [\App\Http\Controllers\Cash\TillCountController::class, 'identify'])->name('identify');
+        Route::post('/forget', [\App\Http\Controllers\Cash\TillCountController::class, 'forget'])->name('forget');
+        Route::post('/store', [\App\Http\Controllers\Cash\TillCountController::class, 'store'])->name('store');
     });
 
     // Financial Management routes

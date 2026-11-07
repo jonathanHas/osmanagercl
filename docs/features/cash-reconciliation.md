@@ -1,221 +1,105 @@
-# Cash Reconciliation System
+# Cash Reconciliation (Till Count)
 
-## Overview
+The end-of-day till count. Whoever closes a till counts the drawer, says what stays
+in as float, and the rest goes in a sealed bag for the manager to verify and lodge
+(see [Cash Closed](./cash-closed.md) for the bag-to-bank side). Rewritten
+2026-11-07; the Laravel page before that only mirrored the old PHP system's figures.
 
-The Cash Reconciliation System provides comprehensive end-of-day cash management functionality, allowing managers to reconcile physical cash counts against POS system totals, track supplier payments, and maintain accurate float records.
+## Where it is
 
-## Features
+| Surface | Route | Who |
+|---|---|---|
+| Shop tablet | `/shop/till-count` (`shop.till-count`, Home tile **Till count**) | anyone with `cash_reconciliation.create` (employees, managers, admins) |
+| Office | `/cash-reconciliation` (`cash-reconciliation.index`) | `cash_reconciliation.view`; same form plus history, legacy re-import and CSV export |
 
-### Core Functionality
-- **Physical Cash Counting**: Count cash by denomination (€50 notes down to 10c coins)
-- **Float Management**: Track note and coin floats carried between days
-- **Variance Calculation**: Automatic comparison between counted cash and POS totals
-- **Supplier Payment Tracking**: Record cash payments made to suppliers from till
-- **Multi-Till Support**: Manage reconciliations across all terminals
-- **Legacy Data Import**: Seamlessly imports existing data from the legacy PHP system
+Both render the same Blade partial (`resources/views/shop/partials/till-count.blade.php`)
+driven by one Alpine module (`resources/js/shop/till-count.js`, registered as
+`shopTillCount`). The office page embeds it inside `<div class="shop shop--embed">` and
+pushes the Shop bundle into the admin layout's `@stack('head')`, which sits before the
+layout's own `@vite` so `shop.js` registers its Alpine data before `app.js` starts Alpine.
 
-### Additional Features
-- **Real-time Calculations**: Dynamic totals update as you enter counts
-- **Previous Float Carry-Over**: Automatically retrieves previous day's float
-- **Daily Notes**: Add comments and notes for each reconciliation
-- **Export to CSV**: Export reconciliation data for reporting
-- **Audit Trail**: Complete tracking of who created/modified reconciliations
-- **Historical View**: Quick access to recent reconciliation history
+## The flow
 
-## Technical Implementation
+1. **Till and close.** Chips show each till's state on the date: *Not counted*,
+   *Counted*, *Open* (close it on the POS first) or *No close*. The page opens on the
+   first till closed that day without a count. A till closed twice on one day lists
+   both closes; each close is its own count (`closed_cash_id` = `CLOSEDCASH.MONEY`).
+2. **Who is counting.** A people grid; the person taps their name and enters their PIN
+   (employees with a PIN, on a trusted device) or password (everyone else). This does
+   **not** sign anyone in or out: the identity is held in the session for
+   `till_count.identity_minutes` (30) or until the count is saved, and recorded as
+   `counted_by`. `created_by` stays the signed-in user (often the shared tablet).
+   `App\Services\Shop\IdentityVerifier` does the check with the same per-user rate
+   limit as switch-user; `App\Services\Cash\CountIdentity` holds the session token.
+3. **Count the drawer.** Nine denominations, a stepper and a numpad each.
+4. **Float.** Notes kept (defaults to last time), *Keep all the coins* on by default.
+   The float carried in comes from the previous counted close of the same till
+   (fallback: the old system's `money` row; failing that the counter types it).
+5. **Card terminal total**, compared with the till's card tenders.
+6. **Paid out / money added / note.** Supplier payments from the drawer (feed the P&L),
+   change brought in, a note. A note is required when |cash variance| ≥ €20
+   (`till_count.note_required_at`).
+7. **Save.** The server recomputes everything and answers with the bag amount and the
+   variance; the screen shows them with "seal the bag" and offers the other till.
 
-### Database Structure
+## The arithmetic (`App\Services\Cash\TillCountService`)
 
-#### Tables
-1. **cash_reconciliations** - Main reconciliation records
-   - Links to POS CLOSEDCASH via `closed_cash_id`
-   - Stores denomination counts (not totals)
-   - Tracks floats, variances, and metadata
-
-2. **cash_reconciliation_payments** - Supplier payment records
-   - Links to suppliers in POS database
-   - Supports multiple payments per reconciliation
-   - Ordered by sequence
-
-3. **cash_reconciliation_notes** - Daily notes/comments
-   - Text notes for each reconciliation
-   - Tracks who created each note
-
-### Models
-- `App\Models\CashReconciliation` - Main reconciliation model with calculation methods
-- `App\Models\CashReconciliationPayment` - Payment records
-- `App\Models\CashReconciliationNote` - Notes/comments
-
-### Repository Pattern
-- `App\Repositories\CashReconciliationRepository` - Business logic layer
-  - Handles legacy data import
-  - Calculates POS totals
-  - Manages float carry-over
-  - Provides export functionality
-
-### Controller
-- `App\Http\Controllers\Management\CashReconciliationController`
-  - REST endpoints for CRUD operations
-  - AJAX endpoints for dynamic data
-  - CSV export functionality
-
-## Legacy System Integration
-
-### Data Import from POS Database
-
-The system automatically imports existing reconciliation data from the legacy PHP system:
-
-#### Tables Imported
-1. **money** - Cash count data
-   - Stores TOTAL VALUES (not counts)
-   - System converts: €400 in cash50 → 8 × €50 notes
-   
-2. **payeePayments** - Supplier payments
-   - Imported with supplier relationships
-   - Maintains payment sequence
-
-3. **dayNotes** - Daily reconciliation notes
-   - Imported as-is into new system
-
-### Conversion Logic
-```php
-// Legacy stores totals, we store counts
-'cash_50' => $legacyMoney->cash50 ? intval($legacyMoney->cash50 / 50) : 0,
-'cash_20' => $legacyMoney->cash20 ? intval($legacyMoney->cash20 / 20) : 0,
-// ... etc
+```
+counted      = Σ count × face value
+bag          = counted − (note float + coin float)
+day's cash   = counted + supplier payments − previous float − money added (+ legacy cashback)
+expected     = POS cash (cash + cashrefund) + customer-invoice cash taken at this till
+cash variance = day's cash − expected
+card variance = terminal total − (POS card (magcard + magcardrefund) + customer-invoice card)
 ```
 
-## User Interface
+Tones: green under €5, amber under €20, red from €20 (`config/till_count.php`).
+Voucher (`paperin`), `free`, `debt`, `debtpaid` and any other tender are shown as
+information only: none of them is cash or card in the drawer.
 
-### Main Features
-- **Date/Till Selector**: Choose date and till to reconcile
-- **POS Summary Cards**: Display POS totals and variance
-- **Cash Counting Grid**: Organized by notes and coins
-- **Float Management Section**: Note and coin float entry
-- **Supplier Payments**: Up to 4 payment entries with supplier dropdown
-- **Notes Section**: Free-text area for daily notes
-- **Summary Panel**: Real-time calculations and variance display
+## Data
 
-### Visual Indicators
-- **Green**: Positive variance (over)
-- **Red**: Negative variance (short)
-- **Gray**: Neutral/no variance
+`cash_reconciliations` (one row per till close, unique `closed_cash_id`):
+
+- `till_id` → `tills.id` (**stable**; `App\Models\Till`, one row per POS `HOST`,
+  registered on first sight). Before 2026-11-07 it was a position in an alphabetical
+  list and drifted.
+- `counted_by`, `counted_at`: who counted and when. `counted_at IS NULL` means no
+  human count (scope `counted()`).
+- `source`: `app` or `legacy` (imported from the old system).
+- `previous_float`, `previous_reconciliation_id`: the float carried in, as used in
+  the stored variance.
+- The nine `cash_*` counts, `note_float`, `coin_float`, `card`, `money_added`,
+  `total_cash_counted`, `pos_cash_total`, `pos_card_total`, `variance`.
+- Legacy-only columns (`cash_back`, `cheque`, `debt*`, `free`, `voucher_used`) stay
+  for imported rows and are shown read-only.
+
+`cash_reconciliation_payments` rows are kept by id on re-save (their `created_at` is
+what the P&L sums by; imported ones are dated to the till close).
+`cash_reconciliation_notes`: one note per count, edited in place.
+
+## Legacy import and repair
+
+- `php artisan cash:import-legacy-reconciliations [--from --to --dry-run]`: backfill
+  the old system's `money` / `payeePayments` / `dayNotes` through the service, oldest
+  first. Existing rows are skipped.
+- **Import from old system** button (office, managers): re-import one close,
+  overwriting the row. For days before the cut-over only.
+- `php artisan cash:recalculate-variances [--from --till --dry-run]`: re-resolve every
+  counted row's previous float and recompute its variance with the one formula. Run
+  once after the 2026-11-07 migrations (on dev it changed 162 of 350 rows and brought
+  the median |variance| from €30.02 to €12.77).
+- The lodgements page imports the old system's count for any close in the last
+  `till_count.needs_count_days` (60) that has no row; it never creates empty rows.
 
 ## Permissions
 
-### Role-Based Access
-- **Admin**: Full access to all features
-- **Manager**: Full access to all features
-- **Employee**: No access (view-only for till receipts)
+`cash_reconciliation.view` and `.create` for admin, manager and employee (migration
+`2026_11_07_000003`); `.export` for admin and manager. The Shop endpoints
+(`till-count.identify`, `.forget`, `.store`) are on `config('shop.pin_session_routes')`.
 
-### Permission Keys
-- `cash_reconciliation.view` - View reconciliation interface
-- `cash_reconciliation.create` - Create/edit reconciliations
-- `cash_reconciliation.export` - Export to CSV
+## Tests
 
-## Calculations
-
-### Total Cash Formula
-```
-Total Cash = (€50 × count) + (€20 × count) + ... + (10c × count)
-```
-
-### Day's Cash Taking
-```
-Day's Cash = Total Counted + Cash Back - Previous Float - Money Added
-```
-
-### Variance
-```
-Variance = Day's Cash Taking - POS Cash Total
-```
-
-## Usage Workflow
-
-1. **Select Till and Date**: Choose the till and date to reconcile
-2. **System Loads Data**: 
-   - Imports any existing legacy data
-   - Calculates POS totals
-   - Retrieves previous float
-3. **Enter Cash Counts**: Input the number of each denomination
-4. **Record Payments**: Add any supplier payments made
-5. **Add Notes**: Optional daily notes
-6. **Save Reconciliation**: System calculates variance and stores data
-
-## API Endpoints
-
-### Main Routes
-- `GET /cash-reconciliation` - Main interface
-- `POST /cash-reconciliation/store` - Save reconciliation
-- `POST /cash-reconciliation/sync` - Force re-import of a day's legacy POS data (see [Sync from POS](./cash-reconciliation-pos-sync.md))
-- `GET /cash-reconciliation/previous-float` - Get previous day's float
-- `GET /cash-reconciliation/reconciliation` - Get reconciliation data via AJAX
-- `GET /cash-reconciliation/export` - Export to CSV
-
-## Troubleshooting
-
-### Common Issues
-
-#### "No closed cash record found"
-- **Cause**: Till was not closed on the selected date
-- **Solution**: Ensure till was properly closed in POS system
-
-#### High Variance
-- **Cause**: Incorrect float or missing payments
-- **Solution**: Check previous day's float and supplier payments
-
-#### Missing Legacy Data (POS totals show but cash counts are zero)
-- **Cause**: The page was opened before the old POS system wrote the day's `money` row, so the
-  reconciliation was auto-created with zero denomination counts and never re-pulled.
-- **Solution**: Use the **Sync from POS** button to force a re-import once the old system has the data.
-  See [Sync from POS](./cash-reconciliation-pos-sync.md).
-
-## Related Systems
-
-- [Sync from POS](./cash-reconciliation-pos-sync.md) - Force re-import of a day's legacy POS cash figures when the automatic import left them empty
-- [Cash Closed (End-of-Day Overview)](./cash-closed.md) - How reconciliation fits into the full cash-to-bank pipeline, legacy migration details
-- [Cash Lodgements](../features/cash-closed.md#key-integration-reconciliation--lodgements) - Bank deposit tracking with side-by-side reconciliation comparison
-- [Receipts / Till Review](../management/receipts.md) - View receipts and transactions
-- [POS Integration](./pos-integration.md) - Connection to uniCenta POS
-- [User Roles & Permissions](./user-roles-permissions.md) - Access control
-
-## Migration from Legacy System
-
-The system seamlessly migrates from the legacy PHP cash reconciliation:
-
-1. **Automatic Import**: First access imports existing data
-2. **Data Preservation**: Once imported, data stays in new system
-3. **Backward Compatible**: Reads from legacy tables if present
-4. **No Data Loss**: All counts, payments, and notes preserved
-
-### Legacy Table Mapping
-| Legacy Table | Legacy Column | New Table | New Column | Conversion |
-|-------------|---------------|-----------|------------|------------|
-| money | cash50 | cash_reconciliations | cash_50 | Total ÷ 50 |
-| money | cash20 | cash_reconciliations | cash_20 | Total ÷ 20 |
-| payeePayments | payeeID | cash_reconciliation_payments | supplier_id | Direct |
-| dayNotes | message | cash_reconciliation_notes | message | Direct |
-
-## Performance Considerations
-
-- **Caching**: Till list cached for 1 hour
-- **Lazy Loading**: Payments and notes loaded on demand
-- **Indexed Queries**: Date and till_id indexed for fast lookups
-- **Optimized Calculations**: Totals calculated in PHP, not database
-
-## Security
-
-- **Role-based Access**: Only managers and admins can access
-- **Audit Trail**: All actions logged with user and timestamp
-- **Data Validation**: Comprehensive input validation
-- **CSRF Protection**: All forms protected against CSRF attacks
-
-## Future Enhancements
-
-Potential improvements for future versions:
-- Dashboard widgets for variance trends
-- Email alerts for large variances
-- Mobile app for cash counting
-- Automated bank reconciliation
-- Multi-currency support
-- Barcode scanning for sealed cash bags
+`tests/Unit/Cash/TillCountServiceTest`, `tests/Feature/Cash/*`,
+`tests/Feature/Shop/ShopTillCountTest`, `tests/Feature/CashReconciliationTest`.
+The POS fixture is `tests/Concerns/BuildsPosTillFixture`.

@@ -93,52 +93,45 @@ class CashLodgementController extends Controller
             ->orderBy('total', 'desc')
             ->get();
 
-        // Build till name → till_id lookup for linking to cash-reconciliation page
-        $reconciliationRepo = app(\App\Repositories\CashReconciliationRepository::class);
-        $tillNameToId = $reconciliationRepo->getAvailableTills()->flip();
+        // Till name -> till_id (stable ids, see App\Models\Till) for links to the count page.
+        $tillCount = app(\App\Services\Cash\TillCountService::class);
+        $tillNameToId = $tillCount->tillOptions()->flip();
 
-        // Auto-create CashReconciliation records for POS till closes that don't have one yet
-        // This imports legacy denomination data so they appear in Pending Bags
-        $reconciledMoneyIds = CashReconciliation::pluck('closed_cash_id')->toArray();
+        // Till closes in the window with no reconciliation yet. For days before the
+        // cut-over to the new count the old system may still hold the count, so that
+        // is imported; otherwise the day is listed below as needing a count. Nothing
+        // is created when there is nothing to import: a visit no longer writes rows.
+        $windowDays = (int) config('till_count.needs_count_days', 60);
         $lodgedMoneyIds = CashLodgement::pluck('money_id')->toArray();
-        $excludedMoneyIds = array_unique(array_merge($reconciledMoneyIds, $lodgedMoneyIds));
-        $unreconciledClosedCash = ClosedCash::whereNotIn('MONEY', $excludedMoneyIds)
-            ->whereDate('DATEEND', '>=', now()->subDays(60))
+        $reconciledMoneyIds = CashReconciliation::pluck('closed_cash_id')->toArray();
+        $recentCloses = ClosedCash::whereNotNull('DATEEND')
+            ->whereDate('DATEEND', '>=', now()->subDays($windowDays))
             ->orderBy('DATEEND', 'desc')
             ->get();
 
-        // Create reconciliation records for unreconciled days (imports legacy money data)
-        foreach ($unreconciledClosedCash as $closedCash) {
+        foreach ($recentCloses->whereNotIn('MONEY', array_merge($reconciledMoneyIds, $lodgedMoneyIds)) as $closedCash) {
             try {
-                $tillId = $tillNameToId[$closedCash->HOST] ?? 1;
-                $reconciliationRepo->getOrCreateReconciliation(
-                    $closedCash->DATEEND->startOfDay(),
-                    $tillId,
-                    $closedCash->HOST
-                );
+                $tillCount->importFromLegacy($closedCash, $tillCount->tillByHost($closedCash->HOST));
             } catch (\Exception $e) {
-                // Skip if creation fails (e.g., missing POS data)
                 continue;
             }
         }
 
-        // Pending bags: reconciliations with cash available but no bag verification
-        $pendingBags = CashReconciliation::whereDoesntHave('bagVerification')
-            ->with(['payments'])
+        // Pending bags: counted reconciliations with cash available but no bag verification
+        $pendingBags = CashReconciliation::counted()
+            ->whereDoesntHave('bagVerification')
+            ->with(['payments', 'counter'])
             ->orderBy('date', 'desc')
             ->get()
             ->filter(fn ($r) => $r->calculateAvailableToLodge() > 0)
             ->take(40)
             ->values();
 
-        // Remaining unreconciled days: those where auto-creation didn't produce a lodgeable amount
-        // (e.g., no legacy money data, denominations still zero)
-        $allReconciledMoneyIds = CashReconciliation::pluck('closed_cash_id')->toArray();
-        $allExcludedMoneyIds = array_unique(array_merge($allReconciledMoneyIds, $lodgedMoneyIds));
-        $unreconciledDays = ClosedCash::whereNotIn('MONEY', $allExcludedMoneyIds)
-            ->whereDate('DATEEND', '>=', now()->subDays(60))
-            ->orderBy('DATEEND', 'desc')
-            ->get();
+        // Days needing a count: a close with no counted reconciliation and no lodgement
+        $countedMoneyIds = CashReconciliation::counted()->pluck('closed_cash_id')->toArray();
+        $unreconciledDays = $recentCloses
+            ->whereNotIn('MONEY', array_merge($countedMoneyIds, $lodgedMoneyIds))
+            ->values();
 
         // Verified bags: bag verifications not yet included in a lodgement
         $verifiedBags = CashBagVerification::whereNull('cash_lodgement_id')

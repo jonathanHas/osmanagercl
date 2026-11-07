@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Shop;
 
 use App\Http\Controllers\Controller;
+use App\Services\Cash\TillCountService;
 use App\Services\CustomerRequestService;
 use App\Services\LabelQueueService;
 use Illuminate\Http\Request;
@@ -51,6 +52,7 @@ class ShopHomeController extends Controller
             'requests' => app(CustomerRequestService::class)->dashboardCounts()['due'],
             'deliveries' => $this->openDeliveryCount(),
             'labels' => $this->labelQueueCount(),
+            'till-count' => $this->uncountedTillCount(),
             default => null,
         };
     }
@@ -64,6 +66,21 @@ class ShopHomeController extends Controller
     {
         try {
             return app(LabelQueueService::class)->countsByEventType()['total'] ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Tills that closed today and have not been counted. Guarded like the others:
+     * the POS may be down, and Home must still render.
+     */
+    private function uncountedTillCount(): ?int
+    {
+        try {
+            $statuses = app(TillCountService::class)->tillStatuses(now());
+
+            return collect($statuses)->filter(fn ($s) => $s['session_id'] && ! $s['counted'])->count() ?: null;
         } catch (\Throwable $e) {
             return null;
         }

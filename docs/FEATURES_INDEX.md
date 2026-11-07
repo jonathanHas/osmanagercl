@@ -902,24 +902,20 @@ Comprehensive POS vs Bank reconciliation system for accurate financial tracking 
 
 📖 [Bank Statement Analysis Documentation](./features/bank-statement-analysis.md)
 
-### Cash Reconciliation System
-Comprehensive end-of-day cash management with physical counting and variance tracking.
-- **Physical Cash Counting**: Count by denomination (€50 to 10c) with real-time totals
-- **Legacy Data Import**: Seamlessly imports from PHP system (converts totals to counts)
-- **Variance Tracking**: Automatic calculation against POS with visual indicators
-- **Supplier Payments**: Track cash payments made from till (already deducted before cash count)
-- **Float Management**: Automatic carry-over between days
-- **Multi-Till Support**: Manage all terminals from one interface
-- **Export to CSV**: Generate reconciliation reports
-- **Audit Trail**: Complete tracking with user timestamps
-- **Bag Verification & Lodgement**: Count bags, verify against expected, create bank lodgements
-- **Auto-Reconciliation**: Auto-creates records for POS till closes with legacy data on lodgement page load
-- **Unreconciled Days**: Shows days needing cash reconciliation with direct links
-- **Till Close Date**: Lodgements table shows POS till close date alongside lodgement date
-- **Sync from POS**: Manual button to force re-import of a day's legacy cash figures when the auto-import left them empty
+### Cash Reconciliation (Till Count)
+End-of-day till count, rewritten 2026-11-07: one form on the Shop tablet (`/shop/till-count`) and in the office (`/cash-reconciliation`).
+- **Who is counting**: PIN (trusted device) or password identifies the counter without changing who is signed in
+- **Count the drawer**: nine denominations with steppers and a numpad, float kept, bag to lodge
+- **Expected from the till**: cash and card tenders per till close (refunds netted), customer-invoice till payments added, vouchers/free/debt shown as information
+- **Variance**: one formula in `TillCountService`, previous float from the previous counted close of the same till, stored with the row; note required over €20
+- **Stable tills**: `tills` table replaces the positional till number
+- **Supplier payments and money added**: kept by id on re-save; feed the P&L
+- **Legacy**: one-off import of the old system's counts, per-close re-import for pre-cut-over days, `cash:recalculate-variances` repair
+- **Bag Verification & Lodgement**: count bags, verify against expected, create bank lodgements (lodgements page lists closes needing a count)
+- **Export to CSV**
 
 📖 [Cash Reconciliation Documentation](./features/cash-reconciliation.md)
-📖 [Sync from POS Documentation](./features/cash-reconciliation-pos-sync.md)
+📖 [Cash Closed (bags and lodgements)](./features/cash-closed.md)
 
 ---
 

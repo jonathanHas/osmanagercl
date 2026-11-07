@@ -287,6 +287,26 @@ class RolesAndPermissionsSeeder extends Seeder
                 'module' => 'Financial Management',
             ],
 
+            // Till count (also created by 2026_11_07_000003_grant_cash_reconciliation_to_employees)
+            [
+                'name' => 'cash_reconciliation.view',
+                'display_name' => 'View Cash Reconciliation',
+                'description' => 'View the end-of-day till count',
+                'module' => 'Cash Management',
+            ],
+            [
+                'name' => 'cash_reconciliation.create',
+                'display_name' => 'Create Cash Reconciliation',
+                'description' => 'Count the till at the end of the day',
+                'module' => 'Cash Management',
+            ],
+            [
+                'name' => 'cash_reconciliation.export',
+                'display_name' => 'Export Cash Reconciliation',
+                'description' => 'Export till counts to CSV',
+                'module' => 'Cash Management',
+            ],
+
             // Shop mode route gating (see 2026_09_23_150000_add_shop_mode_permissions)
             [
                 'name' => 'stocking.scan',
@@ -356,6 +376,10 @@ class RolesAndPermissionsSeeder extends Seeder
             // Employees hold this on the live database (granted by the cash
             // reconciliation migration); a fresh install needs it here too.
             'till_review.view',
+            // The end-of-day till count is done by whoever closes the till
+            // (migration 2026_11_07_000003).
+            'cash_reconciliation.view',
+            'cash_reconciliation.create',
         ];
 
         foreach ($employeePermissions as $permission) {
@@ -377,6 +401,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'customer-invoices.manage',
             'vouchers.manage',
             'products.create',
+            'cash_reconciliation.export',
             'orders.manage',
             'invoices.manage',
             'kitchen.manage',

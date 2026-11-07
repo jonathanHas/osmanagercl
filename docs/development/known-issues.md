@@ -1276,6 +1276,23 @@ php artisan tinker --execute="echo config('mail.default');"
 
 ---
 
+## Cash Reconciliation (before the 2026-11-07 rewrite)
+
+### Till numbers drifted and variances were frozen against the wrong previous float
+
+**Symptoms**: reconciliations carrying `till_id = 6` for both tills; stored variances
+disagreeing with the documented formula on about half the rows (median |variance| €30
+stored vs €13 recomputed); rows of zero denominations created just by opening a page.
+
+**Cause**: `till_id` was the position of the POS host in an alphabetical list of the
+hosts seen in the last six months; the variance was computed once at creation against
+whichever "previous" row existed at that moment; GET requests created rows.
+
+**Fix**: the `tills` table (migration `2026_11_07_000001`) gives hosts stable ids and
+rewrites `till_id` by name; `previous_float` is stored on the row and
+`php artisan cash:recalculate-variances` repairs history; rows are created only by a
+save or a legacy import. See [Cash Reconciliation](../features/cash-reconciliation.md).
+
 ## Additional Resources
 
 For comprehensive troubleshooting procedures, see:

@@ -45,6 +45,11 @@ class CashReconciliation extends Model
         'variance',
         'created_by',
         'updated_by',
+        'counted_by',
+        'counted_at',
+        'source',
+        'previous_float',
+        'previous_reconciliation_id',
     ];
 
     protected $casts = [
@@ -74,6 +79,8 @@ class CashReconciliation extends Model
         'pos_cash_total' => 'decimal:2',
         'pos_card_total' => 'decimal:2',
         'variance' => 'decimal:2',
+        'counted_at' => 'datetime',
+        'previous_float' => 'decimal:2',
     ];
 
     /**
@@ -145,6 +152,33 @@ class CashReconciliation extends Model
     public function latestNote(): HasOne
     {
         return $this->hasOne(CashReconciliationNote::class)->latestOfMany();
+    }
+
+    /**
+     * The till this count belongs to (stable id, see App\Models\Till).
+     */
+    public function till(): BelongsTo
+    {
+        return $this->belongsTo(Till::class, 'till_id');
+    }
+
+    /**
+     * The person who did the count (identified by PIN or password), as opposed
+     * to created_by, which is whoever was signed in on the device.
+     */
+    public function counter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'counted_by');
+    }
+
+    /**
+     * Rows a person has actually counted. A row without counted_at only carries
+     * POS totals (or was auto-created by the old page) and must not be treated as
+     * a count of nothing.
+     */
+    public function scopeCounted($query)
+    {
+        return $query->whereNotNull('counted_at');
     }
 
     /**

@@ -22,6 +22,7 @@ import requestForm from './shop/requests';
 import requestsBoard from './shop/requests-board';
 import scanInput from './shop/scan-input';
 import stockScan from './shop/stock-scan';
+import tillCount from './shop/till-count';
 import vouchers from './shop/vouchers';
 import zebra from './shop/zebra';
 
@@ -35,6 +36,7 @@ if (shopRoot?.dataset.idleLockSeconds) {
 document.addEventListener('alpine:init', () => {
     Alpine.data('shopScanInput', scanInput);
     Alpine.data('shopStockScan', stockScan);
+    Alpine.data('shopTillCount', tillCount);
     Alpine.data('shopFindProduct', findProduct);
     Alpine.data('shopDeliveryScan', deliveryScan);
     Alpine.data('shopDeliverySummary', deliverySummary);
