@@ -1387,6 +1387,10 @@ class DeliveryLegacyController extends Controller
             ]);
         }
 
+        // A customer waiting for this product can now be told it is in (or,
+        // corrected back to nothing, that it is not).
+        $this->customerRequests->recordArrival($barcode, $quantity, $delID);
+
         $response = [
             'success' => true,
             'quantity' => $quantity,
@@ -1498,6 +1502,10 @@ class DeliveryLegacyController extends Controller
                 'barcode' => $resolvedBarcode,
                 'quantity' => $newQuantity,
             ]);
+
+            // Stamp the open request lines for this product so the requests
+            // board shows it has arrived (requests cycle 3).
+            $this->customerRequests->recordArrival((string) $resolvedBarcode, $newQuantity, $delID);
         }
 
         // Check expected quantity from invoice

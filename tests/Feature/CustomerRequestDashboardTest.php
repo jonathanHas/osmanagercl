@@ -76,12 +76,28 @@ class CustomerRequestDashboardTest extends TestCase
         $closed = CustomerRequest::factory()->create(['wanted_on' => today()->subDay(), 'closed_at' => now()]);
         CustomerRequestItem::factory()->for($closed, 'request')->status('collected')->create();
 
+        $arrived = CustomerRequest::factory()->create(['wanted_on' => today()->addWeek()]);
+        CustomerRequestItem::factory()->for($arrived, 'request')->status('ordered')->create(['arrived_at' => now(), 'arrived_quantity' => 2]);
+
         $response = $this->actingAs($this->admin())->get(route('dashboard'));
 
         $response->assertOk();
         $response->assertSee('Customer Requests Need Attention');
         $response->assertSee('2 requests are due today or overdue');
         $response->assertSee('2 items are put aside awaiting collection');
+        $response->assertSee('1 item has arrived and is not yet put aside');
         $response->assertSee(route('customer-requests.index'));
+    }
+
+    public function test_an_arrival_alone_shows_the_banner(): void
+    {
+        $arrived = CustomerRequest::factory()->create(['wanted_on' => today()->addWeek()]);
+        CustomerRequestItem::factory()->for($arrived, 'request')->status('ordered')->create(['arrived_at' => now(), 'arrived_quantity' => 2]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Customer Requests Need Attention')
+            ->assertSee('1 item has arrived and is not yet put aside');
     }
 }

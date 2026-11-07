@@ -158,7 +158,8 @@
             <!-- Customer Requests Alert (due today / overdue, or put aside awaiting collection) -->
             @php($crDue = $customerRequestCounts['due'] ?? 0)
             @php($crPutAside = $customerRequestCounts['put_aside'] ?? 0)
-            @if($crDue + $crPutAside > 0)
+            @php($crArrived = $customerRequestCounts['arrived'] ?? 0)
+            @if($crDue + $crPutAside + $crArrived > 0)
             <div class="mb-8">
                 <div class="bg-gradient-to-r from-indigo-500 to-purple-600 overflow-hidden shadow rounded-lg">
                     <div class="p-6">
@@ -189,7 +190,10 @@
                         <div class="text-sm">
                             <p class="text-indigo-100">
                                 {{ $crDue }} {{ $crDue == 1 ? 'request is' : 'requests are' }} due today or overdue &middot;
-                                {{ $crPutAside }} {{ $crPutAside == 1 ? 'item is' : 'items are' }} put aside awaiting collection.
+                                {{ $crPutAside }} {{ $crPutAside == 1 ? 'item is' : 'items are' }} put aside awaiting collection
+                                @if($crArrived > 0)
+                                    &middot; {{ $crArrived }} {{ $crArrived == 1 ? 'item has' : 'items have' }} arrived and {{ $crArrived == 1 ? 'is' : 'are' }} not yet put aside
+                                @endif.
                             </p>
                         </div>
                     </div>

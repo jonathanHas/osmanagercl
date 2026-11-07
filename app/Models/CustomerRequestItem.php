@@ -115,6 +115,9 @@ class CustomerRequestItem extends Model
         'case_units',
         'notes',
         'hold_for_collection',
+        'arrived_at',
+        'arrived_quantity',
+        'arrived_session_id',
         'position',
         'status',
         'status_changed_at',
@@ -127,6 +130,8 @@ class CustomerRequestItem extends Model
             'quantity' => 'decimal:2',
             'case_units' => 'integer',
             'hold_for_collection' => 'boolean',
+            'arrived_at' => 'datetime',
+            'arrived_quantity' => 'decimal:3',
             'position' => 'integer',
             'status_changed_at' => 'datetime',
         ];
@@ -249,6 +254,28 @@ class CustomerRequestItem extends Model
             self::STATUS_ORDERED => 'Ordered',
             self::STATUS_DONE => 'Done',
         ];
+    }
+
+    /**
+     * Has Receiving scanned this product since the line was taken, while the
+     * line is still waiting for it? The stamp stays on the line as history once
+     * it is put aside or done, but only an awaiting line reads as "arrived".
+     */
+    public function hasArrived(): bool
+    {
+        return $this->arrived_at !== null && in_array($this->status, self::AWAITING_ARRIVAL, true);
+    }
+
+    /** "Arrived Tue 5 Nov · 6 scanned" (the count only when known). */
+    public function arrivalLabel(): string
+    {
+        $label = 'Arrived '.$this->arrived_at->format('D j M');
+
+        if ($this->arrived_quantity !== null && (float) $this->arrived_quantity > 0) {
+            $label .= ' · '.self::formatQuantity($this->arrived_quantity).' scanned';
+        }
+
+        return $label;
     }
 
     /** Short wording for the choice made when the request was taken. */

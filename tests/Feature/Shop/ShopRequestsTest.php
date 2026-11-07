@@ -820,4 +820,55 @@ class ShopRequestsTest extends TestCase
         $response->assertSee(':name="`items[${idx}][hold_for_collection]`"', false);
         $response->assertSee('x-model="item.hold_for_collection"', false);
     }
+
+    public function test_an_arrived_line_is_flagged_sorted_first_and_put_aside_in_one_tap(): void
+    {
+        $later = CustomerRequest::factory()->create(['customer_name' => 'Waiting Wendy', 'wanted_on' => today()->addDays(2)]);
+        CustomerRequestItem::factory()->for($later, 'request')->create(['description' => 'Still coming']);
+
+        $request = CustomerRequest::factory()->create(['customer_name' => 'Arrived Annie', 'wanted_on' => today()->addDays(5)]);
+        $item = CustomerRequestItem::factory()->for($request, 'request')->create([
+            'description' => 'Now in stock',
+            'arrived_at' => now()->subHours(3),
+            'arrived_quantity' => 6,
+            'arrived_session_id' => 'sess-1',
+        ]);
+
+        $response = $this->actingAs($this->employee())->get('/customer-requests')->assertOk();
+
+        $response->assertSee('Arrived '.now()->format('D j M').' · 6 scanned');
+        // Put aside is the one-tap primary step (the other, un-arrived row keeps Mark ordered).
+        $response->assertSee('shop-btn shop-btn--primary" type="submit">Put aside', false);
+        $response->assertSee('Mark ordered');
+
+        // Arrived before the earlier-dated line that has not.
+        $html = $response->getContent();
+        $this->assertLessThan(strpos($html, 'Still coming'), strpos($html, 'Now in stock'));
+
+        // Guests see that it is in, too.
+        $this->get('/customer-requests')->assertOk()->assertSee('Arrived '.now()->format('D j M'));
+
+        $this->actingAs($this->employee())
+            ->patch(route('customer-requests.items.status', $item), ['status' => CustomerRequestItem::STATUS_PUT_ASIDE])
+            ->assertSessionHas('status');
+
+        $this->assertSame(CustomerRequestItem::STATUS_PUT_ASIDE, $item->fresh()->status);
+    }
+
+    public function test_rows_are_ordered_by_due_date_with_undated_last(): void
+    {
+        $undated = CustomerRequest::factory()->create(['customer_name' => 'Undated Una', 'wanted_on' => null]);
+        CustomerRequestItem::factory()->for($undated, 'request')->create(['description' => 'Row undated']);
+
+        $next = CustomerRequest::factory()->create(['customer_name' => 'Next Week Ned', 'wanted_on' => today()->addDays(7)]);
+        CustomerRequestItem::factory()->for($next, 'request')->create(['description' => 'Row next week']);
+
+        $soon = CustomerRequest::factory()->create(['customer_name' => 'Soon Sue', 'wanted_on' => today()->addDays(2)]);
+        CustomerRequestItem::factory()->for($soon, 'request')->create(['description' => 'Row soon']);
+
+        $html = $this->actingAs($this->employee())->get('/customer-requests')->assertOk()->getContent();
+
+        $this->assertLessThan(strpos($html, 'Row next week'), strpos($html, 'Row soon'));
+        $this->assertLessThan(strpos($html, 'Row undated'), strpos($html, 'Row next week'));
+    }
 }

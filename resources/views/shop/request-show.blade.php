@@ -92,6 +92,14 @@
                                     · {{ $item->notes }}
                                 @endif
                             </span>
+                            @if ($item->arrived_at)
+                                <span class="shop-row__meta">
+                                    Arrived {{ $item->arrived_at->format('D j M H:i') }}@if ($item->arrived_quantity !== null && (float) $item->arrived_quantity > 0) · {{ \App\Models\CustomerRequestItem::formatQuantity($item->arrived_quantity) }} scanned in Receiving @else in Receiving @endif
+                                    @if (isset($arrivalLinks[$item->id]))
+                                        · <a class="shop-link" href="{{ $arrivalLinks[$item->id] }}">Open the delivery</a>
+                                    @endif
+                                </span>
+                            @endif
                         </div>
                         <div class="shop-row__aside">
                             <span class="shop-pill {{ $statusTone[$item->status] ?? 'shop-pill--muted' }}">{{ $item->statusLabel() }}</span>

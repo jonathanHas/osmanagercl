@@ -10,6 +10,7 @@ use App\Models\CustomerRequestItem;
 use App\Models\Product;
 use App\Services\CustomerRequestService;
 use App\Services\ProductThumbnailService;
+use App\Services\ReceivingService;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -130,7 +131,7 @@ class CustomerRequestController extends Controller
             ->exists();
     }
 
-    public function show(CustomerRequest $customerRequest): View
+    public function show(CustomerRequest $customerRequest, ReceivingService $receiving): View
     {
         $customerRequest->load(['items.statusLogs.user', 'items.statusChanger', 'creator', 'updater', 'closer']);
 
@@ -139,7 +140,38 @@ class CustomerRequestController extends Controller
             'images' => $this->service->imageUrlsForRequestLines(
                 $customerRequest->items->pluck('product_code')->all()
             ),
+            'arrivalLinks' => $this->arrivalLinks($customerRequest, $receiving),
         ]);
+    }
+
+    /**
+     * A link to the Receiving session that scanned each arrived line, keyed by
+     * line id. The session lives on the POS; one that has since been deleted or
+     * merged, or a POS that is down, simply means no link.
+     *
+     * @return array<int, string>
+     */
+    private function arrivalLinks(CustomerRequest $customerRequest, ReceivingService $receiving): array
+    {
+        $links = [];
+
+        foreach ($customerRequest->items as $item) {
+            if ($item->arrived_session_id === null) {
+                continue;
+            }
+
+            try {
+                $session = $receiving->session($item->arrived_session_id);
+            } catch (\Throwable) {
+                $session = null;
+            }
+
+            if ($session !== null && $session->supID !== null) {
+                $links[$item->id] = route('delivery-legacy.match', ['delID' => $session->ID, 'supplierID' => $session->supID]);
+            }
+        }
+
+        return $links;
     }
 
     public function edit(CustomerRequest $customerRequest): View

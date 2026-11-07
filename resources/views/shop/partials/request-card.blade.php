@@ -43,5 +43,9 @@
         @if ($item->status !== \App\Models\CustomerRequestItem::STATUS_PENDING)
             <span class="shop-pill {{ $tone[$item->status] ?? 'shop-pill--muted' }}">{{ $item->statusLabel() }}</span>
         @endif
+
+        @if ($item->hasArrived())
+            <span class="shop-pill shop-pill--ok">Arrived {{ $item->arrived_at->format('D j M') }}</span>
+        @endif
     </div>
 </article>

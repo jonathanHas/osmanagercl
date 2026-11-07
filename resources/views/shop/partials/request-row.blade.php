@@ -27,14 +27,17 @@
 
     $overdue = $request->isOverdue();
     $dueToday = $request->isDueToday();
+    $arrived = $item->hasArrived();
 
-    // The design makes the next step prominent only when it is wanted now, or
-    // when it is the last one.
-    $urgent = $overdue || $dueToday;
+    // The design makes the next step prominent only when it is wanted now, when
+    // it is the last one, or when the product has arrived and can be dealt with.
+    $urgent = $overdue || $dueToday || $arrived;
 
     $primary = match (true) {
         $status === Line::STATUS_PENDING && ! $held,
         $status === Line::STATUS_ORDERED && ! $held => ['status' => Line::STATUS_DONE, 'label' => 'Done', 'tone' => 'shop-btn--primary'],
+        // It is in: skip Ordered and go straight to putting it aside.
+        $status === Line::STATUS_PENDING && $arrived => ['status' => Line::STATUS_PUT_ASIDE, 'label' => 'Put aside', 'tone' => 'shop-btn--primary'],
         $status === Line::STATUS_PENDING => ['status' => Line::STATUS_ORDERED, 'label' => 'Mark ordered', 'tone' => $urgent ? 'shop-btn--primary' : 'shop-btn--secondary'],
         $status === Line::STATUS_ORDERED => ['status' => Line::STATUS_PUT_ASIDE, 'label' => 'Put aside', 'tone' => $urgent ? 'shop-btn--primary' : 'shop-btn--secondary'],
         $status === Line::STATUS_PUT_ASIDE => ['status' => Line::STATUS_COLLECTED, 'label' => 'Collected', 'tone' => 'shop-btn--primary'],
@@ -106,6 +109,9 @@
             @unless ($held)
                 <span class="shop-pill shop-pill--muted">{{ $item->handlingLabel() }}</span>
             @endunless
+            @if ($arrived)
+                <span class="shop-pill shop-pill--ok">{{ $item->arrivalLabel() }}</span>
+            @endif
             @if ($status === Line::STATUS_NOT_AVAILABLE)
                 <span class="shop-pill shop-pill--bad">Not available</span>
             @elseif ($status === Line::STATUS_CANCELLED)
@@ -156,12 +162,22 @@
                 <x-shop.icon name="pencil" />Edit
             </a>
 
-            @if ($status === Line::STATUS_PENDING && $held)
+            @if ($status === Line::STATUS_PENDING && $held && ! $arrived)
                 <form method="POST" action="{{ route('customer-requests.items.status', $item) }}">
                     @csrf
                     @method('PATCH')
                     <input type="hidden" name="status" value="{{ Line::STATUS_PUT_ASIDE }}">
                     <button class="shop-menu__item" type="submit"><x-shop.icon name="check" />Put aside now</button>
+                </form>
+            @endif
+
+            {{-- Put aside is the primary button once it has arrived; Ordered moves here. --}}
+            @if ($status === Line::STATUS_PENDING && $held && $arrived)
+                <form method="POST" action="{{ route('customer-requests.items.status', $item) }}">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="status" value="{{ Line::STATUS_ORDERED }}">
+                    <button class="shop-menu__item" type="submit"><x-shop.icon name="package" />Mark ordered</button>
                 </form>
             @endif
 

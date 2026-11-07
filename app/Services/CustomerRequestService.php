@@ -251,12 +251,10 @@ class CustomerRequestService
                     ->whereHas('request', fn ($q) => $q->open())
                     ->with(['request.creator', 'statusChanger'])
                     ->get()
-                    ->sortBy([
-                        fn ($item) => $item->request->wanted_on === null ? 1 : 0,
-                        fn ($item) => $item->request->wanted_on?->toDateString() ?? '',
-                        fn ($item) => $item->request->created_at?->toDateTimeString() ?? '',
-                        fn ($item) => $item->position,
-                    ])
+                    // One composite key per line. (An array of closures given to
+                    // sortBy() is treated as comparators of two items, so the
+                    // per-item keys that stood here never sorted anything.)
+                    ->sortBy(fn (CustomerRequestItem $item) => self::boardSortKey($item))
                     ->values()
             );
 
@@ -275,6 +273,25 @@ class CustomerRequestService
             'done' => $done,
             'counts' => $this->boardCounts(),
         ];
+    }
+
+    /**
+     * Board order within a group: what has arrived first (it can be dealt with
+     * now), then by due date with undated requests last, then oldest request
+     * first, then line position.
+     */
+    private static function boardSortKey(CustomerRequestItem $item): string
+    {
+        $request = $item->request;
+
+        return sprintf(
+            '%d|%d|%s|%s|%06d',
+            $item->hasArrived() ? 0 : 1,
+            $request->wanted_on === null ? 1 : 0,
+            $request->wanted_on?->toDateString() ?? '',
+            $request->created_at?->toDateTimeString() ?? '',
+            $item->position
+        );
     }
 
     /**
@@ -348,14 +365,103 @@ class CustomerRequestService
     /**
      * Counts for the dashboard banner.
      *
-     * @return array{due: int, put_aside: int}
+     * @return array{due: int, put_aside: int, arrived: int}
      */
     public function dashboardCounts(): array
     {
         return [
             'due' => CustomerRequest::dueTodayOrOverdue()->count(),
             'put_aside' => CustomerRequestItem::where('status', CustomerRequestItem::STATUS_PUT_ASIDE)->count(),
+            // Scanned in Receiving but not yet put aside or marked done.
+            'arrived' => CustomerRequestItem::awaitingArrival()->whereNotNull('arrived_at')->count(),
         ];
+    }
+
+    /**
+     * Receiving scanned this barcode: stamp every open line waiting for it.
+     *
+     * Called by the scan endpoints with the session's running total for the
+     * barcode, so the board can say "Arrived Tue 5 Nov · 6 scanned" without ever
+     * reading the (session-indexed) POS scan table. A total of zero is a
+     * correction back to nothing: the stamp this session made is removed.
+     *
+     * @return int lines stamped (or cleared)
+     */
+    public function recordArrival(string $barcode, float $scannedTotal, ?string $sessionId): int
+    {
+        $barcode = trim($barcode);
+        if ($barcode === '') {
+            return 0;
+        }
+
+        if ($scannedTotal <= 0) {
+            return CustomerRequestItem::awaitingArrival()
+                ->forBarcodes([$barcode])
+                ->whereNotNull('arrived_at')
+                ->when($sessionId !== null, fn ($q) => $q->where('arrived_session_id', $sessionId))
+                ->update(['arrived_at' => null, 'arrived_quantity' => null, 'arrived_session_id' => null]);
+        }
+
+        return CustomerRequestItem::awaitingArrival()
+            ->forBarcodes([$barcode])
+            ->update([
+                'arrived_at' => now(),
+                'arrived_quantity' => round($scannedTotal, 3),
+                'arrived_session_id' => $sessionId,
+            ]);
+    }
+
+    /**
+     * Stamp open lines from scans that happened before arrivals were recorded.
+     *
+     * One pass over the POS scan rows for the open lines' barcodes since the
+     * earliest line was taken; a line takes the latest scan of its product made
+     * after it reached its current status. Lines already stamped are left alone,
+     * so the command behind this is safe to re-run.
+     */
+    public function backfillArrivals(): int
+    {
+        $lines = CustomerRequestItem::awaitingArrival()
+            ->whereNull('arrived_at')
+            ->whereNotNull('product_code')
+            ->whereHas('request', fn ($q) => $q->open())
+            ->get();
+
+        if ($lines->isEmpty()) {
+            return 0;
+        }
+
+        $since = $lines->min(fn (CustomerRequestItem $l) => $l->status_changed_at ?? $l->created_at);
+
+        $scans = DB::connection('pos')->table('deliveriesScanItems')
+            ->select('barcode', 'delID', 'quantity', 'dateScan')
+            ->whereIn('barcode', $lines->pluck('product_code')->unique()->values()->all())
+            ->where('dateScan', '>=', $since)
+            ->orderBy('dateScan')
+            ->get()
+            ->groupBy('barcode');
+
+        $stamped = 0;
+
+        foreach ($lines as $line) {
+            $lineSince = $line->status_changed_at ?? $line->created_at;
+            $latest = ($scans->get((string) $line->product_code) ?? collect())
+                ->filter(fn ($row) => $row->dateScan >= $lineSince)
+                ->last();
+
+            if ($latest === null) {
+                continue;
+            }
+
+            $line->forceFill([
+                'arrived_at' => $latest->dateScan,
+                'arrived_quantity' => round((float) $latest->quantity, 3),
+                'arrived_session_id' => $latest->delID,
+            ])->save();
+            $stamped++;
+        }
+
+        return $stamped;
     }
 
     /**
@@ -403,6 +509,8 @@ class CustomerRequestService
                 'case_units' => $item->case_units,
                 'quantity_label' => $item->quantityLabel(),
                 'hold_for_collection' => $item->isHeldForCollection(),
+                'arrived_at' => $item->arrived_at?->toDateTimeString(),
+                'arrived_quantity' => $item->arrived_quantity !== null ? (float) $item->arrived_quantity : null,
                 'wanted_on' => $item->request?->wanted_on?->toDateString(),
                 'taken_on' => $item->request?->created_at?->toDateString(),
                 'status' => $item->status,

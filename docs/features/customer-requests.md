@@ -51,6 +51,9 @@ CREATE TABLE customer_request_items (
     case_units          SMALLINT UNSIGNED NULL,     -- supplier case size snapshotted when taken by the case
     notes               VARCHAR(500) NULL,
     hold_for_collection TINYINT(1) NOT NULL DEFAULT 1,  -- 1: put aside for the customer; 0: just get it in, mark done
+    arrived_at          TIMESTAMP NULL,                 -- stamped by the Receiving scan endpoints (cycle 3)
+    arrived_quantity    DECIMAL(10,3) NULL,             -- the scan session's running total for the barcode
+    arrived_session_id  VARCHAR(64) NULL,               -- POS deliveriesScan.ID, no FK
     position            INT UNSIGNED NOT NULL DEFAULT 0,
     status              VARCHAR(20) NOT NULL DEFAULT 'pending',
     status_changed_at   TIMESTAMP NULL,
@@ -199,6 +202,41 @@ the due date), *Taken Mon 3 Nov* on the guest card, *taken …* in the delivery 
 tooltip, and `taken_on` in the scan-increment JSON next to `wanted_on`. It is the
 request's `created_at`; nothing new is stored.
 
+## Arrivals from Receiving (requests cycle 3)
+
+The board can tell when a requested product has come in. Receiving writes every
+scanned barcode to the POS `deliveriesScanItems` table, which is indexed by
+session only (125k rows on production), so the board never searches it. Instead
+the two scan endpoints stamp the request lines at scan time:
+
+- `DeliveryLegacyController::incrementScanQuantity()` (the Shop scan screen and
+  the office scanner) and `updateScannedQuantity()` (typed corrections) call
+  `CustomerRequestService::recordArrival($barcode, $sessionTotal, $sessionId)`
+  after writing the scan row. Every **pending or ordered** line for that barcode
+  gets `arrived_at` (now), `arrived_quantity` (the session's running total for the
+  barcode) and `arrived_session_id` (POS `deliveriesScan.ID`, no FK). A
+  correction back to zero clears the stamp this session made.
+- `CustomerRequestItem::hasArrived()` is true only while the line is still
+  pending or ordered; once it is put aside or done the stamp stays as history and
+  the detail page shows *Arrived Tue 5 Nov 14:02 · 6 scanned in Receiving*, with an
+  **Open the delivery** link when the Receiving session still exists
+  (`ReceivingService::session()`; a merged or deleted session, or a POS that is
+  down, just means no link).
+- **Board**: an arrived line carries a green *Arrived Tue 5 Nov · 6 scanned* pill
+  and sorts first in its group. Its next step becomes the prominent button: **Put
+  aside** for a held line (even from pending; Mark ordered moves to the menu) and
+  **Done** for a just-get-it-in line. The guest card shows *Arrived Tue 5 Nov*.
+- **Dashboard** banner: `dashboardCounts()['arrived']` adds "N items have arrived
+  and are not yet put aside", and an arrival alone is enough to show the banner.
+  The scan-increment JSON carries `arrived_at` and `arrived_quantity`.
+- No status is changed automatically: staff still confirm the item is physically
+  set aside (or done) with the button.
+
+**Deploy step**: after `migrate`, run `php artisan customer-requests:backfill-arrivals`
+once. It stamps open pending / ordered lines from scans made after the line reached
+its current status (one query on the POS scan table for those barcodes) and skips
+lines already stamped, so it is safe to re-run. Factory columns default to null.
+
 ## Usage
 
 ### User Perspective
@@ -259,7 +297,7 @@ $byBarcode = $service->awaitingArrivalByBarcode(['5000000000017', '5000000000024
 
 - `tests/Feature/CustomerRequestTest.php` — public board (guest vs staff), auth and permission gates, create with snapshot and log, validation and `old()` repopulation, update sync rules, the status lifecycle and auto-close/reopen, cancel, product search, the barcode lookup, the show page.
 - `tests/Feature/CustomerRequestDashboardTest.php` — banner hidden at zero, correct counts otherwise.
-- `tests/Feature/CustomerRequestDeliveryFlagTest.php` — the match page badge and summary card, and the scan-increment JSON carrying `customerRequests` (builds every POS table the legacy raw queries touch in sqlite).
+- `tests/Feature/CustomerRequestDeliveryFlagTest.php` — the match page badge and summary card, the scan-increment JSON carrying `customerRequests`, arrival stamping and clearing by the scan endpoints, and the backfill command (builds every POS table the legacy raw queries touch in sqlite).
 - `tests/Unit/CustomerRequestItemTransitionsTest.php` — the transition matrix, `done`, and the held / just-get-it-in lifecycle steps.
 - `tests/Feature/Shop/ShopRequestsTest.php` — the Shop board, the just-get-it-in row, the Done menu item on a held row, the taken date, the sheet's and the edit screen's put-aside choice.
 
@@ -277,7 +315,8 @@ php artisan test --filter=CustomerRequest
 
 - **Alpine names unnamed radios after their `x-model` expression.** Radios in different `x-for` rows bound to the same expression (`item.unit`, `item.hold_for_collection`) therefore form one browser radio group, and only one row's choice shows as selected (found in requests cycle 2; the Units/Case cards on the edit screen had it). Give such radios a per-row `:name`. The sheet's single-line radios are unaffected.
 
-- No automatic status change on scan or on completing a delivery — staff confirm the item is physically set aside with the button. Marking on scan could be added to `incrementScanQuantity()` if it proves too fiddly in practice.
+- No automatic status change on scan or on completing a delivery — staff confirm the item is physically set aside with the button. Since cycle 3 the scan does stamp the line as arrived (board pill, one-tap Put aside); auto-moving it to `put_aside` would be a one-line addition in `recordArrival()`'s callers if that proves wanted.
+- Merging two Receiving sessions moves the scan rows but not `arrived_session_id`, so the detail page's "Open the delivery" link disappears for lines stamped by the source session. The arrival itself is unaffected.
 - The Laravel-native delivery scan screen (`/deliveries/{id}/scan`) does not show the flag; only the legacy match screen that shop staff use does. The hook point there would be `DeliveryController::formatDeliveryItem()`.
 - No email or push reminder; the board, the dashboard and the delivery screen are the reminders.
 
@@ -285,6 +324,7 @@ php artisan test --filter=CustomerRequest
 
 - **2026-09-10**: Initial release.
 - **2026-10-07**: Lines can be taken by the case or by the unit; the New request sheet shows case size, stock and price for the picked product (requests cycle 1).
+- **2026-11-07** (later): arrivals from Receiving — scan endpoints stamp open lines, Arrived pill and one-tap next step on the board, dashboard count, `customer-requests:backfill-arrivals` (requests cycle 3). Also fixed the board order: `boardRows()` passed per-item key closures to `sortBy([...])`, which Laravel treats as two-item comparators, so rows were never sorted by due date; one composite key (`boardSortKey()`) now orders arrived first, then due date, undated last.
 - **2026-11-07**: "Put aside" or "Just get it in" per line (`hold_for_collection`), the `done` status with a one-tap Done on the board, and the taken date shown next to the due date (requests cycle 2).
 
 ## Staff board v2 (cycle 13)

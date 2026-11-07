@@ -523,6 +523,8 @@ textarea.shop-input { min-height: 112px; padding: 14px 20px; border-radius: var(
 .shop-step.is-current::before { background: var(--shop-accent); border-color: var(--shop-accent); }
 .shop-steps.is-stopped .shop-step { text-decoration: line-through; }
 .shop-steps--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* An inline text link inside meta text (the request detail page's "Open the delivery"). */
+.shop-link { color: var(--shop-accent-strong); font-weight: var(--shop-fw-bold); text-decoration: underline; text-underline-offset: 2px; }
 
 /* ── Sheet (side panel ≥768, bottom sheet on phone). Port as <dialog>. ── */
 .shop-sheet-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; background: var(--shop-scrim); }

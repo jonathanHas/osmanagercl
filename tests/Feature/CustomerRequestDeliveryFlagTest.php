@@ -245,4 +245,112 @@ class CustomerRequestDeliveryFlagTest extends TestCase
             ->assertJsonPath('customerRequests.0.hold_for_collection', false)
             ->assertJsonPath('customerRequests.0.taken_on', now()->subDays(3)->toDateString());
     }
+
+    // ------------------------------------------------------------- arrivals
+
+    public function test_a_scan_stamps_the_waiting_request_lines_as_arrived(): void
+    {
+        $pending = $this->requestFor('Jane Doe', CustomerRequestItem::STATUS_PENDING);
+        $ordered = $this->requestFor('Ordered Olly', CustomerRequestItem::STATUS_ORDERED);
+        $aside = $this->requestFor('Put-aside Pat', CustomerRequestItem::STATUS_PUT_ASIDE);
+
+        $this->postJson(route('delivery-legacy.scan-increment'), [
+            'delID' => self::DELIVERY_ID,
+            'barcode' => self::BARCODE,
+            'quantity' => 4,
+            'supplierID' => self::SUPPLIER_ID,
+        ])->assertOk()
+            ->assertJsonPath('customerRequests.0.arrived_quantity', 4)
+            ->assertJsonPath('customerRequests.1.arrived_quantity', 4);
+
+        foreach ([$pending, $ordered] as $line) {
+            $line->refresh();
+            $this->assertNotNull($line->arrived_at);
+            $this->assertSame(4.0, (float) $line->arrived_quantity);
+            $this->assertSame(self::DELIVERY_ID, $line->arrived_session_id);
+            $this->assertTrue($line->hasArrived());
+            $this->assertSame('Arrived '.now()->format('D j M').' · 4 scanned', $line->arrivalLabel());
+        }
+
+        // A line already put aside is not waiting for anything.
+        $this->assertNull($aside->fresh()->arrived_at);
+
+        // A second scan updates the running total.
+        $this->postJson(route('delivery-legacy.scan-increment'), [
+            'delID' => self::DELIVERY_ID,
+            'barcode' => self::BARCODE,
+            'quantity' => 2,
+            'supplierID' => self::SUPPLIER_ID,
+        ])->assertOk();
+        $this->assertSame(6.0, (float) $pending->fresh()->arrived_quantity);
+
+        // Correcting the scan back to nothing takes the stamp off again.
+        $this->patchJson(route('delivery-legacy.update-quantity'), [
+            'delID' => self::DELIVERY_ID,
+            'barcode' => self::BARCODE,
+            'quantity' => 0,
+            'supplierID' => self::SUPPLIER_ID,
+            'financials' => false,
+        ])->assertOk();
+        $this->assertNull($pending->fresh()->arrived_at);
+        $this->assertNull($ordered->fresh()->arrived_session_id);
+
+        // And a typed correction to a quantity stamps it like a scan.
+        $this->patchJson(route('delivery-legacy.update-quantity'), [
+            'delID' => self::DELIVERY_ID,
+            'barcode' => self::BARCODE,
+            'quantity' => 3,
+            'supplierID' => self::SUPPLIER_ID,
+            'financials' => false,
+        ])->assertOk();
+        $this->assertSame(3.0, (float) $pending->fresh()->arrived_quantity);
+    }
+
+    public function test_the_arrival_stamp_stays_as_history_once_the_line_moves_on(): void
+    {
+        $line = $this->requestFor('Jane Doe', CustomerRequestItem::STATUS_ORDERED);
+        $line->forceFill(['arrived_at' => now(), 'arrived_quantity' => 2, 'arrived_session_id' => self::DELIVERY_ID])->save();
+
+        app(\App\Services\CustomerRequestService::class)
+            ->changeItemStatus($line, CustomerRequestItem::STATUS_PUT_ASIDE, auth()->user());
+
+        $line->refresh();
+        $this->assertNotNull($line->arrived_at);
+        $this->assertFalse($line->hasArrived(), 'put aside: no longer waiting, so not "arrived" on the board');
+
+        // The detail page still tells the story.
+        $this->get(route('customer-requests.show', $line->request))
+            ->assertOk()
+            ->assertSee('2 scanned in Receiving');
+    }
+
+    public function test_backfill_stamps_open_lines_from_past_scans(): void
+    {
+        $ordered = $this->requestFor('Jane Doe', CustomerRequestItem::STATUS_ORDERED);
+        $ordered->forceFill(['status_changed_at' => now()->subDays(5)])->save();
+
+        // Scanned before it was ordered: not this order's arrival.
+        $stale = $this->requestFor('Stale Stan', CustomerRequestItem::STATUS_ORDERED);
+        $stale->forceFill(['status_changed_at' => now()->subHour()])->save();
+
+        DB::connection('pos')->table('deliveriesScanItems')->insert([
+            ['ID' => 's-old', 'delID' => 'd-old', 'barcode' => self::BARCODE, 'quantity' => 1, 'dateScan' => now()->subDays(10)],
+            ['ID' => 's-new', 'delID' => self::DELIVERY_ID, 'barcode' => self::BARCODE, 'quantity' => 6, 'dateScan' => now()->subDays(2)],
+        ]);
+
+        $this->artisan('customer-requests:backfill-arrivals')
+            ->expectsOutputToContain('1 request line(s) stamped')
+            ->assertSuccessful();
+
+        $ordered->refresh();
+        $this->assertSame(now()->subDays(2)->toDateTimeString(), $ordered->arrived_at->toDateTimeString());
+        $this->assertSame(6.0, (float) $ordered->arrived_quantity);
+        $this->assertSame(self::DELIVERY_ID, $ordered->arrived_session_id);
+
+        $this->assertNull($stale->fresh()->arrived_at);
+
+        // Re-running finds nothing new.
+        $this->artisan('customer-requests:backfill-arrivals')
+            ->expectsOutputToContain('0 request line(s) stamped');
+    }
 }
