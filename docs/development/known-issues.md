@@ -424,6 +424,30 @@ order provenance was write-only. Now shown in the order header.
 
 ## Database & Transaction Issues
 
+### Coffee KDS Showed the Same Order Twice
+**Status:** Fixed 2026-11-05
+
+#### Problem
+Now and then a ticket appeared two (occasionally three) times in the `/kds` queue.
+
+#### Cause
+Both importers (`KdsRealtimeController::checkNewOrders()` and `MonitorCoffeeOrdersJob`)
+checked whether a `kds_orders` row existed for the ticket and then inserted one, and
+`kds_orders.ticket_id` had only a plain index. Every open KDS screen calls
+`/kds/realtime-check` every 2 seconds, so two checks could both find nothing and both
+insert. The duplicated rows always share a `created_at` second and have adjacent ids.
+
+#### Fix
+- Migration `2026_11_05_000001_add_unique_ticket_id_to_kds_orders` removes existing
+  duplicates (keeps the earliest row) and makes `ticket_id` unique.
+- Both importers create the order with `KdsOrder::createOrFirst()` and skip the ticket
+  when `wasRecentlyCreated` is false, so the request that loses the race adds nothing.
+- The page no longer stacks a second `realtime-check` while one is still running.
+- Regression tests: `tests/Feature/KdsDuplicateOrderTest.php`.
+
+Any new code that writes to `kds_orders` must go through `createOrFirst()` on
+`ticket_id`; a plain `create()` now throws on a repeat ticket.
+
 ### F&V Price Updates Not Appearing on POS Till
 **Status:** Fixed 2025-08-28
 

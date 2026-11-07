@@ -788,6 +788,7 @@
         let donePanelOpen = false;
         let eventSource = null;
         let isRefreshing = false;
+        let isRealtimeChecking = false;
 
         /* ─────────────── helpers ─────────────── */
         const pad = (n) => String(n).padStart(2, '0');
@@ -1153,6 +1154,10 @@
         }
 
         async function fastRealtimeCheck() {
+            // One check at a time: when the POS database is slow a check can
+            // outlast the 2 s interval, and stacked checks only add load.
+            if (isRealtimeChecking) return;
+            isRealtimeChecking = true;
             try {
                 const r = await fetch(REALTIME_URL);
                 const data = await r.json();
@@ -1165,6 +1170,8 @@
                 setLive(true);
             } catch (e) {
                 setLive(false);
+            } finally {
+                isRealtimeChecking = false;
             }
         }
 

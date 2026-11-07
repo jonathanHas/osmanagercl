@@ -161,16 +161,25 @@ class MonitorCoffeeOrdersJob implements ShouldQueue
                     ];
                 }
 
-                // Create KDS order
-                $kdsOrder = KdsOrder::create([
-                    'ticket_id' => $ticket->ID,
-                    'ticket_number' => $ticket->TICKETID ?? 0,
-                    'person' => $ticket->PERSON,
-                    'person_name' => $ticket->person?->NAME,
-                    'status' => 'new',
-                    'order_time' => $ticket->receipt ? Carbon::parse($ticket->receipt->DATENEW) : now(),
-                    'customer_info' => $customerInfo,
-                ]);
+                // Create KDS order. The realtime check (or another run of this
+                // job) can insert the same ticket after the batch check above;
+                // the unique index on ticket_id rejects the second insert and
+                // createOrFirst() returns the row that won, which we skip.
+                $kdsOrder = KdsOrder::createOrFirst(
+                    ['ticket_id' => $ticket->ID],
+                    [
+                        'ticket_number' => $ticket->TICKETID ?? 0,
+                        'person' => $ticket->PERSON,
+                        'person_name' => $ticket->person?->NAME,
+                        'status' => 'new',
+                        'order_time' => $ticket->receipt ? Carbon::parse($ticket->receipt->DATENEW) : now(),
+                        'customer_info' => $customerInfo,
+                    ]
+                );
+
+                if (! $kdsOrder->wasRecentlyCreated) {
+                    continue;
+                }
 
                 // Add order items
                 foreach ($coffeeLines as $line) {

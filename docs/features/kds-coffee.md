@@ -9,7 +9,7 @@ The Coffee KDS is a real-time order display system for baristas to track and man
 - **Automatic Polling**: Checks POS database every minute for new coffee orders
 - **Server-Sent Events (SSE)**: Real-time updates pushed to display without page refresh
 - **Order Detection**: Filters for Coffee Fresh products (Category 081)
-- **Duplicate Prevention**: Tracks processed orders to avoid duplicates
+- **Duplicate Prevention**: One KDS order per POS ticket, enforced by a unique index on `kds_orders.ticket_id`; importers use `createOrFirst()` so concurrent checks cannot double-insert
 
 ### Order Display
 - **Visual Status Indicators**:

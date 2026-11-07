@@ -75,15 +75,25 @@ class KdsRealtimeController extends Controller
                     continue;
                 }
 
-                // Create KDS order
-                $kdsOrder = KdsOrder::create([
-                    'ticket_id' => $ticket->ID,
-                    'ticket_number' => $ticket->TICKETID ?? 0,
-                    'person' => $ticket->PERSON,
-                    'person_name' => $ticket->person_name ?? null,
-                    'status' => 'new',
-                    'order_time' => Carbon::parse($ticket->DATENEW),
-                ]);
+                // Create KDS order. Every open KDS screen runs this check every
+                // 2 s, so another request can insert the same ticket between the
+                // exists() above and here. The unique index on ticket_id makes
+                // that insert fail, createOrFirst() hands back the other
+                // request's row, and we leave its items to that request.
+                $kdsOrder = KdsOrder::createOrFirst(
+                    ['ticket_id' => $ticket->ID],
+                    [
+                        'ticket_number' => $ticket->TICKETID ?? 0,
+                        'person' => $ticket->PERSON,
+                        'person_name' => $ticket->person_name ?? null,
+                        'status' => 'new',
+                        'order_time' => Carbon::parse($ticket->DATENEW),
+                    ]
+                );
+
+                if (! $kdsOrder->wasRecentlyCreated) {
+                    continue;
+                }
 
                 // Get ticket lines for this order (only KDS-enabled products)
                 $lines = DB::connection('pos')
