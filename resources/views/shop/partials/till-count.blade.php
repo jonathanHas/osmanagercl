@@ -342,9 +342,10 @@
         <div class="shop-actions__summary">
             <strong x-text="'Bag ' + money(bag)"></strong>
             <span x-text="anythingCounted ? 'Cash variance ' + money(variance, true) : 'Count the drawer to begin'"></span>
+            <span class="shop-hint" x-show="saveBlocker === 'note'" x-cloak>The variance is over the limit, so the count needs a note before it can be saved.</span>
         </div>
         <button class="shop-btn shop-btn--primary shop-btn--lg shop-btn--fit" type="button" :disabled="! canSave" @click="save()">
-            <x-shop.icon name="check" /><span x-text="identity ? 'Save count' : 'Say who you are first'"></span>
+            <x-shop.icon name="check" /><span x-text="saveLabel"></span>
         </button>
     </div>
 

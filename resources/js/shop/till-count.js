@@ -207,6 +207,19 @@ export default () => ({
         return ! this.identity;
     },
 
+    /** Why Save is disabled: 'identify', 'count', 'note' or null when it may be pressed. */
+    get saveBlocker() {
+        if (! this.identity) return 'identify';
+        if (! this.anythingCounted) return 'count';
+        if (this.noteRequired && this.note.trim() === '') return 'note';
+
+        return null;
+    },
+
+    get saveLabel() {
+        return { identify: 'Say who you are first', count: 'Count the drawer first', note: 'Add a note first' }[this.saveBlocker] ?? 'Save count';
+    },
+
     tone(v) {
         const a = Math.abs(v);
         const t = this.state?.thresholds ?? { ok: 5, warn: 20 };
