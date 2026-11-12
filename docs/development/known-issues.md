@@ -29,6 +29,14 @@ This document tracks known issues that have been identified and resolved in the 
 
 **After deploying**: the docket that was in Receiving at deploy time was sent the old way (its POS rows have no `delID`) and shows no invoice lines until it is re-sent once from its docket page.
 
+### Received Dockets Lost "Scan Barcode" / "Add to POS" (fixed 2026-11-11)
+
+**Symptom**: After the 2026-11-07 deploy, new-product lines on `/deliveries/{id}` showed no **Scan Barcode** or **Add to POS** button, and the cost / price tools were gone too, on every docket that had been received.
+
+**Cause**: Those tools were wrapped in `@if($delivery->status !== 'completed')`. Before the clean-up no docket ever reached `completed` (the module's own complete path was never used), so the gate was invisible. Since `b2b18ca9`, Receiving's Complete marks the linked docket `completed` the moment the goods are scanned in, which locked the office work that is normally done afterwards.
+
+**Resolution**: The page gates those tools on `cancelled` only (`$locked` in `resources/views/deliveries/show.blade.php`); **Include in Orders**, **Delete** and adding lines still follow the status. The stale **New Product** header button, which only pointed at the removed scanning interface, was dropped. Test: `DeliveryDocketCleanupTest::test_new_product_tools_stay_available_after_the_docket_is_received`.
+
 ---
 
 ## Label & Printing Issues

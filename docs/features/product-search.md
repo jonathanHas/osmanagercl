@@ -38,6 +38,7 @@ and JSON shape.
 | `url` | `route('api.products.search')` | Override only to point at a compatible endpoint |
 | `stocked` | `true` | Initial state of the stocked filter |
 | `show-stocked-toggle` | `true` | Renders the "Include unstocked" checkbox |
+| `show-till` | `false` | Picker: marks each row "on till" / "not on till" (sends `with_till=1`) |
 | `supplier-id`, `category-id` | `null` | Hidden fixed filters sent with every request |
 | `exclude-ids` | `[]` | Product IDs never returned (e.g. already on an order) |
 | `per-page` | 10 picker / 20 list | Max 50 |
@@ -110,6 +111,7 @@ Ekoplaza `/small/` CDN image, which is larger than 40 px but not full resolution
 |---|---|---|
 | `q` | string ≤100 | `""` (browse listing ordered by name) |
 | `stocked` | `0/1/true/false` | `1` |
+| `with_till` | `0/1/true/false` | `0`; when on, each item's `on_till` is true/false (is a till button, `PRODUCTS_CAT`) instead of `null`; one extra POS query |
 | `supplier_id`, `category_id` | string | — |
 | `exclude` | comma-separated product IDs (≤200) | — |
 | `page` | int ≥1 | 1 |
@@ -127,7 +129,7 @@ Response (this shape is canonical; do not add per-page variants):
       "price_sell": 5.08, "price_with_vat": 6.25, "vat_rate": 0.23, "vat_label": "23.0%",
       "vat_badge_class": "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100",
       "stock_units": 7, "stock_location": null, "has_stock_record": true,
-      "is_stocked": true, "is_service": false, "has_image": false,
+      "is_stocked": true, "is_service": false, "on_till": null, "has_image": false,
       "image_url": "https://cdn.ekoplaza.nl/ekoplaza/producten/small/8721325594341.jpg",
       "supplier": { "id": "5", "name": "Udea", "code": "6001397", "website_url": "https://www.udea.nl/search/?qry=6001397" },
       "case_units": 6,

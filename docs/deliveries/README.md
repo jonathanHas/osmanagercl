@@ -40,6 +40,10 @@ lines only. When Receiving **completes** the session, the scanned units are
 written onto the docket's lines (`unit_/case_received_quantity`,
 `received_quantity`, status) and the docket becomes `completed` with
 `received_at`; **undo** puts it back to `draft` with nothing received.
+`completed` means *goods received*, nothing more: the docket page keeps
+offering **Scan Barcode** / **Add to POS** on new-product lines and the cost
+and price tools, because the office does that work after the goods are in.
+Only a `cancelled` docket hides them (regression fixed 2026-11-11).
 Deleting a session removes its lines and unlinks the docket; merging moves
 the lines and the link to the kept session (a kept session that already has
 its own docket keeps it, the source's docket is unlinked). Rows with a NULL

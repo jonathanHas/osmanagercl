@@ -26,11 +26,11 @@
                 </div>
 
                 <!-- Tab Navigation -->
-                <div class="border-b border-gray-200 dark:border-gray-700" x-data="{ activeTab: 'pdf' }">
+                <div class="border-b border-gray-200 dark:border-gray-700" x-data="{ activeTab: '{{ $errors->has('invoice_pdf') ? 'dynamis' : 'pdf' }}' }">
                     <nav class="flex -mb-px" aria-label="Tabs">
                         <button @click="activeTab = 'pdf'"
                                 :class="activeTab === 'pdf' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                                class="w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                                class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
                             <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
@@ -38,15 +38,25 @@
                         </button>
                         <button @click="activeTab = 'xlsx'"
                                 :class="activeTab === 'xlsx' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                                class="w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                                class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
                             <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
                             XLSX (Dynamis)
                         </button>
+                        @if (auth()->user()->hasAnyRole(['manager', 'admin']))
+                            <button @click="activeTab = 'dynamis'"
+                                    :class="activeTab === 'dynamis' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
+                                    class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                                <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/>
+                                </svg>
+                                Dynamis invoice (pricing)
+                            </button>
+                        @endif
                         <button @click="activeTab = 'csv'"
                                 :class="activeTab === 'csv' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'"
-                                class="w-1/3 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                                class="flex-1 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
                             <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
@@ -54,6 +64,30 @@
                         </button>
                     </nav>
                     @include('deliveries.partials.xlsx-tab')
+
+                    @if (auth()->user()->hasAnyRole(['manager', 'admin']))
+                        <!-- Dynamis invoice PDF: docket + fruit & veg pricing page -->
+                        <div x-show="activeTab === 'dynamis'" x-cloak class="p-6">
+                            <form method="POST" action="{{ route('deliveries.dynamis-invoice') }}" enctype="multipart/form-data" class="max-w-xl space-y-4">
+                                @csrf
+                                <p class="text-sm text-gray-600 dark:text-gray-400">
+                                    Upload the Dynamis invoice PDF (FC&hellip;). It creates the delivery docket and opens a pricing page
+                                    where each fruit &amp; veg line gets a guide RRP and can be priced per kg or each for the till.
+                                </p>
+                                <div>
+                                    <label for="dynamis_invoice_pdf" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Invoice PDF</label>
+                                    <input type="file" id="dynamis_invoice_pdf" name="invoice_pdf" accept="application/pdf,.pdf" required
+                                           class="mt-1 block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                    @error('invoice_pdf')
+                                        <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                                <button type="submit" class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                    Import and price
+                                </button>
+                            </form>
+                        </div>
+                    @endif
 
                     <!-- PDF Upload Tab -->
                     <div x-show="activeTab === 'pdf'" class="p-6">

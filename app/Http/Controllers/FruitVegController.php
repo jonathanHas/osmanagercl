@@ -12,6 +12,7 @@ use App\Models\VegLabelPrintBatch;
 use App\Models\VegPrintQueue;
 use App\Models\ZebraLabel;
 use App\Repositories\OptimizedSalesRepository;
+use App\Services\FruitVegPriceService;
 use App\Services\ProductThumbnailService;
 use App\Services\SalesDataSyncService;
 use App\Services\TillVisibilityService;
@@ -207,7 +208,7 @@ class FruitVegController extends Controller
     /**
      * Update product price.
      */
-    public function updatePrice(Request $request)
+    public function updatePrice(Request $request, FruitVegPriceService $priceService)
     {
         $request->validate([
             'product_code' => 'required|string',
@@ -225,63 +226,10 @@ class FruitVegController extends Controller
             return response()->json(['error' => 'Product not visible on till'], 422);
         }
 
-        // Get current price from veg_price_history or product
-        $lastPriceRecord = DB::table('veg_price_history')
-            ->where('product_code', $request->product_code)
-            ->orderBy('changed_at', 'desc')
-            ->first();
-
-        $oldPrice = $lastPriceRecord ? $lastPriceRecord->new_price : $product->getGrossPrice();
-        $newPrice = $request->new_price;
-
-        // Only proceed if price actually changed
-        if ($oldPrice != $newPrice) {
-            // Start transactions on both database connections
-            DB::beginTransaction();
-            DB::connection('pos')->beginTransaction();
-
-            try {
-                // Log price change in Laravel database
-                DB::table('veg_price_history')->insert([
-                    'product_code' => $request->product_code,
-                    'old_price' => $oldPrice,
-                    'new_price' => $newPrice,
-                    'changed_by' => Auth::id(),
-                    'changed_at' => now(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                // Calculate net price for POS database (remove VAT)
-                $vatRate = $product->getVatRate();
-                $netPrice = $newPrice / (1 + $vatRate);
-
-                // Update POS database price
-                DB::connection('pos')->table('PRODUCTS')
-                    ->where('ID', $product->ID)
-                    ->update(['PRICESELL' => $netPrice]);
-
-                // Commit both transactions if everything succeeded
-                DB::commit();
-                DB::connection('pos')->commit();
-
-                // Add to print queue after successful update
-                VegPrintQueue::addToQueue($request->product_code, 'price_change');
-            } catch (\Exception $e) {
-                // Rollback both transactions on failure
-                DB::rollBack();
-                DB::connection('pos')->rollBack();
-
-                // Log the error for debugging
-                \Log::error('Failed to update product price', [
-                    'product_code' => $request->product_code,
-                    'old_price' => $oldPrice,
-                    'new_price' => $newPrice,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return response()->json(['error' => 'Failed to update price. Please try again.'], 500);
-            }
+        try {
+            $priceService->setPrice($product, (float) $request->new_price, Auth::id());
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Failed to update price. Please try again.'], 500);
         }
 
         return response()->json(['success' => true]);

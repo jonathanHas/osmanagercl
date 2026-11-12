@@ -3,6 +3,7 @@
 namespace App\Services\ProductSearch;
 
 use App\Models\Product;
+use App\Models\ProductsCat;
 use App\Models\Stocking;
 use App\Models\SupplierImageCache;
 use App\Services\SupplierService;
@@ -384,6 +385,10 @@ class ProductSearchService
 
         $imageCache = $this->loadSupplierImageCache($products);
 
+        $onTill = $criteria->withTill
+            ? ProductsCat::whereIn('PRODUCT', array_map(fn (Product $p) => $p->ID, $products))->pluck('PRODUCT')->flip()
+            : null;
+
         $items = [];
         foreach ($products as $product) {
             $link = $product->supplierLink;
@@ -411,6 +416,8 @@ class ProductSearchService
                 'has_stock_record' => $product->stockCurrent !== null,
                 'is_stocked' => isset($stockedCodes[$product->CODE]),
                 'is_service' => (bool) $product->ISSERVICE,
+                // Shown as a button on the till (PRODUCTS_CAT); null unless asked for with with_till=1.
+                'on_till' => $onTill?->has($product->ID),
                 'has_image' => (bool) $product->has_image,
                 'image_url' => $this->imageUrl($product, $imageCache),
                 'supplier' => $supplier ? [

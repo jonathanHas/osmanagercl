@@ -27,6 +27,8 @@ final readonly class ProductSearchCriteria
         public array $excludeIds = [],
         int $page = 1,
         int $perPage = 20,
+        /** Add `on_till` (shown as a till button) to each result; one extra POS query. */
+        public bool $withTill = false,
     ) {
         $this->q = trim((string) $q);
         $this->page = max(1, $page);

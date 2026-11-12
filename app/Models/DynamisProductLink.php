@@ -15,6 +15,9 @@ class DynamisProductLink extends Model
         'dynamis_description',
         'pos_product_id',
         'pos_product_code',
+        'pricing_mode',
+        'units_per_box',
+        'kg_per_box',
         'matched_by',
         'confidence',
         'ai_model',
@@ -24,6 +27,8 @@ class DynamisProductLink extends Model
 
     protected $casts = [
         'confidence' => 'float',
+        'units_per_box' => 'float',
+        'kg_per_box' => 'float',
         'verified_at' => 'datetime',
     ];
 

@@ -125,6 +125,18 @@
                 </div>
             @endif
 
+            {{-- Dynamis invoice pricing (managers and admins) --}}
+            @if(isset($delivery->import_data['dynamis']) && auth()->user()->hasAnyRole(['manager', 'admin']))
+                <div class="mb-4 p-4 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div class="text-sm text-indigo-900 dark:text-indigo-100">
+                        <span class="font-semibold">Dynamis invoice {{ $delivery->import_data['dynamis']['invoice_number'] ?? '' }}</span>
+                        · price the fruit &amp; veg lines for the till from the guide RRP.
+                    </div>
+                    <a href="{{ route('deliveries.dynamis-pricing.show', $delivery) }}"
+                       class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-md whitespace-nowrap">Open pricing page</a>
+                </div>
+            @endif
+
             {{-- Receiving: the scan session this docket is received through (ReceivingService) --}}
             <div class="mb-4 p-4 bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 rounded-lg" id="receiving-card">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -886,6 +898,7 @@
                 </div>
             </div>
 
+            @php $locked = $delivery->status === 'cancelled'; @endphp
             <!-- Items Table -->
             <div class="bg-white dark:bg-gray-800 shadow-sm rounded-lg">
                 <div class="px-3 py-2 sm:px-6 sm:py-4 border-b border-gray-200 dark:border-gray-700">
@@ -893,7 +906,7 @@
                         <div class="flex flex-wrap items-center gap-2 sm:gap-4">
                             <h3 class="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Delivery Items</h3>
 
-                            @if($delivery->status !== 'completed')
+                            @if(! $locked)
                                 <!-- Auto Update Costs Button -->
                                 <button onclick="autoUpdateCosts()" id="autoUpdateBtn"
                                         class="hidden sm:flex px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors duration-200 items-center gap-2">
@@ -901,15 +914,6 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                     </svg>
                                     Auto Update Costs
-                                </button>
-
-                                <!-- Create New Product Button -->
-                                <button onclick="alert('New product creation is available in the scanning interface. Use the \'Continue Scanning\' button above.')"
-                                        class="hidden sm:flex px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors duration-200 items-center gap-2">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                                    </svg>
-                                    New Product
                                 </button>
                             @endif
 
@@ -1103,7 +1107,7 @@
                                 <div class="mt-1.5 flex items-center gap-1.5" id="mobile-barcode-display-{{ $item->id }}">
                                     <span class="text-xs text-gray-500 dark:text-gray-400">Barcode:</span>
                                     <code class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100">{{ $item->barcode }}</code>
-                                    @if($delivery->status !== 'completed')
+                                    @if(! $locked)
                                         <button type="button"
                                                 onclick="openBarcodeScannerForItem({{ $item->id }}, {{ $delivery->id }})"
                                                 class="text-blue-600 dark:text-blue-400 text-xs underline touch-manipulation">rescan</button>
@@ -1112,7 +1116,7 @@
                             @endif
 
                             {{-- Actions row for new products --}}
-                            @if($item->is_new_product && $delivery->status !== 'completed')
+                            @if($item->is_new_product && ! $locked)
                                 <div class="mt-2 flex items-center gap-2">
                                     @if(!$item->barcode)
                                         <button type="button"
@@ -1444,7 +1448,7 @@
                                                         in POS
                                                     </div>
                                                 </div>
-                                                @if($delivery->status !== 'completed' && abs($item->unit_cost - $item->product->PRICEBUY) > 0.01)
+                                                @if(! $locked && abs($item->unit_cost - $item->product->PRICEBUY) > 0.01)
                                                     <button onclick="updateProductCost('{{ $item->product->ID }}', {{ $item->unit_cost }}, '{{ addslashes($item->description) }}', event)"
                                                             class="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
                                                             title="Update cost to €{{ number_format($item->unit_cost, 2) }}">
@@ -1490,7 +1494,7 @@
                                                 }
                                             }
                                         @endphp
-                                        @if($item->product && $delivery->status !== 'completed')
+                                        @if($item->product && ! $locked)
                                             @php
                                                 $taxRate = 0;
                                                 if ($item->product->taxCategory && $item->product->taxCategory->primaryTax) {
@@ -1636,7 +1640,7 @@
                                                 </button>
                                             @endif
                                             
-                                            @if($item->is_new_product && !$item->barcode && $delivery->status !== 'completed')
+                                            @if($item->is_new_product && !$item->barcode && ! $locked)
                                                 <button type="button"
                                                         onclick="openBarcodeScannerForItem({{ $item->id }}, {{ $delivery->id }})"
                                                         id="scan-btn-{{ $item->id }}"
@@ -1648,7 +1652,7 @@
                                                 </button>
                                             @endif
 
-                                            @if($item->is_new_product && $delivery->status !== 'completed')
+                                            @if($item->is_new_product && ! $locked)
                                                 <a href="{{ route('products.create', ['delivery_item' => $item->id]) }}"
                                                    class="inline-flex items-center px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors duration-200">
                                                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

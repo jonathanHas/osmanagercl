@@ -32,6 +32,7 @@
     'initial' => null,
     'syncUrl' => true,
     'name' => null,
+    'showTill' => false,
 ])
 
 @php
@@ -45,6 +46,7 @@
         'supplierId' => $supplierId ?: null,
         'categoryId' => $categoryId ?: null,
         'excludeIds' => array_values($excludeIds ?? []),
+        'withTill' => (bool) $showTill,
         'perPage' => (int) ($perPage ?? ($mode === 'list' ? 20 : 10)),
         'minLength' => (int) $minLength,
         'debounce' => (int) $debounce,
@@ -145,6 +147,10 @@
                                 <span> · <span x-text="product.supplier.name"></span><template x-if="product.supplier.code"><span> <span class="font-mono" x-text="product.supplier.code"></span></span></template></span>
                             </template>
                             <span x-show="!product.is_stocked" class="ml-1 text-amber-600 dark:text-amber-400">unstocked</span>
+                            @if ($showTill)
+                                <span x-show="product.on_till" class="ml-1 font-medium text-green-700 dark:text-green-400">on till</span>
+                                <span x-show="!product.on_till" class="ml-1 text-gray-400 dark:text-gray-500">not on till</span>
+                            @endif
                         </span>
                     </span>
                     <span class="text-right flex-shrink-0">
@@ -402,6 +408,7 @@
                 if (config.supplierId) url.searchParams.set('supplier_id', config.supplierId);
                 if (config.categoryId) url.searchParams.set('category_id', config.categoryId);
                 if (config.excludeIds.length) url.searchParams.set('exclude', config.excludeIds.join(','));
+                if (config.withTill) url.searchParams.set('with_till', '1');
                 url.searchParams.set('page', String(page));
                 url.searchParams.set('per_page', String(config.perPage));
                 return url.toString();

@@ -20,6 +20,7 @@ class ProductSearchController extends Controller
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'stocked' => ['nullable', 'boolean'],
+            'with_till' => ['nullable', 'boolean'],
             'supplier_id' => ['nullable', 'string', 'max:50'],
             'category_id' => ['nullable', 'string', 'max:50'],
             'exclude' => ['nullable', 'string', 'max:8000'],
@@ -37,6 +38,7 @@ class ProductSearchController extends Controller
             excludeIds: array_slice($exclude, 0, 200),
             page: (int) ($validated['page'] ?? 1),
             perPage: (int) ($validated['per_page'] ?? 20),
+            withTill: $request->boolean('with_till'),
         );
 
         return response()->json($search->search($criteria));

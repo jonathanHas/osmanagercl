@@ -514,6 +514,18 @@ Route::middleware('auth')->group(function () {
         Route::patch('/{zebraLabel}/country', [ZebraLabelController::class, 'setCountry'])->name('set-country')->middleware('permission:labels.print');
     });
 
+    // Dynamis invoice pricing: invoice PDF -> docket -> price each F&V line for the till
+    Route::middleware('role:manager,admin')->group(function () {
+        Route::post('/deliveries/dynamis-invoice', [\App\Http\Controllers\DynamisPricingController::class, 'store'])->name('deliveries.dynamis-invoice');
+        Route::get('/deliveries/{delivery}/dynamis-pricing', [\App\Http\Controllers\DynamisPricingController::class, 'show'])->name('deliveries.dynamis-pricing.show');
+        Route::post('/deliveries/{delivery}/dynamis-pricing/settings', [\App\Http\Controllers\DynamisPricingController::class, 'updateSettings'])->name('deliveries.dynamis-pricing.settings');
+        Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/product', [\App\Http\Controllers\DynamisPricingController::class, 'link'])->name('deliveries.dynamis-pricing.link');
+        Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/apply', [\App\Http\Controllers\DynamisPricingController::class, 'apply'])->name('deliveries.dynamis-pricing.apply');
+        Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/skip', [\App\Http\Controllers\DynamisPricingController::class, 'skip'])->name('deliveries.dynamis-pricing.skip');
+        Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/show-on-till', [\App\Http\Controllers\DynamisPricingController::class, 'showOnTill'])->name('deliveries.dynamis-pricing.show-on-till');
+        Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/country', [\App\Http\Controllers\DynamisPricingController::class, 'country'])->name('deliveries.dynamis-pricing.country');
+    });
+
     // Fruit & Veg routes
     Route::prefix('fruit-veg')->name('fruit-veg.')->group(function () {
         Route::get('/', [FruitVegController::class, 'index'])->name('index')->middleware('permission:fruit_veg.operate');

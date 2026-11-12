@@ -134,4 +134,37 @@ class DeliveryDocketCleanupTest extends TestCase
         $this->assertFalse($item->is_new_product);
         $this->assertSame('5000000000017', $item->barcode);
     }
+
+    public function test_new_product_tools_stay_available_after_the_docket_is_received(): void
+    {
+        $docket = $this->docket();
+        $docket->forceFill(['status' => 'completed', 'received_at' => now()])->save();
+        $docket->items()->create([
+            'supplier_code' => 'UD-NEW',
+            'description' => 'Brand new oat biscuits',
+            'barcode' => null,
+            'unit_cost' => 2.10,
+            'ordered_quantity' => 6,
+            'total_cost' => 12.60,
+            'is_new_product' => true,
+            'product_id' => null,
+        ]);
+        $manager = $this->manager();
+
+        // Receiving marks the docket completed when the goods are scanned in; the
+        // office still has to put the new products on the till afterwards.
+        $this->actingAs($manager)->get(route('deliveries.show', $docket))
+            ->assertOk()
+            ->assertSee('Add to POS')
+            ->assertSee('Scan Barcode')
+            ->assertSee('Auto Update Costs')
+            ->assertDontSee('Continue Scanning');
+
+        $docket->forceFill(['status' => 'cancelled'])->save();
+
+        $this->actingAs($manager)->get(route('deliveries.show', $docket))
+            ->assertOk()
+            ->assertDontSee('Add to POS')
+            ->assertDontSee('Auto Update Costs');
+    }
 }

@@ -42,13 +42,13 @@ class DynamisMatcherService
      * Returns the same items plus match_status / product_id / product_code /
      * product_name / confidence / suggestions[].
      */
-    public function matchItems(array $items): array
+    public function matchItems(array $items, bool $tillVisibleOnly = true): array
     {
         if (empty($items)) {
             return [];
         }
 
-        $candidates = $this->loadTillProducts();
+        $candidates = $this->loadTillProducts($tillVisibleOnly);
         $candidateIndex = $this->indexCandidates($candidates);
 
         $codes = array_values(array_filter(array_map(fn ($i) => $i['code'] ?? null, $items)));
@@ -116,10 +116,16 @@ class DynamisMatcherService
     }
 
     /**
-     * All till-visible F&V products (joining PRODUCTS_CAT and PRODUCTS).
+     * F&V products to match against: by default only those visible on the
+     * till (PRODUCTS_CAT), or every F&V product when $tillVisibleOnly is false.
      */
-    public function loadTillProducts(): Collection
+    public function loadTillProducts(bool $tillVisibleOnly = true): Collection
     {
+        if (! $tillVisibleOnly) {
+            return Product::whereIn('CATEGORY', self::FV_CATEGORIES)
+                ->get(['ID', 'CODE', 'NAME', 'DISPLAY', 'CATEGORY']);
+        }
+
         $visibleIds = ProductsCat::pluck('PRODUCT')->all();
 
         if (empty($visibleIds)) {
@@ -230,6 +236,9 @@ class DynamisMatcherService
     {
         if (strlen($token) > 3 && substr($token, -3) === 'IES') {
             return substr($token, 0, -3).'Y';
+        }
+        if (strlen($token) > 4 && substr($token, -3) === 'OES') {
+            return substr($token, 0, -2); // TOMATOES → TOMATO
         }
         if (strlen($token) > 2 && substr($token, -1) === 'S' && substr($token, -2) !== 'SS') {
             return substr($token, 0, -1);

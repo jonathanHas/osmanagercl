@@ -4,6 +4,9 @@
 **Supplier**: Dynamis (POS `SupplierID = 56`) — primary fruit & veg supplier.
 **Entry point**: `/deliveries/create` → **XLSX (Dynamis)** tab.
 
+> **See also**: [Dynamis Invoice Pricing](./dynamis-pricing.md) (2026-11-11) imports the invoice **PDF** instead, shares the
+> `dynamis_product_links` table, and adds retail pricing. The XLSX flow below is unchanged.
+
 ## Why this exists
 
 Fruit & veg cost updates were being done by hand through `/fruit-veg/manage`.

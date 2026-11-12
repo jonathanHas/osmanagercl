@@ -10,6 +10,7 @@ use App\Models\LabelLog;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierImageCache;
+use App\Services\DeliveryDocumentService;
 use App\Services\DeliveryParsingService;
 use App\Services\DeliveryService;
 use App\Services\Deposits\DepositEvidenceService;
@@ -957,43 +958,7 @@ class DeliveryController extends Controller
         ?array $parsingMetadata = null,
         ?string $orderNumber = null
     ): DeliveryDocument {
-        $storedFilename = DeliveryDocument::generateStoredFilename($originalFilename);
-        $filePath = DeliveryDocument::generateFilePath($delivery->id, $storedFilename);
-
-        // Get file info before moving
-        $mimeType = mime_content_type($tempFilePath);
-        $fileSize = filesize($tempFilePath);
-        $fileHash = hash_file('sha256', $tempFilePath);
-
-        // Ensure directory exists
-        $directory = dirname($filePath);
-        if (! Storage::disk('private')->exists($directory)) {
-            Storage::disk('private')->makeDirectory($directory, 0775, true);
-        }
-
-        // Copy file to permanent storage
-        $fileContents = file_get_contents($tempFilePath);
-        Storage::disk('private')->put($filePath, $fileContents);
-
-        // Set proper permissions
-        $fullPath = Storage::disk('private')->path($filePath);
-        @chmod($fullPath, 0644);
-
-        // Create document record
-        return DeliveryDocument::create([
-            'delivery_id' => $delivery->id,
-            'original_filename' => $originalFilename,
-            'order_number' => $orderNumber,
-            'stored_filename' => $storedFilename,
-            'file_path' => $filePath,
-            'mime_type' => $mimeType,
-            'file_size' => $fileSize,
-            'file_hash' => $fileHash,
-            'document_type' => $documentType,
-            'is_primary' => $delivery->documents()->count() === 0,
-            'uploaded_by' => auth()->id(),
-            'parsing_metadata' => $parsingMetadata,
-        ]);
+        return app(DeliveryDocumentService::class)->store($delivery, $tempFilePath, $originalFilename, $documentType, $parsingMetadata, $orderNumber);
     }
 
     /**

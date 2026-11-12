@@ -192,7 +192,7 @@ class DeliveryService
                 $totalExpected += $lineTotal;
 
                 // If new product, queue barcode retrieval
-                if (! $product) {
+                if (! $product && empty($record['skip_barcode_retrieval'])) {
                     $this->queueBarcodeRetrieval($deliveryItem, true);
                 }
             }
