@@ -46,6 +46,13 @@ class DynamisPricingTest extends TestCase
             $table->string('classId')->nullable();
             $table->integer('unitId')->nullable();
         });
+        $pos->create('class', function (Blueprint $table) {
+            $table->integer('ID')->primary();
+            $table->integer('classNum');
+            $table->string('class');
+        });
+        DB::connection('pos')->table('class')->insert([['ID' => 1, 'classNum' => 1, 'class' => 'I'], ['ID' => 2, 'classNum' => 2, 'class' => 'II']]);
+        DB::connection('pos')->table('CATEGORIES')->insert([['ID' => 'SUB1', 'NAME' => 'Fruit'], ['ID' => 'SUB2', 'NAME' => 'Vegetables']]);
         DB::connection('pos')->table('units')->insert([['ID' => 1, 'units' => 'kg'], ['ID' => 2, 'units' => 'each']]);
         DB::connection('pos')->table('TAXCATEGORIES')->insert([['ID' => '000', 'NAME' => 'Zero'], ['ID' => '001', 'NAME' => 'Standard']]);
         DB::connection('pos')->table('TAXES')->insert([
@@ -415,5 +422,58 @@ class DynamisPricingTest extends TestCase
         $line->update(['origin' => 'ZZ']);
         $this->actingAs($manager)->postJson($url)->assertStatus(422);
         $this->assertSame((int) $spain->id, $country());
+    }
+
+    public function test_a_new_till_product_can_be_created_from_a_line(): void
+    {
+        $delivery = $this->import();
+        $line = $this->line($delivery, 'AVO001'); // AVOCADO BACON SPAIN CLASS II, 1 box at 25.20, no count on the invoice
+        $manager = $this->user('manager');
+        $url = route('deliveries.dynamis-pricing.new-product', [$delivery, $line]);
+        $spain = \App\Models\Country::where('code', 'ES')->firstOrFail();
+
+        $page = collect(app(\App\Services\DynamisPricingService::class)->lines($delivery)['produce'])->keyBy('code');
+        $this->assertSame(['name' => 'Avocado Bacon', 'class' => 'II'], $page['AVO001']['new_product']);
+
+        $form = [
+            'name' => 'Avocado Bacon', 'display' => 'Bacon Avo', 'category' => 'SUB1', 'mode' => 'each', 'units_per_box' => 14,
+            'price' => 2.70, 'country_id' => $spain->id, 'class_id' => 2, 'show_on_till' => 1,
+            'image' => UploadedFile::fake()->image('bacon.jpg', 600, 400),
+        ];
+
+        $this->actingAs($this->user('employee'))->post($url, $form, ['Accept' => 'application/json'])->assertForbidden();
+        // No count yet: the cost per piece cannot be worked out.
+        $this->actingAs($manager)->post($url, ['units_per_box' => null] + $form, ['Accept' => 'application/json'])->assertStatus(422);
+        // A name the till already has.
+        $this->actingAs($manager)->post($url, ['name' => 'Avocado Hass'] + $form, ['Accept' => 'application/json'])->assertStatus(422);
+        $this->assertSame(0, DB::connection('pos')->table('PRODUCTS')->where('NAME', 'Avocado Bacon')->count());
+
+        $this->actingAs($manager)->post($url, $form, ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('line.product.name', 'Avocado Bacon')
+            ->assertJsonPath('line.product.on_till', true)
+            ->assertJsonPath('line.product.till_unit', 'each')
+            ->assertJsonPath('line.product.country_name', 'Spain')
+            ->assertJsonPath('line.applied_price', 2.7);
+
+        $product = DB::connection('pos')->table('PRODUCTS')->where('NAME', 'Avocado Bacon')->first();
+        $this->assertSame('Bacon Avo', $product->DISPLAY);
+        $this->assertSame('SUB1', $product->CATEGORY);
+        $this->assertSame('000', $product->TAXCAT);
+        $this->assertEquals(2.70, round((float) $product->PRICESELL, 2));
+        // Cost is the invoice cost per piece, without delivery.
+        $this->assertEquals(round($line->net_unit_price * $line->quantity / $line->packages / 14, 4), round((float) $product->PRICEBUY, 4));
+        $this->assertNotEmpty($product->IMAGE);
+        $this->assertLessThanOrEqual(128, imagesx(imagecreatefromstring($product->IMAGE)));
+        $this->assertTrue(ctype_digit($product->CODE) && (int) $product->CODE >= 1000 && (int) $product->CODE <= 2999);
+
+        $details = DB::connection('pos')->table('vegDetails')->where('product', $product->CODE)->first();
+        $this->assertSame([(int) $spain->id, 2, 2], [(int) $details->countryCode, (int) $details->classId, (int) $details->unitId]);
+        $this->assertSame('new_product', VegPrintQueue::where('product_code', $product->CODE)->value('reason'));
+        $this->assertSame($product->ID, $line->deliveryItem->fresh()->product_id);
+        $this->assertSame($product->ID, \App\Models\DynamisProductLink::where('dynamis_code', 'AVO001')->value('pos_product_id'));
+
+        // The line has a product now; a second one is refused.
+        $this->actingAs($manager)->post($url, ['name' => 'Avocado Bacon Two'] + $form, ['Accept' => 'application/json'])->assertStatus(422);
     }
 }

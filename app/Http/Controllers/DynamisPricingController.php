@@ -93,6 +93,7 @@ class DynamisPricingController extends Controller
             'settings' => $this->pricing->settings($delivery),
             'defaults' => $this->pricing->defaults(),
             'lines' => $this->pricing->lines($delivery),
+            'newProductOptions' => $this->pricing->newProductOptions(),
             'warnings' => $delivery->import_data['parser_warnings'] ?? [],
         ]);
     }
@@ -165,6 +166,42 @@ class DynamisPricingController extends Controller
         $this->guard($delivery, $line);
 
         $this->pricing->skip($line, $request->boolean('skip', true));
+
+        return response()->json(['success' => true, 'line' => $this->pricing->presentLine($line->refresh())]);
+    }
+
+    /** Create a new fruit & veg till product from a line that has none. */
+    public function createProduct(Request $request, Delivery $delivery, DynamisPricingLine $line): JsonResponse
+    {
+        $this->guard($delivery, $line);
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'display' => 'nullable|string|max:255',
+            'category' => ['required', Rule::in(['SUB1', 'SUB2'])],
+            'mode' => ['required', Rule::in([DynamisPricingLine::MODE_PER_KG, DynamisPricingLine::MODE_EACH])],
+            'units_per_box' => 'nullable|numeric|gt:0|max:9999',
+            'kg_per_box' => 'nullable|numeric|gt:0|max:9999',
+            'price' => 'required|numeric|gt:0|max:9999',
+            'country_id' => ['required', 'integer', Rule::exists(\App\Models\Country::class, 'id')],
+            'class_id' => ['required', 'integer', Rule::exists(\App\Models\VegClass::class, 'ID')],
+            'show_on_till' => 'sometimes|boolean',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:4096',
+        ]);
+        foreach (['units_per_box', 'kg_per_box'] as $key) {
+            $data[$key] = isset($data[$key]) ? (float) $data[$key] : null;
+        }
+        $data['show_on_till'] = $request->boolean('show_on_till', true);
+
+        try {
+            $this->pricing->createProduct($line, $data, $request->file('image'), $request->user()->id);
+        } catch (InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['success' => false, 'message' => 'The product could not be created. Please try again.'], 500);
+        }
 
         return response()->json(['success' => true, 'line' => $this->pricing->presentLine($line->refresh())]);
     }

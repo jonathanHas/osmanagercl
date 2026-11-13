@@ -524,6 +524,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/skip', [\App\Http\Controllers\DynamisPricingController::class, 'skip'])->name('deliveries.dynamis-pricing.skip');
         Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/show-on-till', [\App\Http\Controllers\DynamisPricingController::class, 'showOnTill'])->name('deliveries.dynamis-pricing.show-on-till');
         Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/country', [\App\Http\Controllers\DynamisPricingController::class, 'country'])->name('deliveries.dynamis-pricing.country');
+        Route::post('/deliveries/{delivery}/dynamis-pricing/lines/{line}/new-product', [\App\Http\Controllers\DynamisPricingController::class, 'createProduct'])->name('deliveries.dynamis-pricing.new-product');
     });
 
     // Fruit & Veg routes

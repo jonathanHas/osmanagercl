@@ -25,7 +25,9 @@
     <div class="py-6" x-data="dynamisPricing(@js([
             'lines' => $lines['produce'],
             'settings' => $settings,
+            'options' => $newProductOptions,
             'urls' => [
+                'search' => route('api.products.search'),
                 'settings' => route('deliveries.dynamis-pricing.settings', $delivery),
                 'line' => url("/deliveries/{$delivery->id}/dynamis-pricing/lines"),
             ],
@@ -171,17 +173,23 @@
                                                     <span x-text="line.suggestion.name"></span><span x-show="line.suggestion.on_till" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200">On till</span><span x-show="!line.suggestion.on_till" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100" title="This product is hidden from the till buttons">Not on till</span>
                                                     <span class="text-xs text-gray-500 dark:text-gray-400 tabular-nums">(<span x-text="money(line.suggestion.till_price)"></span>)</span>
                                                 </div>
-                                                <div class="mt-1 flex gap-2">
+                                                <div class="mt-1 flex flex-wrap gap-1.5 whitespace-nowrap">
                                                     <button type="button" x-on:click="link(line, line.suggestion.id)" :disabled="line.busy"
                                                             class="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-100">Yes, use this</button>
                                                     <button type="button" x-on:click="openPicker(line)"
                                                             class="px-2 py-1 rounded text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Choose another</button>
+                                                    <button type="button" x-on:click="openNewProduct(line)"
+                                                            class="px-2 py-1 rounded text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">New product</button>
                                                 </div>
                                             </div>
                                         </template>
                                         <template x-if="!line.product && !line.suggestion">
+                                            <div>
                                             <button type="button" x-on:click="openPicker(line)"
                                                     class="px-2 py-1 rounded text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">Choose till product</button>
+                                                    <button type="button" x-on:click="openNewProduct(line)"
+                                                            class="ml-1 px-2 py-1 rounded text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">New product</button>
+                                        </div>
                                         </template>
                                     </td>
 
@@ -338,6 +346,118 @@
                 <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">The choice is remembered for this Dynamis code on future invoices.</p>
             </div>
         </div>
+
+        {{-- New till product for a line that has none --}}
+        <div x-show="creating" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-10 px-4 pb-10 overflow-y-auto bg-gray-900/50"
+             x-on:keydown.escape.window="creating = null" x-on:click.self="creating = null">
+            <template x-if="creating">
+                <form class="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-lg shadow-xl p-5 space-y-4" x-on:submit.prevent="saveNewProduct()">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <div class="font-semibold text-gray-900 dark:text-gray-100">New till product</div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400"><span x-text="creating.description"></span> &middot; <span x-text="creating.origin"></span></div>
+                        </div>
+                        <button type="button" x-on:click="creating = null" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">&#10005;</button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <label class="block">
+                            <span class="text-gray-700 dark:text-gray-300">Name</span>
+                            <input type="text" x-model="form.name" x-on:input.debounce.400ms="findSimilar()" required maxlength="255"
+                                   class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 dark:text-gray-300">Till button text <span class="text-gray-400">(optional)</span></span>
+                            <input type="text" x-model="form.display" maxlength="255" :placeholder="form.name"
+                                   class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                        </label>
+
+                        <div class="sm:col-span-2 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 px-3 py-2" x-show="form.similar.length">
+                            <div class="text-xs font-medium text-amber-900 dark:text-amber-100">Already in the till's product list &mdash; use one of these instead?</div>
+                            <template x-for="match in form.similar" :key="match.id">
+                                <div class="mt-1 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-100">
+                                    <span><span class="font-medium" x-text="match.name"></span> &middot; <span x-text="money(match.price_with_vat)"></span> &middot; <span x-text="match.on_till ? 'on till' : 'not on till'"></span></span>
+                                    <button type="button" class="underline" x-on:click="useExisting(match)">Use this</button>
+                                </div>
+                            </template>
+                        </div>
+
+                        <label class="block">
+                            <span class="text-gray-700 dark:text-gray-300">Category</span>
+                            <select x-model="form.category" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                                <option value="">Choose&hellip;</option>
+                                <template x-for="option in options.categories" :key="option.id"><option :value="option.id" :selected="String(option.id) === String(form.category)" x-text="option.name"></option></template>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 dark:text-gray-300">Country of origin</span>
+                            <select x-model="form.country_id" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                                <option value="">Choose&hellip;</option>
+                                <template x-for="option in options.countries" :key="option.id"><option :value="option.id" :selected="String(option.id) === String(form.country_id)" x-text="option.name"></option></template>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 dark:text-gray-300">Class</span>
+                            <select x-model="form.class_id" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm">
+                                <template x-for="option in options.classes" :key="option.id"><option :value="option.id" :selected="String(option.id) === String(form.class_id)" x-text="'Class ' + option.name"></option></template>
+                            </select>
+                        </label>
+                        <div>
+                            <span class="text-gray-700 dark:text-gray-300">Sold</span>
+                            <div class="mt-1 flex items-center gap-2">
+                                <div class="inline-flex rounded-md shadow-sm" role="group">
+                                    <button type="button" x-on:click="creating.mode = 'per_kg'" :class="modeClass(creating, 'per_kg')" class="px-3 py-1.5 text-xs font-medium border rounded-l-md">Per kg</button>
+                                    <button type="button" x-on:click="creating.mode = 'each'" :class="modeClass(creating, 'each')" class="px-3 py-1.5 text-xs font-medium border border-l-0 rounded-r-md">Each</button>
+                                </div>
+                                <template x-if="creating && creating.mode === 'each'">
+                                    <span class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"><input type="number" min="1" step="1" x-model.number="creating.units_per_box" x-on:input="creating.count_source = null" placeholder="count" class="w-20 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm py-1"> in a box</span>
+                                </template>
+                                <template x-if="creating && creating.mode === 'per_kg' && creating.unit !== 'KG'">
+                                    <span class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400"><input type="number" min="0.1" step="0.1" x-model.number="creating.kg_per_box" placeholder="kg" class="w-20 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm py-1"> kg in a box</span>
+                                </template>
+                            </div>
+                        </div>
+
+                        <label class="block">
+                            <span class="text-gray-700 dark:text-gray-300">Price <span x-text="creating.mode === 'per_kg' ? 'per kg' : 'each'"></span></span>
+                            <div class="mt-1 flex items-center gap-1.5">
+                                <span class="text-gray-500 dark:text-gray-400">&euro;</span>
+                                <input type="number" min="0.01" step="0.01" x-model="form.price" required
+                                       class="w-28 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 text-sm tabular-nums font-medium">
+                            </div>
+                            <div class="mt-1 text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                                <template x-if="creating && suggested(creating) !== null">
+                                    <button type="button" class="underline decoration-dotted" x-on:click="form.price = suggested(creating).toFixed(2)">guide <span x-text="creating ? money(suggested(creating)) : ''"></span></button>
+                                </template>
+                                <template x-if="creating && landedCost(creating) !== null">
+                                    <span> &middot; cost <span x-text="creating ? money(landedCost(creating)) : ''"></span> inc. delivery</span>
+                                </template>
+                            </div>
+                        </label>
+                        <label class="block">
+                            <span class="text-gray-700 dark:text-gray-300">Picture for the till <span class="text-gray-400">(optional)</span></span>
+                            <input type="file" accept="image/jpeg,image/png,image/gif" x-ref="newProductImage" x-on:change="previewImage($event)"
+                                   class="mt-1 block w-full text-xs text-gray-600 dark:text-gray-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-gray-100 dark:file:bg-gray-700 file:text-gray-700 dark:file:text-gray-200">
+                            <img x-show="form.preview" :src="form.preview" alt="" class="mt-2 h-16 w-16 object-cover rounded border border-gray-200 dark:border-gray-700">
+                        </label>
+
+                        <label class="sm:col-span-2 flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                            <input type="checkbox" x-model="form.show_on_till" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600"> Show on the till
+                        </label>
+                    </div>
+
+                    <div class="text-sm text-red-600 dark:text-red-400" x-show="form.error" x-text="form.error"></div>
+
+                    <div class="flex items-center justify-between gap-4">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">The code is given automatically. The label is queued and this line is marked priced.</p>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <button type="button" x-on:click="creating = null" class="px-3 py-2 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Cancel</button>
+                            <button type="submit" :disabled="form.busy" class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50" x-text="form.busy ? 'Creating…' : 'Create product'"></button>
+                        </div>
+                    </div>
+                </form>
+            </template>
+        </div>
     </div>
 
     @push('scripts')
@@ -349,6 +469,9 @@
                 settingsNote: '',
                 hideDone: false,
                 picking: null,
+                creating: null,
+                options: config.options,
+                form: { similar: [] },
                 bulkBusy: false,
 
                 // ---- the formula (mirrors App\Services\DynamisPricingService) ----
@@ -477,6 +600,84 @@
                 openPicker(line) {
                     this.picking = line;
                     this.$nextTick(() => this.$root.querySelector('.product-search input[type=text], .product-search input[type=search]')?.focus());
+                },
+                // ---- new product ----
+                openNewProduct(line) {
+                    const defaults = line.new_product || { name: '', class: null };
+                    const invoiceClass = this.options.classes.find((c) => c.name === defaults.class);
+                    const guide = this.suggested(line);
+                    this.form = {
+                        name: defaults.name, display: '', category: '',
+                        country_id: line.origin_country ? line.origin_country.id : '',
+                        class_id: (invoiceClass || this.options.classes[0] || { id: '' }).id,
+                        price: guide === null ? '' : guide.toFixed(2),
+                        show_on_till: true, preview: null, similar: [], error: null, busy: false,
+                    };
+                    this.creating = line;
+                    this.findSimilar();
+                },
+                previewImage(event) {
+                    const file = event.target.files[0];
+                    this.form.preview = file ? URL.createObjectURL(file) : null;
+                },
+                // Fruit & veg already in the product list under a similar name (most are hidden from the till).
+                async findSimilar() {
+                    const word = (this.form.name || '').trim().split(/\s+/).sort((a, b) => b.length - a.length)[0] || '';
+                    if (word.length < 3) { this.form.similar = []; return; }
+                    const url = new URL(config.urls.search, window.location.origin);
+                    url.searchParams.set('q', word.replace(/(es|s)$/i, ''));
+                    url.searchParams.set('stocked', '0');
+                    url.searchParams.set('with_till', '1');
+                    url.searchParams.set('per_page', '50');
+                    try {
+                        const data = await (await fetch(url, { headers: { Accept: 'application/json' } })).json();
+                        if (this.creating) this.form.similar = (data.data || []).filter((p) => ['SUB1', 'SUB2', 'SUB3'].includes(p.category_id)).slice(0, 6);
+                    } catch (e) { this.form.similar = []; }
+                },
+                useExisting(match) {
+                    const line = this.creating;
+                    this.creating = null;
+                    this.link(line, match.id);
+                },
+                async saveNewProduct() {
+                    const line = this.creating, form = this.form;
+                    const body = new FormData();
+                    body.append('name', form.name);
+                    body.append('display', form.display || '');
+                    body.append('category', form.category);
+                    body.append('country_id', form.country_id);
+                    body.append('class_id', form.class_id);
+                    body.append('price', form.price);
+                    body.append('mode', line.mode);
+                    if (line.units_per_box) body.append('units_per_box', line.units_per_box);
+                    if (line.kg_per_box) body.append('kg_per_box', line.kg_per_box);
+                    body.append('show_on_till', form.show_on_till ? '1' : '0');
+                    const file = this.$refs.newProductImage ? this.$refs.newProductImage.files[0] : null;
+                    if (file) body.append('image', file);
+
+                    form.busy = true;
+                    form.error = null;
+                    try {
+                        const response = await fetch(`${config.urls.line}/${line.id}/new-product`, {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                            body,
+                        });
+                        const data = await response.json().catch(() => ({}));
+                        if (!response.ok || data.success === false) {
+                            const first = data.errors ? Object.values(data.errors)[0][0] : null;
+                            throw new Error(first || data.message || 'Something went wrong (' + response.status + ').');
+                        }
+                        this.merge(line, data.line, false);
+                        line.price = Number(data.line.applied_price).toFixed(2);
+                        line.priceSource = 'typed';
+                        line.ticked = false;
+                        this.creating = null;
+                    } catch (e) {
+                        form.error = e.message;
+                    } finally {
+                        form.busy = false;
+                    }
                 },
                 async post(url, body) {
                     const response = await fetch(url, {

@@ -10,8 +10,10 @@ use App\Models\DynamisProductLink;
 use App\Models\PosUnit;
 use App\Models\Product;
 use App\Models\ProductsCat;
+use App\Models\VegClass;
 use App\Models\VegDetails;
 use App\Models\VegPrintQueue;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -53,6 +55,7 @@ class DynamisPricingService
         private DynamisMatcherService $matcher,
         private DeliveryService $deliveryService,
         private FruitVegPriceService $priceService,
+        private FruitVegProductService $productService,
     ) {}
 
     // ---------------------------------------------------------------------
@@ -440,6 +443,7 @@ class DynamisPricingService
             'description' => $line->description,
             'origin' => $line->origin,
             'origin_country' => $this->originCountry($line->origin),
+            'new_product' => $product ? null : self::newProductDefaults($line->description),
             'unit' => $line->unit,
             'packages' => $line->packages,
             'quantity' => $line->quantity,
@@ -595,6 +599,75 @@ class DynamisPricingService
     public function skip(DynamisPricingLine $line, bool $skip = true): void
     {
         $line->update(['pricing_mode' => $skip ? DynamisPricingLine::MODE_SKIP : null]);
+    }
+
+    /**
+     * What the "New product" form starts with for an invoice description:
+     * a till-style name and the class as invoiced ("CLASS II" → "II").
+     *
+     * @return array{name: string, class: ?string}
+     */
+    public static function newProductDefaults(string $description): array
+    {
+        preg_match('/\bCLASS\s+(I{1,3})\b/i', $description, $m);
+
+        return [
+            'name' => ucwords(strtolower(self::productWords($description))),
+            'class' => isset($m[1]) ? strtoupper($m[1]) : null,
+        ];
+    }
+
+    /**
+     * Create a till product for a line that has none, tie the line to it and
+     * mark the line priced. The cost stored on the product is the invoice
+     * cost for one kg / one piece as sold, without delivery.
+     *
+     * @param  array{name: string, display?: ?string, category: string, price: float, mode: string,
+     *     units_per_box?: ?float, kg_per_box?: ?float, country_id: int, class_id: int, show_on_till?: bool}  $data
+     */
+    public function createProduct(DynamisPricingLine $line, array $data, ?UploadedFile $image, ?int $userId): Product
+    {
+        if ($line->deliveryItem?->product_id) {
+            throw new InvalidArgumentException('This line already has a till product.');
+        }
+
+        $perKg = $data['mode'] === DynamisPricingLine::MODE_PER_KG;
+        $divisor = (float) ($perKg ? ($data['kg_per_box'] ?? 0) : ($data['units_per_box'] ?? 0));
+        if ($divisor <= 0) {
+            throw new InvalidArgumentException($perKg ? 'Enter the weight of a box first.' : 'Enter how many are in a box first.');
+        }
+
+        $product = $this->productService->create([
+            'name' => $data['name'],
+            'display' => $data['display'] ?? null,
+            'category' => $data['category'],
+            'price' => (float) $data['price'],
+            'cost' => $line->net_unit_price * $line->quantity / max(1, $line->packages) / $divisor,
+            'unit' => $perKg ? 'kg' : 'each',
+            'country_id' => (int) $data['country_id'],
+            'class_id' => (int) $data['class_id'],
+            'show_on_till' => (bool) ($data['show_on_till'] ?? true),
+            'source' => 'dynamis_pricing',
+        ], $image, $userId);
+
+        $this->linkProduct($line, (string) $product->ID, $userId);
+        $line->load('deliveryItem');
+        $this->apply($line, $data['mode'], $data['units_per_box'] ?? null, $data['kg_per_box'] ?? null, (float) $data['price'], $userId);
+
+        return $product;
+    }
+
+    /** The lists the "New product" form chooses from. */
+    public function newProductOptions(): array
+    {
+        return [
+            'categories' => \App\Models\Category::whereIn('ID', ['SUB1', 'SUB2'])->orderBy('ID')->get(['ID', 'NAME'])
+                ->map(fn ($c) => ['id' => (string) $c->ID, 'name' => (string) $c->NAME])->all(),
+            'countries' => Country::orderBy('name')->get(['id', 'name'])
+                ->map(fn ($c) => ['id' => (int) $c->id, 'name' => (string) $c->name])->all(),
+            'classes' => VegClass::orderBy('ID')->get()
+                ->map(fn ($c) => ['id' => (int) $c->ID, 'name' => (string) $c->class])->all(),
+        ];
     }
 
     /**

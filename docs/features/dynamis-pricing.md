@@ -79,8 +79,38 @@ disagrees with the till unit.
   activity log as Fruit & Veg > Manage). It is not offered for an unconfirmed guess, and
   the page never hides a product.
 - No till product → the guide is shown but the line cannot be applied. New products are
-  still created in Fruit & Veg. (Creating products from the page and AI suggestions were
-  left out on purpose; add them if they turn out to be needed.)
+  still created in Fruit & Veg. See **New product from a line** below. (AI suggestions were left out on
+  purpose; add them if they turn out to be needed.)
+
+## New product from a line
+
+A line with no till product has a **New product** button (beside "Choose till product" /
+"Choose another"). The form is prefilled from the line and creates a fruit & veg till
+product in one step.
+
+| Field | Starts as |
+|---|---|
+| Name | the description without class / size / weight / country, in title case (`newProductDefaults`) |
+| Till button text | empty (the till then shows the name); stored in `PRODUCTS.DISPLAY` |
+| Category | must be chosen: Fruit (`SUB1`) or Vegetables (`SUB2`) |
+| Country of origin | the invoice origin |
+| Class | the class in the description ("CLASS II"), else Class I |
+| Sold | the line's Per kg / Each choice and box count / weight (editable in the form) |
+| Price | the guide price; cost inc. delivery shown beside it |
+| Picture for the till | optional; scaled down to 128 px and stored in `PRODUCTS.IMAGE` |
+| Show on the till | ticked |
+
+- The code is the next free one in the fruit & veg range (`BarcodeGeneratorService`).
+  VAT is zero (`TAXCAT 000`, as every F&V product). **Cost price** (`PRICEBUY`) is the
+  invoice cost for one kg / one piece as sold, **without delivery**.
+- The form lists fruit & veg already in the product list with a similar name (most are
+  hidden from the till) with **Use this**, so an old product is re-used rather than
+  duplicated. A name that already exists is refused.
+- On save: `FruitVegProductService::create` (product, `vegDetails`, stock rows, label
+  log, metadata, label queue with reason `new_product`, till button), then the line is
+  linked (remembered for this Dynamis code) and marked priced.
+- `FruitVegProductService` repeats the shared steps of `ProductController@store` rather
+  than replacing them; that page is unchanged. Keep the two in step if either changes.
 
 ## The new price box
 
