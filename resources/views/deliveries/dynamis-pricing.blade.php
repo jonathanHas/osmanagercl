@@ -238,6 +238,11 @@
                                                 <span :class="changeClass(line)" x-text="changeText(line)"></span>
                                             </template>
                                         </div>
+                                        <div class="mt-1 text-xs tabular-nums" x-show="landedCost(line) !== null"
+                                             :class="belowCost(line) ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-500 dark:text-gray-400'"
+                                             title="Invoice cost × transport, for one kg or one piece as sold. Margin is on the price before VAT.">
+                                            cost <span x-text="money(landedCost(line))"></span> <span x-text="line.mode === 'per_kg' ? '/kg' : 'each'"></span> inc. delivery<template x-if="margin(line) !== null"><span> &middot; <span x-text="belowCost(line) ? 'below cost' : 'margin ' + Math.round(margin(line) * 100) + '%'"></span></span></template>
+                                        </div>
                                     </td>
 
                                     <td class="px-3 py-3 text-right whitespace-nowrap">
@@ -358,6 +363,26 @@
                     const divisor = line.mode === 'per_kg' ? line.kg_per_box : line.units_per_box;
                     if (!divisor || divisor <= 0) return null;
                     return Math.round(this.boxPrice(line) / divisor * 100) / 100;
+                },
+
+                // ---- cost ----
+                // What one kg / one piece as sold costs us, delivery included (ex VAT).
+                landedCost(line) {
+                    const divisor = line.mode === 'per_kg' ? line.kg_per_box : line.units_per_box;
+                    if (!divisor || divisor <= 0) return null;
+                    return line.net_unit_price * this.settings.transport * line.quantity / line.packages / divisor;
+                },
+                // Share of the price before VAT that is left after the landed cost.
+                margin(line) {
+                    const cost = this.landedCost(line), price = this.priceNumber(line);
+                    if (cost === null || price === null) return null;
+                    const product = line.product || line.suggestion;
+                    const exVat = price / (1 + (product ? product.vat_rate : 0));
+                    return (exVat - cost) / exVat;
+                },
+                belowCost(line) {
+                    const m = this.margin(line);
+                    return m !== null && m < 0;
                 },
 
                 // ---- price box ----

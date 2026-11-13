@@ -97,6 +97,16 @@ disagrees with the till unit.
   Applying an unchanged price writes nothing to the till; it just marks the line done and
   remembers per kg / each and the count.
 
+## Cost and margin
+
+Under the price box each line shows **cost €x.xx /kg (or each) inc. delivery · margin
+n%**: invoice cost × transport for one kg or one piece as sold (`landedCost` in the
+page's JS), and the share of the price before VAT left after it. It follows the price
+box, the count / weight and the transport setting live, and turns red with "below cost"
+when the price no longer covers it. "Delivery" here is the transport multiplier (the
+estimate used for the guide), not the actual charge on the invoice. Display only; nothing
+is stored.
+
 ## Country of origin
 
 - The invoice's origin column is a two-letter code (`FR`, `ES`). `countries.code` holds
