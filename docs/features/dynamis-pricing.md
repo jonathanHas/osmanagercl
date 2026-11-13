@@ -90,7 +90,9 @@ disagrees with the till unit.
 - **Use guide €x.xx** puts the guide price in the box; it then follows the count, weight,
   transport and markup as they are edited. **keep €x.xx** goes back to the till price.
   Typing a price overrides both.
-- A line with no till product shows the guide for reference and cannot be applied.
+- Before a product is confirmed the box shows the suggested product's till price; with
+  no product and no suggestion it is empty until **Use guide** is clicked or a price is
+  typed. Either way the line cannot be applied until a till product is chosen.
 - **Tick all with a new price** ticks only linked lines whose box differs from the till.
   Applying an unchanged price writes nothing to the till; it just marks the line done and
   remembers per kg / each and the count.

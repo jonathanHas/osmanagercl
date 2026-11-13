@@ -231,8 +231,8 @@
                                                         :class="line.priceSource === 'guide' ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 dark:border-gray-600 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-gray-700'"
                                                         class="px-1.5 py-0.5 rounded border font-medium">Use guide <span x-text="money(suggested(line))"></span></button>
                                             </template>
-                                            <template x-if="line.product && line.priceSource !== 'till'">
-                                                <button type="button" x-on:click="line.priceSource = 'till'" class="ml-1 underline decoration-dotted" title="Go back to the price on the till now">keep <span x-text="money(line.product.till_price)"></span></button>
+                                            <template x-if="tillPrice(line) !== null && line.priceSource !== 'till'">
+                                                <button type="button" x-on:click="line.priceSource = 'till'" class="ml-1 underline decoration-dotted" title="Go back to the price on the till now">keep <span x-text="money(tillPrice(line))"></span></button>
                                             </template>
                                             <template x-if="line.product && priceNumber(line) !== null">
                                                 <span :class="changeClass(line)" x-text="changeText(line)"></span>
@@ -365,9 +365,17 @@
                 // goes in when "Use guide" is clicked; typing overrides both.
                 priceValue(line) {
                     if (line.priceSource === 'typed') return line.price;
-                    if (line.priceSource === 'till' && line.product) return Number(line.product.till_price).toFixed(2);
+                    if (line.priceSource === 'till') {
+                        // Before a product is confirmed, the suggested product's till price stands in.
+                        const now = this.tillPrice(line);
+                        return now === null ? '' : now.toFixed(2);
+                    }
                     const s = this.suggested(line);
                     return s === null ? '' : s.toFixed(2);
+                },
+                tillPrice(line) {
+                    const product = line.product || line.suggestion;
+                    return product ? Number(product.till_price) : null;
                 },
                 changesTill(line) {
                     const price = this.priceNumber(line);
