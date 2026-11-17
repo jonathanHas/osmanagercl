@@ -22,6 +22,7 @@ The order generation system automates the calculation of required stock quantiti
   - Global chart scaling, percentage grid lines, and condensed captions directly under each trend line.
   - A default sort by recent sales volume, with alternate sort modes (name, priority, value).
   - A toggle to hide/show unordered items (`show_all` query parameter); when hidden only products with a positive ordered quantity are displayed.
+  - A **Not sold in 6 months** button (2026-11) beside that toggle. Generation only takes stocked supplier products with a sale in the last `OrderService::RECENT_SALES_MONTHS` (6) months, so the rest never become order rows. The button lists them (`GET /orders/{order}/dormant-products`, `OrderService::dormantSupplierProducts()`: stocked, linked to the supplier, no sale in the window, not already on the order) with last-sold date, stock and cost, and adds one through the existing `orders.add-product` endpoint, so it lands in the **Added** group. The list loads in the background after the page renders; it is not on the Shop order review or the Christmas review. Its search box runs in the browser on the loaded list and follows the product search rules (words in any order, all must match name, barcode or supplier code, ranked, typo fallback with "Showing results for …"); rows render 40 at a time with **Show more**.
   - Inline comparisons between suggested vs final quantities, ensuring the “After” stock bars reflect final user adjustments.
 
 ### 2025-10 Enhancements

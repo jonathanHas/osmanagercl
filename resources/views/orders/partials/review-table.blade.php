@@ -314,6 +314,78 @@
            class="px-3 py-2 rounded-md border {{ $showAll ? 'border-indigo-500 text-indigo-600' : 'border-gray-300 text-gray-600' }} text-sm hover:bg-gray-100">
             {{ $showAll ? 'Hide unordered' : 'Show unordered'.($hiddenCount > 0 ? ' ('.$hiddenCount.')' : '') }}
         </a>
+        {{-- Stocked supplier products that generation skipped: no sale in the last 6 months. --}}
+        <div x-data="orderDormantProducts({ listUrl: '{{ route('orders.dormant-products', $orderSession) }}', addUrl: '{{ route('orders.add-product', $orderSession) }}', editable: {{ $orderSession->isEditable() ? 'true' : 'false' }} })" x-init="load()" @keydown.escape.window="open = false">
+            <button
+                type="button"
+                @click="open = true"
+                :class="open ? 'border-indigo-500 text-indigo-600' : 'border-gray-300 text-gray-600'"
+                class="px-3 py-2 rounded-md border text-sm hover:bg-gray-100"
+                title="Stocked products from this supplier with no sales in the last 6 months, so not included when the order was generated"
+            >
+                Not sold in 6 months<span x-show="loaded" x-text="' (' + results.length + ')'"></span>
+            </button>
+            <div x-show="open" class="fixed inset-0 z-40 flex items-start justify-center bg-gray-900/50 p-4 sm:p-10" style="display: none;" @click.self="open = false">
+                <div class="w-full max-w-2xl max-h-full flex flex-col bg-white rounded-lg shadow-xl">
+                    <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900">Not sold in the last 6 months</h3>
+                            <p class="text-sm text-gray-500">Stocked products from this supplier that were left out of the order because they have no recent sales. Enter a quantity to add one.</p>
+                        </div>
+                        <button type="button" @click="open = false" class="text-gray-400 hover:text-gray-600 text-2xl leading-none" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="px-5 py-3 border-b border-gray-100" x-show="results.length > 8">
+                        <input type="search" x-model="filter" @input.debounce.200ms="applyFilter()" @search="applyFilter()" placeholder="Search by name, barcode or supplier code…" class="w-full border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <p class="mt-1 text-xs text-gray-500" x-show="correctedTo">Showing results for <span class="font-medium" x-text="correctedTo"></span></p>
+                    </div>
+                    <div class="overflow-y-auto">
+                        <div class="p-6 text-sm text-gray-500 text-center" x-show="loading">Loading…</div>
+                        <div class="p-6 text-sm text-red-600 text-center" x-show="failed">Could not load the list. <button type="button" class="underline" @click="load()">Try again</button></div>
+                        <div class="p-6 text-sm text-gray-500 text-center" x-show="loaded && results.length === 0">Every stocked product from this supplier has sold in the last 6 months or is already on the order.</div>
+                        <div class="p-6 text-sm text-gray-500 text-center" x-show="results.length > 0 && matches.length === 0">Nothing matches that search.</div>
+                        <template x-for="item in matches.slice(0, shown)" :key="item.product_id">
+                            <div class="px-5 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 flex items-center justify-between gap-4">
+                                <div class="min-w-0">
+                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="item.name"></div>
+                                    <div class="text-xs text-gray-500">
+                                        <span x-text="'Code ' + item.code"></span>
+                                        <template x-if="item.supplier_code"><span x-text="' · Sup ' + item.supplier_code"></span></template>
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-gray-600">
+                                        <span>Last sold: <span class="font-medium" x-text="item.last_sold ? formatDate(item.last_sold) : 'never'"></span></span>
+                                        <span>Stock: <span class="font-medium" x-text="item.current_stock"></span></span>
+                                        <span>Cost: <span class="font-medium" x-text="'€' + Number(item.unit_cost).toFixed(2)"></span></span>
+                                        <template x-if="item.is_case_product"><span class="text-indigo-600" x-text="'×' + item.case_units + '/case'"></span></template>
+                                    </div>
+                                </div>
+                                <div class="shrink-0 flex items-center gap-2">
+                                    <label class="text-xs text-gray-500" x-text="item.is_case_product ? 'Cases' : 'Units'"></label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        x-model="item._qty"
+                                        :disabled="!editable || item._saving"
+                                        class="w-20 border-gray-300 rounded-md text-sm py-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                        @keydown.enter.prevent="applyQty(item)"
+                                    >
+                                    <button
+                                        type="button"
+                                        @click="applyQty(item)"
+                                        :disabled="!editable || item._saving"
+                                        class="px-3 py-1 text-sm rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-50"
+                                        x-text="item._saving ? 'Adding…' : 'Add'"
+                                    ></button>
+                                </div>
+                            </div>
+                        </template>
+                        <div class="p-3 text-center" x-show="matches.length > shown">
+                            <button type="button" @click="shown += pageSize" class="text-sm text-indigo-600 hover:underline" x-text="'Show more (' + (matches.length - shown) + ' more)'"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <form method="GET" class="flex items-center space-x-2 text-sm text-gray-600">
             @foreach(request()->except('sort') as $paramKey => $paramValue)
                 <input type="hidden" name="{{ $paramKey }}" value="{{ $paramValue }}">
@@ -4012,6 +4084,137 @@
                 } catch (e) {
                     item._saving = false;
                     alert('Failed to save: ' + e.message);
+                }
+            },
+        };
+    }
+
+    // Alpine factory for the "Not sold in 6 months" list: stocked supplier products that
+    // generation skipped. Loads once in the background (so the button can show a count)
+    // and adds through the same add-product endpoint as the catalogue search.
+    function orderDormantProducts(config) {
+        return {
+            ...orderProductSearch({ addUrl: config.addUrl, editable: config.editable }),
+            listUrl: config.listUrl,
+            open: false,
+            loaded: false,
+            failed: false,
+            filter: '',
+            _vocab: [],
+
+            // Rows are rendered a page at a time: drawing several hundred rows on every
+            // keystroke is what made typing stutter.
+            matches: [],
+            pageSize: 40,
+            shown: 40,
+            correctedTo: '',
+
+            // Same idea as the product search (docs/features/product-search.md), done in the
+            // browser on the loaded list: split into words, every word must match the name,
+            // barcode or supplier code, best matches first, and a typo fallback when nothing matches.
+            tokens(text) {
+                return [...new Set(String(text).toLowerCase().split(/\s+/)
+                    .map(t => t.replace(/[^a-z0-9%.\-]/g, '')).filter(Boolean))].slice(0, 6);
+            },
+
+            score(item, tokens) {
+                let total = 0;
+                for (const t of tokens) {
+                    let s = 0;
+                    if (item._codes.some(c => c.endsWith(t))) s = 4;
+                    else if (item._words.some(w => w.startsWith(t))) s = 3;
+                    else if (item._name.includes(t)) s = 2;
+                    else if (item._codes.some(c => c.includes(t))) s = 1;
+                    if (!s) return 0;
+                    total += s;
+                }
+                return total;
+            },
+
+            rank(tokens) {
+                return this.results
+                    .map(item => ({ item, s: this.score(item, tokens) }))
+                    .filter(x => x.s > 0)
+                    .sort((a, b) => b.s - a.s || a.item._name.localeCompare(b.item._name))
+                    .map(x => x.item);
+            },
+
+            distance(a, b) {
+                let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+                for (let i = 1; i <= a.length; i++) {
+                    const cur = [i];
+                    for (let j = 1; j <= b.length; j++) {
+                        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+                    }
+                    prev = cur;
+                }
+                return prev[b.length];
+            },
+
+            // Nearest word in the list's own names for a mistyped word (4+ letters, not digits).
+            correct(token) {
+                if (token.length < 4 || /^[0-9.%\-]+$/.test(token)) return token;
+                if (this._vocab.some(w => w.includes(token))) return token;
+                const max = token.length <= 6 ? 1 : 2;
+                let best = token, bestD = max + 1;
+                for (const w of this._vocab) {
+                    if (Math.abs(w.length - token.length) > 2) continue;
+                    const d = this.distance(token, w);
+                    if (d < bestD) { best = w; bestD = d; }
+                }
+                return best;
+            },
+
+            applyFilter() {
+                const tokens = this.tokens(this.filter);
+                this.shown = this.pageSize;
+                this.correctedTo = '';
+                if (!tokens.length) {
+                    this.matches = this.results;
+                    return;
+                }
+                let found = this.rank(tokens);
+                if (!found.length) {
+                    const corrected = tokens.map(t => this.correct(t));
+                    if (corrected.join(' ') !== tokens.join(' ')) {
+                        found = this.rank(corrected);
+                        if (found.length) this.correctedTo = corrected.join(' ');
+                    }
+                }
+                this.matches = found;
+            },
+
+            formatDate(iso) {
+                const d = new Date(iso + 'T00:00:00');
+                return isNaN(d) ? iso : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+            },
+
+            async load() {
+                this.loading = true;
+                this.failed = false;
+                try {
+                    const resp = await fetch(this.listUrl, { headers: { 'Accept': 'application/json' } });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    this.results = (data.results || []).map(r => {
+                        const name = String(r.name ?? '').toLowerCase();
+                        return {
+                            ...r,
+                            _qty: '',
+                            _saving: false,
+                            _name: name,
+                            _words: name.split(/[^a-z0-9%.]+/).filter(Boolean),
+                            _codes: [r.code, r.supplier_code].map(v => String(v ?? '').toLowerCase()).filter(Boolean),
+                        };
+                    });
+                    this._vocab = [...new Set(this.results.flatMap(r => r._words))];
+                    this.applyFilter();
+                    this.loaded = true;
+                } catch (e) {
+                    console.error('Loading unsold products failed', e);
+                    this.failed = true;
+                } finally {
+                    this.loading = false;
                 }
             },
         };

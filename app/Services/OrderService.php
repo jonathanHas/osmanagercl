@@ -23,6 +23,12 @@ class OrderService
 {
     protected SalesRepository $salesRepository;
 
+    /**
+     * Order generation only considers products sold within this many months.
+     * The review page's "Not sold in 6 months" list shows the rest.
+     */
+    public const RECENT_SALES_MONTHS = 6;
+
     public function __construct(SalesRepository $salesRepository)
     {
         $this->salesRepository = $salesRepository;
@@ -877,8 +883,94 @@ class OrderService
         array $categoryGroups = [],
         array $targetProductIds = []
     ): Collection {
-        $sixMonthsAgo = Carbon::now()->subMonths(6);
+        $stockedProductIds = $this->stockedSupplierProductIds($supplierId, $groupFilter, $categoryGroups, $targetProductIds);
 
+        if (empty($stockedProductIds)) {
+            return collect();
+        }
+
+        // Step 5: Get products with sales in the recent-sales window (using sales_daily_summary - pre-aggregated, much faster)
+        $productsWithSales = $this->productIdsWithRecentSales($stockedProductIds);
+
+        \Log::debug('getSupplierProducts Step 5: After sales filter ('.self::RECENT_SALES_MONTHS.'mo): '.count($productsWithSales).' products');
+
+        if (empty($productsWithSales)) {
+            return collect();
+        }
+
+        // Step 6: Fetch the actual Product models with eager loading
+        return Product::whereIn('ID', $productsWithSales)
+            ->with([
+                'supplierLinks' => function ($query) use ($supplierId) {
+                    $query->where('SupplierID', $supplierId);
+                },
+                'stockCurrent',
+                'stocking',
+            ])
+            ->get();
+    }
+
+    /**
+     * Product IDs that had at least one sale inside the recent-sales window.
+     *
+     * @param  array<int, string>  $productIds
+     * @return array<int, string>
+     */
+    protected function productIdsWithRecentSales(array $productIds): array
+    {
+        if (empty($productIds)) {
+            return [];
+        }
+
+        return SalesDailySummary::whereIn('product_id', $productIds)
+            ->where('sale_date', '>=', Carbon::now()->subMonths(self::RECENT_SALES_MONTHS)->format('Y-m-d'))
+            ->distinct()
+            ->pluck('product_id')
+            ->toArray();
+    }
+
+    /**
+     * Stocked products of this supplier that order generation leaves out because
+     * they have no sale inside the recent-sales window, and that are not on the
+     * order yet. Sorted by name.
+     *
+     * @return Collection<int, Product>
+     */
+    public function dormantSupplierProducts(OrderSession $order): Collection
+    {
+        $stockedProductIds = $this->stockedSupplierProductIds((string) $order->supplier_id);
+
+        if (empty($stockedProductIds)) {
+            return collect();
+        }
+
+        $onOrder = $order->items()->pluck('product_id')->all();
+
+        $dormantIds = array_values(array_diff(
+            $stockedProductIds,
+            $this->productIdsWithRecentSales($stockedProductIds),
+            $onOrder
+        ));
+
+        if (empty($dormantIds)) {
+            return collect();
+        }
+
+        return Product::whereIn('ID', $dormantIds)->orderBy('NAME')->get();
+    }
+
+    /**
+     * IDs of the supplier's products that have a stocking record, optionally
+     * narrowed to target products or category groups.
+     *
+     * @return array<int, string>
+     */
+    protected function stockedSupplierProductIds(
+        string $supplierId,
+        ?array $groupFilter = null,
+        array $categoryGroups = [],
+        array $targetProductIds = []
+    ): array {
         // Step 1: Get product barcodes from supplier_link (links via Barcode to Product.CODE)
         $supplierBarcodes = DB::connection('pos')
             ->table('supplier_link')
@@ -889,7 +981,7 @@ class OrderService
         \Log::debug('getSupplierProducts Step 1: Found '.count($supplierBarcodes).' barcodes for supplier '.$supplierId);
 
         if (empty($supplierBarcodes)) {
-            return collect();
+            return [];
         }
 
         // Step 2: Get product IDs from PRODUCTS table using CODE (barcode)
@@ -902,7 +994,7 @@ class OrderService
         \Log::debug('getSupplierProducts Step 2: Found '.count($supplierProductIds).' products matching barcodes');
 
         if (empty($supplierProductIds)) {
-            return collect();
+            return [];
         }
 
         // Step 3: Filter by target products or category codes if specified
@@ -922,7 +1014,7 @@ class OrderService
             \Log::debug('getSupplierProducts Step 3b: Category codes filter: '.implode(',', $categoryCodes));
 
             if (empty($categoryCodes)) {
-                return collect();
+                return [];
             }
 
             // Filter products by category
@@ -937,7 +1029,7 @@ class OrderService
         }
 
         if (empty($supplierProductIds)) {
-            return collect();
+            return [];
         }
 
         // Step 4: Get products that are stocked (have 'stocking' records - links via Barcode to Product.CODE)
@@ -951,7 +1043,7 @@ class OrderService
         \Log::debug('getSupplierProducts Step 4: After stocked filter: '.count($stockedBarcodes).' barcodes');
 
         if (empty($stockedBarcodes)) {
-            return collect();
+            return [];
         }
 
         // Filter product IDs to only those with stocking records
@@ -964,32 +1056,10 @@ class OrderService
         \Log::debug('getSupplierProducts Step 4b: Stocked product IDs: '.count($stockedProductIds));
 
         if (empty($stockedProductIds)) {
-            return collect();
+            return [];
         }
 
-        // Step 5: Get products with sales in last 6 months (using sales_daily_summary - pre-aggregated, much faster)
-        $productsWithSales = SalesDailySummary::whereIn('product_id', $stockedProductIds)
-            ->where('sale_date', '>=', $sixMonthsAgo->format('Y-m-d'))
-            ->distinct()
-            ->pluck('product_id')
-            ->toArray();
-
-        \Log::debug('getSupplierProducts Step 5: After sales filter (6mo): '.count($productsWithSales).' products');
-
-        if (empty($productsWithSales)) {
-            return collect();
-        }
-
-        // Step 6: Fetch the actual Product models with eager loading
-        return Product::whereIn('ID', $productsWithSales)
-            ->with([
-                'supplierLinks' => function ($query) use ($supplierId) {
-                    $query->where('SupplierID', $supplierId);
-                },
-                'stockCurrent',
-                'stocking',
-            ])
-            ->get();
+        return $stockedProductIds;
     }
 
     /**

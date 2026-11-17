@@ -6,6 +6,7 @@ use App\Models\Delivery;
 use App\Models\OrderItem;
 use App\Models\OrderSession;
 use App\Models\Product;
+use App\Models\SalesDailySummary;
 use App\Models\StockCurrent;
 use App\Models\Supplier;
 use App\Models\SupplierLink;
@@ -908,6 +909,65 @@ class OrderController extends Controller
         })->values();
 
         return response()->json(['results' => $results]);
+    }
+
+    /**
+     * Stocked supplier products left out of generation because they have not
+     * sold in the last six months and are not on this order (AJAX).
+     *
+     * Same result shape as searchProducts(), plus `last_sold`, so the review
+     * page can list them and add any of them through addProduct().
+     */
+    public function dormantProducts(OrderSession $order): JsonResponse
+    {
+        $products = $this->orderService->dormantSupplierProducts($order);
+
+        if ($products->isEmpty()) {
+            return response()->json(['results' => [], 'months' => OrderService::RECENT_SALES_MONTHS]);
+        }
+
+        $productIds = $products->pluck('ID')->all();
+
+        $supplierLinks = SupplierLink::where('SupplierID', (string) $order->supplier_id)
+            ->whereIn('Barcode', $products->pluck('CODE')->all())
+            ->get()
+            ->keyBy('Barcode');
+
+        $stockLevels = StockCurrent::whereIn('PRODUCT', $productIds)
+            ->get(['PRODUCT', 'UNITS'])
+            ->keyBy('PRODUCT');
+
+        // Last sale of each product, however long ago (none = never sold).
+        $lastSold = SalesDailySummary::whereIn('product_id', $productIds)
+            ->selectRaw('product_id, MAX(sale_date) as last_sold')
+            ->groupBy('product_id')
+            ->pluck('last_sold', 'product_id');
+
+        $editable = $order->isEditable();
+
+        $results = $products->map(function (Product $product) use ($supplierLinks, $stockLevels, $lastSold, $editable) {
+            $link = $supplierLinks->get($product->CODE);
+            $caseUnits = (int) ($link?->CaseUnits ?? 1);
+            $last = $lastSold->get($product->ID);
+
+            return [
+                'product_id' => $product->ID,
+                'name' => $product->NAME,
+                'code' => $product->CODE,
+                'supplier_code' => $link?->SupplierCode,
+                'unit_cost' => (float) ($link?->Cost ?? $product->PRICEBUY ?? 0),
+                'case_units' => $caseUnits,
+                'is_case_product' => $caseUnits > 1,
+                'current_stock' => (float) ($stockLevels->get($product->ID)->UNITS ?? 0),
+                'last_sold' => $last ? Carbon::parse($last)->format('Y-m-d') : null,
+                'order_item_id' => null,
+                'current_quantity' => null,
+                'current_cases' => null,
+                'editable' => $editable,
+            ];
+        })->values();
+
+        return response()->json(['results' => $results, 'months' => OrderService::RECENT_SALES_MONTHS]);
     }
 
     /**
