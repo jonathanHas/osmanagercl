@@ -8,8 +8,52 @@
  * The "New request" sheet has its own tiny Alpine scope in the view, and each row
  * owns the open state of its own actions panel, so none of them interfere.
  */
+const SCROLL_KEY = 'shop.requests.scroll';
+
 export default () => ({
     q: '',
+
+    /**
+     * A status change reloads the page, which would land back at the top of a
+     * long sheet. Remember where the user was when a row's form is submitted
+     * and put them back there after the reload.
+     *
+     * The position is kept only for the same view (URL) and only briefly, so a
+     * later, unrelated visit to the board still opens at the top.
+     */
+    init() {
+        this.restoreScroll();
+
+        this.$root.addEventListener('submit', () => {
+            try {
+                sessionStorage.setItem(SCROLL_KEY, JSON.stringify({
+                    url: location.pathname + location.search,
+                    y: window.scrollY,
+                    at: Date.now(),
+                }));
+            } catch (e) {
+                // Storage unavailable: the page just reloads at the top as before.
+            }
+        });
+    },
+
+    restoreScroll() {
+        let saved = null;
+
+        try {
+            saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY));
+            sessionStorage.removeItem(SCROLL_KEY);
+        } catch (e) {
+            return;
+        }
+
+        if (! saved || saved.url !== location.pathname + location.search || Date.now() - saved.at > 30000) {
+            return;
+        }
+
+        // After Alpine has drawn the rows, so the page is its full height.
+        this.$nextTick(() => window.scrollTo({ top: saved.y, behavior: 'instant' }));
+    },
 
     matches(text) {
         const needle = this.q.trim().toLowerCase();

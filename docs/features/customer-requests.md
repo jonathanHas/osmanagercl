@@ -344,6 +344,10 @@ The staff view is a list of request **rows**, not cards:
 - Every action is still a plain form to the existing endpoints. There is no
   confirm dialog: "Undo last step" and "Reopen" are the safety net, which is what
   the backwards transitions in `ALLOWED_TRANSITIONS` are for.
+- The form post reloads the page, so `resources/js/shop/requests-board.js` saves
+  the window scroll position in `sessionStorage` on any submit inside the board
+  and restores it after the reload (same URL, within 30 seconds), so staff stay
+  where they were on a long sheet.
 - **Search** filters the rows already on screen (`data-text` + `x-show`); it does
   not fetch. **New request** lives in the sticky bottom bar and opens a sheet
   (a side sheet, a bottom sheet on phones) holding the cycle 12 form.
