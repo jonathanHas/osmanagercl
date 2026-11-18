@@ -33,6 +33,7 @@ The Stock Check Review is a tool for reviewing and reconciling physical stock ch
 - **Fullscreen Modal**: Dark-themed scanner that opens over the review page
 - **Barcode Input**: Physical scanner input or manual keyboard entry
 - **Camera Scanning**: Phone camera barcode detection via `html5-qrcode` (requires HTTPS)
+- **− / + count buttons**: Round 64px buttons either side of the new count step it by one (never below zero); the count box is still a number input, so tapping it opens the keypad. The line underneath shows the correction ("+2 from 3")
 - **Continuous camera scanning**: Once the camera is on (`scanner.cameraMode`), it pauses on each detection and comes back by itself after **Update & scan next**, or straight away when the barcode is not found. Tapping the camera button while paused resumes without updating; tapping it while live turns camera mode off. Hand-scanner and typed entry are unchanged
 - **Product Display**: Shows product image, name, category, supplier, and current stock
 - **Stock Update**: Optional — enter actual count to update stock in the same flow

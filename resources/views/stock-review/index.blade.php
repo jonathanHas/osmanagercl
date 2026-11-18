@@ -571,16 +571,29 @@
                                             <div class="text-xs text-gray-400">in stock</div>
                                         </div>
                                     </div>
-                                    <div class="mt-4 flex items-stretch gap-3">
-                                        <input type="number" inputmode="numeric" x-model="scanner.stockCount" @keydown.enter="updateScannerStock()" min="0" max="9999" step="1"
+                                    {{-- New count: − / + for small corrections, tap the number to type --}}
+                                    <div class="mt-4 text-xs font-medium text-gray-400 uppercase">New count</div>
+                                    <div class="mt-1 flex items-stretch gap-3">
+                                        <button type="button" @click="stepScannerStock(-1)" aria-label="One less"
+                                                class="w-16 h-16 flex-shrink-0 flex items-center justify-center rounded-full border-2 border-gray-500 bg-gray-800 text-white hover:bg-gray-700 active:bg-gray-600 disabled:opacity-40 touch-manipulation select-none"
+                                                :disabled="scanner.updating || !(parseFloat(scanner.stockCount) > 0)">
+                                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2.5" d="M5 12h14"/></svg>
+                                        </button>
+                                        <input type="number" inputmode="numeric" x-model="scanner.stockCount" @keydown.enter="updateScannerStock()" @focus="$event.target.select()" min="0" max="9999" step="1"
                                                aria-label="New stock count"
-                                               class="w-28 h-16 text-center px-2 rounded-lg border-2 border-gray-600 bg-gray-800 text-white focus:border-blue-500 focus:ring-blue-500 text-2xl font-semibold touch-manipulation" placeholder="qty">
-                                        <button @click="updateScannerStock()"
-                                                class="flex-1 h-16 px-4 bg-blue-600 text-white rounded-lg text-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 touch-manipulation"
-                                                :disabled="scanner.updating || scanner.stockCount === '' || scanner.stockCount === null">
-                                            <span x-text="scanner.updating ? 'Saving...' : (scanner.cameraMode ? 'Update & scan next' : 'Update')"></span>
+                                               class="stock-count-input flex-1 min-w-0 h-16 text-center px-2 rounded-lg border-2 border-gray-600 bg-gray-800 text-white focus:border-blue-500 focus:ring-blue-500 text-3xl font-bold touch-manipulation" placeholder="qty">
+                                        <button type="button" @click="stepScannerStock(1)" aria-label="One more"
+                                                class="w-16 h-16 flex-shrink-0 flex items-center justify-center rounded-full border-2 border-gray-500 bg-gray-800 text-white hover:bg-gray-700 active:bg-gray-600 disabled:opacity-40 touch-manipulation select-none"
+                                                :disabled="scanner.updating">
+                                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2.5" d="M12 5v14M5 12h14"/></svg>
                                         </button>
                                     </div>
+                                    <div class="mt-1 h-5 text-sm text-gray-400" x-text="scannerStockChangeText()"></div>
+                                    <button @click="updateScannerStock()"
+                                            class="mt-2 w-full h-16 px-4 bg-blue-600 text-white rounded-lg text-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 touch-manipulation"
+                                            :disabled="scanner.updating || scanner.stockCount === '' || scanner.stockCount === null">
+                                        <span x-text="scanner.updating ? 'Saving...' : (scanner.cameraMode ? 'Update & scan next' : 'Update')"></span>
+                                    </button>
                                     <div x-show="scanner.stockUpdated" x-transition class="mt-2 text-green-400 text-sm font-medium">Stock updated</div>
                                     <div class="mt-2 flex items-center gap-1">
                                         <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
@@ -727,6 +740,12 @@
             </div>
         </div>
     </div>
+
+    <style>
+        .stock-count-input::-webkit-outer-spin-button,
+        .stock-count-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .stock-count-input { -moz-appearance: textfield; appearance: textfield; }
+    </style>
 
     @vite(['resources/js/barcode-scanner.js'])
 
@@ -918,6 +937,22 @@
                         this.scanner.barcode = '';
                         this.$nextTick(() => this.$refs.scannerInput?.focus());
                     }
+                },
+
+                // − / + buttons: move the new count by one, never below zero.
+                stepScannerStock(delta) {
+                    const current = parseFloat(this.scanner.stockCount);
+                    const next = (isNaN(current) ? 0 : current) + delta;
+                    this.scanner.stockCount = Math.min(9999, Math.max(0, next));
+                },
+
+                // "+2 from 3" under the count, so the size of the correction is visible.
+                scannerStockChangeText() {
+                    const count = parseFloat(this.scanner.stockCount);
+                    const was = Math.floor(this.scanner.lastResult?.stock ?? 0);
+                    if (isNaN(count) || count === was) return 'No change';
+                    const diff = count - was;
+                    return (diff > 0 ? '+' : '−') + Math.abs(diff) + ' from ' + was;
                 },
 
                 async updateScannerStock() {
