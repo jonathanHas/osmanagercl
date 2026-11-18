@@ -532,7 +532,7 @@
                             </button>
                             <button @click="toggleScannerCamera()"
                                     class="px-3 py-2 rounded-lg border-2 touch-manipulation"
-                                    :class="scanner.cameraActive ? 'bg-green-900 border-green-500 text-green-300' : 'bg-gray-800 border-gray-600 text-gray-500'">
+                                    :class="(scanner.cameraActive || scanner.cameraMode) ? 'bg-green-900 border-green-500 text-green-300' : 'bg-gray-800 border-gray-600 text-gray-500'">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -571,13 +571,17 @@
                                             <div class="text-xs text-gray-400">in stock</div>
                                         </div>
                                     </div>
-                                    <div class="mt-3 flex items-center gap-2">
-                                        <label class="text-sm text-gray-300">Update:</label>
-                                        <input type="number" x-model="scanner.stockCount" @keydown.enter="updateScannerStock()" min="0" max="9999" step="1"
-                                               class="w-24 text-center py-2 px-2 rounded border border-gray-600 bg-gray-800 text-white focus:border-blue-500 focus:ring-blue-500 text-lg touch-manipulation" placeholder="qty">
-                                        <button @click="updateScannerStock()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 touch-manipulation" :disabled="scanner.stockCount === '' || scanner.stockCount === null">Update</button>
-                                        <span x-show="scanner.stockUpdated" x-transition class="text-green-400 text-sm font-medium">Done!</span>
+                                    <div class="mt-4 flex items-stretch gap-3">
+                                        <input type="number" inputmode="numeric" x-model="scanner.stockCount" @keydown.enter="updateScannerStock()" min="0" max="9999" step="1"
+                                               aria-label="New stock count"
+                                               class="w-28 h-16 text-center px-2 rounded-lg border-2 border-gray-600 bg-gray-800 text-white focus:border-blue-500 focus:ring-blue-500 text-2xl font-semibold touch-manipulation" placeholder="qty">
+                                        <button @click="updateScannerStock()"
+                                                class="flex-1 h-16 px-4 bg-blue-600 text-white rounded-lg text-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 touch-manipulation"
+                                                :disabled="scanner.updating || scanner.stockCount === '' || scanner.stockCount === null">
+                                            <span x-text="scanner.updating ? 'Saving...' : (scanner.cameraMode ? 'Update & scan next' : 'Update')"></span>
+                                        </button>
                                     </div>
+                                    <div x-show="scanner.stockUpdated" x-transition class="mt-2 text-green-400 text-sm font-medium">Stock updated</div>
                                     <div class="mt-2 flex items-center gap-1">
                                         <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                                         <span class="text-sm text-green-400" x-text="scanner.lastResult.message"></span>
@@ -791,9 +795,14 @@
                     history: [],
                     stockCount: '',
                     stockUpdated: false,
+                    updating: false,
+                    // cameraMode: the user is scanning with the camera. The camera
+                    // pauses on each detection and comes back after Update.
+                    cameraMode: false,
                     cameraActive: false,
                     cameraVisible: false,
                     cameraStatus: '',
+                    cameraStarting: false,
                 },
 
                 openScanner() {
@@ -803,29 +812,53 @@
 
 
                 closeScanner() {
+                    this.scanner.cameraMode = false;
                     this.stopScannerCamera();
                     this.scannerOpen = false;
                 },
 
+                // Camera button: off while the camera is live, otherwise on
+                // (which also resumes a camera paused on a scanned product).
                 async toggleScannerCamera() {
                     if (this.scanner.cameraActive) {
+                        this.scanner.cameraMode = false;
                         await this.stopScannerCamera();
                         return;
                     }
+                    this.scanner.cameraMode = true;
+                    await this.startScannerCamera();
+                },
+
+                async startScannerCamera() {
+                    if (this.scanner.cameraActive || this.scanner.cameraStarting) return;
                     if (!window.BarcodeScanner) {
+                        this.scanner.cameraMode = false;
                         this.scanner.cameraStatus = 'Camera not available. Use HTTPS.';
                         return;
                     }
-                    this.scanner.cameraVisible = true;
-                    this.scanner.cameraStatus = 'Starting camera...';
-                    await this.$nextTick();
+                    this.scanner.cameraStarting = true;
                     try {
+                        // Let a stop from the previous detection finish first.
+                        await this._cameraStopping;
+                        this.scanner.cameraVisible = true;
+                        this.scanner.cameraStatus = 'Starting camera...';
+                        await this.$nextTick();
                         await window.BarcodeScanner.startScanner('stock-check-scanner', (text) => this.onScannerDetected(text), () => {});
                         this.scanner.cameraActive = true;
                         this.scanner.cameraStatus = 'Point camera at barcode...';
                     } catch (err) {
+                        this.scanner.cameraMode = false;
                         this.scanner.cameraVisible = false;
                         this.scanner.cameraStatus = 'Camera error: ' + (err?.message || String(err));
+                    } finally {
+                        this.scanner.cameraStarting = false;
+                    }
+                },
+
+                // Back to the camera for the next item, if that is how the user is scanning.
+                resumeScannerCamera() {
+                    if (this.scanner.cameraMode && this.scannerOpen) {
+                        this.startScannerCamera();
                     }
                 },
 
@@ -848,7 +881,7 @@
                         osc.stop(ctx.currentTime + 0.1);
                     } catch (e) {}
                     this.scanner.cameraStatus = 'Detected: ' + text;
-                    this.stopScannerCamera();
+                    this._cameraStopping = this.stopScannerCamera();
                     this.scanner.barcode = text;
                     this.scanBarcode();
                 },
@@ -880,6 +913,7 @@
                     } catch (err) {
                         this.scanner.lastResult = { success: false, message: 'Network error' };
                     } finally {
+                        if (!this.scanner.lastResult?.success) this.resumeScannerCamera();
                         this.scanner.processing = false;
                         this.scanner.barcode = '';
                         this.$nextTick(() => this.$refs.scannerInput?.focus());
@@ -887,7 +921,8 @@
                 },
 
                 async updateScannerStock() {
-                    if (this.scanner.stockCount === '' || this.scanner.stockCount === null || !this.scanner.lastResult?.product) return;
+                    if (this.scanner.updating || this.scanner.stockCount === '' || this.scanner.stockCount === null || !this.scanner.lastResult?.product) return;
+                    this.scanner.updating = true;
                     this.scanner.stockUpdated = false;
                     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
                     try {
@@ -902,9 +937,14 @@
                             this.scanner.lastResult.message = data.message;
                             this.scanner.stockUpdated = true;
                             setTimeout(() => this.scanner.stockUpdated = false, 2000);
+                            this.resumeScannerCamera();
+                        } else {
+                            this.scanner.lastResult.message = data.message || 'Update failed';
                         }
                     } catch (err) {
+                        this.scanner.lastResult.message = 'Network error, stock not updated';
                     } finally {
+                        this.scanner.updating = false;
                         this.$nextTick(() => this.$refs.scannerInput?.focus());
                     }
                 }
