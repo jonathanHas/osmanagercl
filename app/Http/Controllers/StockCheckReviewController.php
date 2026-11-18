@@ -9,6 +9,7 @@ use App\Models\StockReviewCategorySetting;
 use App\Models\StockZeroAudit;
 use App\Services\StockCheckReviewService;
 use App\Services\SupplierService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -241,6 +242,26 @@ class StockCheckReviewController extends Controller
      */
     public function history(Request $request)
     {
+        // Every set-to-zero made in this app writes a catSetZero row as well as
+        // its stock_zero_audits row (so the old system still sees the date).
+        // Those mirror rows are dropped below so each event is listed once.
+        $auditTimes = StockZeroAudit::query()
+            ->get(['category_id', 'created_at'])
+            ->groupBy('category_id')
+            ->map(fn ($audits) => $audits->map(fn ($a) => $a->created_at->getTimestamp()));
+
+        $isMirrorOfAudit = function ($record) use ($auditTimes): bool {
+            $times = $auditTimes->get($record->category_id);
+            if (! $times) {
+                return false;
+            }
+
+            $recordTime = Carbon::parse($record->date)->getTimestamp();
+
+            // The two rows are written one after the other, so allow a few seconds.
+            return $times->contains(fn ($t) => abs($t - $recordTime) <= 5);
+        };
+
         // Old system records from POS catSetZero table
         $oldRecords = DB::connection('pos')
             ->table('catSetZero')
@@ -254,6 +275,7 @@ class StockCheckReviewController extends Controller
             ->orderByDesc('catSetZero.dateUpdated')
             ->limit(200)
             ->get()
+            ->reject($isMirrorOfAudit)
             ->map(fn ($r) => [
                 'id' => $r->id,
                 'date' => $r->date,

@@ -46,6 +46,7 @@ The Stock Check Review is a tool for reviewing and reconciling physical stock ch
 
 ### Set to Zero History
 - **Combined Timeline**: Shows records from both old system (`catSetZero`) and new Laravel audits
+- **One row per event**: A set-to-zero made in this app writes both tables, so `history()` drops the `catSetZero` row that mirrors an audit (same category, within 5 seconds). Only rows made on the old system show as "Legacy"
 - **AJAX Modal**: Opens in a modal overlay, loads on demand
 - **Expandable Details**: New system records show individual products that were zeroed with old stock values
 
