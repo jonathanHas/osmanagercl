@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\StockLastChecked;
 use App\Models\StockReviewCategorySetting;
 use App\Models\StockZeroAudit;
 use App\Services\StockCheckReviewService;
@@ -146,7 +145,8 @@ class StockCheckReviewController extends Controller
     }
 
     /**
-     * Stock check a product by barcode - lookup and mark as checked.
+     * Scanner endpoint. With only a barcode it looks the product up; with a
+     * stock_count it records the stock check and corrects the stock.
      */
     public function stockCheck(Request $request)
     {
@@ -168,35 +168,17 @@ class StockCheckReviewController extends Controller
 
         $currentStock = $product->getCurrentStock();
 
-        // Update the stockLastChecked record (upsert)
-        StockLastChecked::updateOrCreate(
-            ['Barcode' => $product->CODE],
-            ['Date' => now()]
-        );
-
-        // If a stock count was provided, update stock
+        // A scan only looks the product up. The check is recorded when the
+        // user confirms a count (Update), even if the count is unchanged.
+        $lastCheck = $this->reviewService->lastCheckFor($product);
+        $checked = false;
         $stockUpdated = false;
-        if ($request->has('stock_count') && $request->stock_count !== null) {
-            $newStock = (float) $request->stock_count;
-            if ($newStock != $currentStock) {
-                \App\Models\StockCurrent::updateOrCreate(
-                    ['PRODUCT' => $product->ID],
-                    ['UNITS' => $newStock, 'LOCATION' => '0', 'ATTRIBUTESETINSTANCE_ID' => null]
-                );
 
-                \App\Models\StockAdjustment::create([
-                    'barcode' => $product->CODE,
-                    'product_id' => $product->ID,
-                    'old_stock' => $currentStock,
-                    'new_stock' => $newStock,
-                    'adjustment' => $newStock - $currentStock,
-                    'user_id' => auth()->id(),
-                    'source' => 'stock_check',
-                ]);
-
-                $stockUpdated = true;
-                $currentStock = $newStock;
-            }
+        if ($request->filled('stock_count')) {
+            $result = $this->reviewService->recordStockCheck($product, (float) $request->stock_count, auth()->id());
+            $checked = true;
+            $stockUpdated = $result['stock_updated'];
+            $currentStock = $result['stock'];
         }
 
         // Get image URL
@@ -210,7 +192,13 @@ class StockCheckReviewController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => $stockUpdated ? 'Stock checked & updated' : 'Stock checked',
+            'message' => match (true) {
+                $stockUpdated => 'Stock checked & updated',
+                $checked => 'Stock checked',
+                default => 'Not checked yet',
+            },
+            'checked' => $checked,
+            'last_check' => $lastCheck,
             'product' => [
                 'name' => $product->NAME,
                 'code' => $product->CODE,

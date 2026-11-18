@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Models\Category;
+use App\Models\Product;
 use App\Models\StockAdjustment;
+use App\Models\StockCheck;
 use App\Models\StockCurrent;
+use App\Models\StockLastChecked;
 use App\Models\StockReviewCategorySetting;
 use App\Models\StockZeroAudit;
 use App\Repositories\ProductRepository;
@@ -181,6 +184,80 @@ class StockCheckReviewService
             'at_risk_value' => round($atRiskValue, 2),
             'progress_percentage' => $total > 0 ? round(($checked / $total) * 100) : 0,
         ];
+    }
+
+    /**
+     * When a product was last stock-checked, and the quantity counted then.
+     *
+     * The date comes from the POS stockLastChecked table (also written by the
+     * old system). The quantity is only known for checks confirmed in this app
+     * since stock_checks was added; a newer date than our latest row means
+     * something else recorded the check, so the quantity is unknown.
+     *
+     * @return array{date: string, ago: string, quantity: float|null}|null
+     */
+    public function lastCheckFor(Product $product): ?array
+    {
+        $date = StockLastChecked::where('Barcode', $product->CODE)->value('Date');
+
+        if (! $date) {
+            return null;
+        }
+
+        $date = Carbon::parse($date);
+
+        $check = StockCheck::where('barcode', $product->CODE)->latest('created_at')->latest('id')->first();
+        $quantityKnown = $check && $check->created_at->diffInSeconds($date, true) <= 60;
+
+        return [
+            'date' => $date->format('j M Y'),
+            'ago' => $date->diffForHumans(),
+            'quantity' => $quantityKnown ? (float) $check->counted_stock : null,
+        ];
+    }
+
+    /**
+     * Record a confirmed stock check: stamp the product as checked now, keep
+     * the counted quantity, and correct the till stock if the count differs.
+     *
+     * @return array{stock: float, stock_updated: bool}
+     */
+    public function recordStockCheck(Product $product, float $counted, ?int $userId): array
+    {
+        $previous = (float) $product->getCurrentStock();
+        $stockUpdated = $counted != $previous;
+
+        StockLastChecked::updateOrCreate(
+            ['Barcode' => $product->CODE],
+            ['Date' => now()]
+        );
+
+        StockCheck::create([
+            'barcode' => $product->CODE,
+            'product_id' => $product->ID,
+            'previous_stock' => $previous,
+            'counted_stock' => $counted,
+            'user_id' => $userId,
+        ]);
+
+        if ($stockUpdated) {
+            StockCurrent::updateOrCreate(
+                ['PRODUCT' => $product->ID],
+                ['UNITS' => $counted, 'LOCATION' => '0', 'ATTRIBUTESETINSTANCE_ID' => null]
+            );
+
+            StockAdjustment::create([
+                'barcode' => $product->CODE,
+                'product_id' => $product->ID,
+                'old_stock' => $previous,
+                'new_stock' => $counted,
+                'adjustment' => $counted - $previous,
+                'user_id' => $userId,
+                'source' => 'stock_check',
+            ]);
+        }
+
+        return ['stock' => $counted, 'stock_updated' => $stockUpdated];
     }
 
     /**

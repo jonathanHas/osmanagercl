@@ -554,7 +554,7 @@
 
                         {{-- Result --}}
                         <div x-show="scanner.lastResult && !scanner.processing" x-transition class="rounded-lg border-2 p-4 mb-3"
-                             :class="scanner.lastResult?.success ? 'border-green-500 bg-green-900/30' : 'border-red-500 bg-red-900/30'">
+                             :class="!scanner.lastResult?.success ? 'border-red-500 bg-red-900/30' : (scanner.lastResult.checked ? 'border-green-500 bg-green-900/30' : 'border-gray-600 bg-gray-800/60')">
                             <template x-if="scanner.lastResult?.success">
                                 <div>
                                     <div class="flex items-start gap-3">
@@ -571,6 +571,22 @@
                                             <div class="text-xs text-gray-400">in stock</div>
                                         </div>
                                     </div>
+                                    {{-- When it was last checked, and what was counted then --}}
+                                    <div class="mt-3 text-sm" :class="scanner.lastResult.last_check ? 'text-gray-300' : 'text-amber-400'">
+                                        <template x-if="scanner.lastResult.last_check">
+                                            <span>
+                                                Last checked <span class="font-semibold text-white" x-text="scanner.lastResult.last_check.date"></span>
+                                                <span class="text-gray-400" x-text="'(' + scanner.lastResult.last_check.ago + ')'"></span>
+                                                <template x-if="scanner.lastResult.last_check.quantity !== null">
+                                                    <span>&middot; counted <span class="font-semibold text-white" x-text="formatQty(scanner.lastResult.last_check.quantity)"></span></span>
+                                                </template>
+                                            </span>
+                                        </template>
+                                        <template x-if="!scanner.lastResult.last_check">
+                                            <span>Never stock checked</span>
+                                        </template>
+                                    </div>
+
                                     {{-- New count: − / + for small corrections, tap the number to type --}}
                                     <div class="mt-4 text-xs font-medium text-gray-400 uppercase">New count</div>
                                     <div class="mt-1 flex items-stretch gap-3">
@@ -592,13 +608,13 @@
                                     <button @click="updateScannerStock()"
                                             class="mt-2 w-full h-16 px-4 bg-blue-600 text-white rounded-lg text-lg font-semibold hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 touch-manipulation"
                                             :disabled="scanner.updating || scanner.stockCount === '' || scanner.stockCount === null">
-                                        <span x-text="scanner.updating ? 'Saving...' : (scanner.cameraMode ? 'Update & scan next' : 'Update')"></span>
+                                        <span x-text="scannerUpdateLabel()"></span>
                                     </button>
-                                    <div x-show="scanner.stockUpdated" x-transition class="mt-2 text-green-400 text-sm font-medium">Stock updated</div>
-                                    <div class="mt-2 flex items-center gap-1">
+                                                                        <div x-show="scanner.lastResult.checked" class="mt-2 flex items-center gap-1">
                                         <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                                         <span class="text-sm text-green-400" x-text="scanner.lastResult.message"></span>
                                     </div>
+                                    <div x-show="scanner.lastResult.error" class="mt-2 text-sm text-red-400" x-text="scanner.lastResult.error"></div>
                                 </div>
                             </template>
                             <template x-if="scanner.lastResult && !scanner.lastResult.success">
@@ -616,9 +632,9 @@
                                 <div class="space-y-1 max-h-48 overflow-y-auto">
                                     <template x-for="(scan, i) in scanner.history" :key="i">
                                         <div class="flex items-center justify-between text-sm py-1.5 px-3 rounded"
-                                             :class="scan.success ? 'bg-green-900/30 text-green-300' : 'bg-red-900/30 text-red-300'">
+                                             :class="!scan.success ? 'bg-red-900/30 text-red-300' : (scan.checked ? 'bg-green-900/30 text-green-300' : 'bg-gray-800 text-gray-400')">
                                             <span class="truncate" x-text="scan.name || scan.barcode"></span>
-                                            <span class="text-xs text-gray-500 whitespace-nowrap ml-2" x-text="scan.time"></span>
+                                            <span class="text-xs text-gray-500 whitespace-nowrap ml-2" x-text="(scan.success && !scan.checked ? 'not checked · ' : '') + scan.time"></span>
                                         </div>
                                     </template>
                                 </div>
@@ -813,7 +829,6 @@
                     checksCount: 0,
                     history: [],
                     stockCount: '',
-                    stockUpdated: false,
                     updating: false,
                     // cameraMode: the user is scanning with the camera. The camera
                     // pauses on each detection and comes back after Update.
@@ -910,7 +925,6 @@
                     this.scanner.processing = true;
                     this.scanner.lastResult = null;
                     this.scanner.stockCount = '';
-                    this.scanner.stockUpdated = false;
                     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
                     try {
                         const res = await fetch('{{ route("stock-review.stock-check") }}', {
@@ -922,9 +936,9 @@
                         this.scanner.lastResult = data;
                         const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                         if (data.success) {
-                            this.scanner.checksCount++;
+                            // Looked up only; it counts as checked once Update is pressed.
                             this.scanner.stockCount = Math.floor(data.stock);
-                            this.scanner.history.unshift({ success: true, barcode: data.product.code, name: data.product.name, time });
+                            this.scanner.history.unshift({ success: true, checked: false, barcode: data.product.code, name: data.product.name, time });
                         } else {
                             this.scanner.history.unshift({ success: false, barcode: this.scanner.barcode, name: data.message || 'Not found', time });
                         }
@@ -937,6 +951,19 @@
                         this.scanner.barcode = '';
                         this.$nextTick(() => this.$refs.scannerInput?.focus());
                     }
+                },
+
+                formatQty(value) {
+                    const n = parseFloat(value);
+                    return Number.isInteger(n) ? String(n) : n.toFixed(2);
+                },
+
+                // "Confirm count" when the count matches the till, "Update" when it differs.
+                scannerUpdateLabel() {
+                    if (this.scanner.updating) return 'Saving...';
+                    const count = parseFloat(this.scanner.stockCount);
+                    const same = !isNaN(count) && count === parseFloat(this.scanner.lastResult?.stock ?? 0);
+                    return (same ? 'Confirm count' : 'Update') + (this.scanner.cameraMode ? ' & scan next' : '');
                 },
 
                 // − / + buttons: move the new count by one, never below zero.
@@ -958,7 +985,6 @@
                 async updateScannerStock() {
                     if (this.scanner.updating || this.scanner.stockCount === '' || this.scanner.stockCount === null || !this.scanner.lastResult?.product) return;
                     this.scanner.updating = true;
-                    this.scanner.stockUpdated = false;
                     const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
                     try {
                         const res = await fetch('{{ route("stock-review.stock-check") }}', {
@@ -967,17 +993,20 @@
                             body: JSON.stringify({ barcode: this.scanner.lastResult.product.code, stock_count: parseFloat(this.scanner.stockCount) })
                         });
                         const data = await res.json();
+                        this.scanner.lastResult.error = null;
                         if (data.success) {
+                            if (!this.scanner.lastResult.checked) this.scanner.checksCount++;
                             this.scanner.lastResult.stock = data.stock;
                             this.scanner.lastResult.message = data.message;
-                            this.scanner.stockUpdated = true;
-                            setTimeout(() => this.scanner.stockUpdated = false, 2000);
+                            this.scanner.lastResult.checked = true;
+                            const row = this.scanner.history.find((h) => h.success && h.barcode === data.product.code);
+                            if (row) row.checked = true;
                             this.resumeScannerCamera();
                         } else {
-                            this.scanner.lastResult.message = data.message || 'Update failed';
+                            this.scanner.lastResult.error = data.message || 'Not saved';
                         }
                     } catch (err) {
-                        this.scanner.lastResult.message = 'Network error, stock not updated';
+                        this.scanner.lastResult.error = 'Network error, check not saved';
                     } finally {
                         this.scanner.updating = false;
                         this.$nextTick(() => this.$refs.scannerInput?.focus());
