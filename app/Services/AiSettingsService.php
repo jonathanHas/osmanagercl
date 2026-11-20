@@ -44,6 +44,8 @@ class AiSettingsService
                 'provider' => config('invoices.ai_parsing.provider', 'gemini'),
                 default => config("invoices.ai_parsing.{$key}"),
             },
+            // Electricity bills are read as whole PDFs, which only Claude takes directly.
+            'electricity_parsing' => self::getDefaults('electricity_parsing')[$key] ?? null,
             default => null,
         };
 
@@ -124,6 +126,11 @@ class AiSettingsService
                 'base_url' => 'https://api.mistral.ai/v1',
                 'timeout' => '60',
             ],
+            'electricity_parsing' => [
+                'provider' => 'anthropic',
+                'model' => 'claude-opus-5-5',
+                'timeout' => '120',
+            ],
             'label_translation' => [
                 'provider' => 'gemini',
                 'model' => 'gemini-2.5-flash',
@@ -178,6 +185,7 @@ class AiSettingsService
             'invoice_ai_fallback' => 'Invoice AI Fallback (Failed Parses)',
             'label_translation' => 'Label Translation',
             'dynamis_matcher' => 'Dynamis Product Matcher',
+            'electricity_parsing' => 'Electricity Bill Reading (unknown layouts)',
         ];
     }
 }

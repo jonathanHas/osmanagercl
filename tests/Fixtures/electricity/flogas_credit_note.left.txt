@@ -1,0 +1,164 @@
+ Electricity
+
+
+
+
+           JONATHAN HASLAM TA ORGANIC STORE
+           MAIN STREET
+           BIRR
+           Offaly
+           R42 TY29 ,
+           IRL
+
+
+
+
+  Billing Period                                        14/08/2025–15/09/2025
+
+  Bill Summary                                                                   Amount
+  Your last Bill                                                                €1,520.98
+  Payment Received Thank You                                                          €0.00
+  Balance brought forward                                                     €1,520.98
+  Net Bill for this period                                                        €-60.37
+  Total VAT                                                                         €-5.43
+  Current Bill                                                                    €-65.80
+
+  Total Due                                                                   €1,455.18
+
+  Your fuel mix is presented on the back of this bill. For further information on your fuel mix,
+  please contact customer service on 041-2149500
+
+
+
+
+Payment Slip
+Building 2, 3rd & 4th Floor,
+The Green,
+Dublin Airport Central,
+                                      Account No:                       400039597
+Dublin Airport,
+Swords,                               MPRN:                             10012131474
+Co. Dublin,
+K67 E2H3
+                                      Transaction Date:                 10/12/2025
+T: 041 214 9500
+E: info@flogas.ie                     Total Due €:                      1,455.18
+www.flogas.ie
+    Description       Meter No       From                Meter Readings              Multiplier       Consumption
+                                                    Previous     Present
+    24hr              Z00000302      14/08/2025      241044 E     242512 E           1                            1468
+    24hr              Z00027782      14/08/2025      44031 E      45995 E            1                            1964
+    24hr              Z00027782      14/08/2025      44177 E      45995 E            1                          - 1818
+    24hr              Z00000302      14/08/2025      240694 E     242512 E           1                          - 1818
+
+    A – Actual, C – Customer Read, E – Estimate
+
+
+    Bill Information                  Units           Rate ﴾€﴿            VAT       Unit            Amount ﴾€﴿
+    Unit Rate 24Hr ﴾1st                -204               0.2449            9%      €/kWh                     -49.96
+    131 kWh per 24Hr﴿
+    ﴾€/kWh﴿
+    Unit Rate 24Hr ﴾Bal.                    0             0.2449            9%      €/kWh                        0.00
+    of kWh per 24Hr﴿
+    ﴾€/kWh﴿
+    Electricity Tax                     -0.2                     1          9%                                  -0.21
+    ﴾€/MWh﴿
+    I-SEM Trading                      -204                  0.05           9%      €/kWh                     -10.20
+    Charge ﴾€/kWh﴿
+    Standing Charge                         0                  1.2          9%                                   0.00
+    ﴾€/day﴿
+    PSO Levy ﴾Aug 25                        0               12.91           9%                                   0.00
+    to Sep 25﴿
+    ﴾€/month﴿
+
+    Net total                                                                                                 -60.37
+    VAT 9%                                                                                                     -5.43
+
+                                                                                Current Bill                  -65.80
+                                                      Previous Outstanding Balance                          1,520.98
+                                                                                   Total Due                1,455.18
+
+
+
+
+Energy Saving Hints and tips
+          These days we use many electrical devices & appliances to get through our day. It would be
+           diﬃcult for any of us to stop using them, but making small changes to our habits can help to
+           reduce energy consumption over time & being a bit smarter in the times we use devices can help
+           to lessen use at peak times.
+          Switch oﬀ unused devices at the wall socket when you are not using them. When devices are
+           sleeping or in standby mode, they still use small amounts of electricity. Timers or smart plugs can
+           be a good way to do this.
+You can save money by renewing your contract or switching supplier if your existing agreement is due
+to cease or if you are out of contract.
+       .
+
+
+                                        Flogas Fuel Mix Disclosure
+                                     January 2023 to December 2023
+                                                                                % of total
+                                                    Electricity Supplied by         Average for All Island Market
+    Electricity supplied has been sourced from
+                                                    Flogas                          ﴾for comparison﴿
+    the following fuels
+    Renewable                                       100.0                            61.0
+    Natural gas                                     0.0                              34.1
+    Coal                                            0.0                              3.0
+    Oil                                             0.0                              1.0
+    Other                                           0.0                              0.6
+    Total                                           100.0                            100.0
+    Environmental Impact
+    CO2 Emissions                                   0g CO2/kWh                       223g CO2/kWh
+
+For information on your fuel mix and on the environmental impact of your electricity supply, visit www.flogas.ie or, for
+                                           further details call 0412149500.
+Pass-through charges applicable to your premises are scheduled to change from the 1 Octob
+these charges is dependent on the DUoS ﴾Distribution use of system﴿ or the ‘DG’ number that
+commercial premises.
+
+Pass-through charges are the charges that all electricity suppliers must pay other entities in th
+Electricity Market ﴾I-SEM﴿, when supplying electricity to customers, such as those incurred for
+and Eirgrid’s systems. Some elements are not Flogas charges, these are market charges. Usual
+Eirgrid set these charges, subject to regulatory approval by the
+Commission for Regulation of Utilities ﴾CRU﴿, on an annual basis.
+
+Pass-through charges include:
+ Transmission Use of Systems ﴾TUoS﴿
+ Distribution Use of Systems ﴾DUoS﴿
+ Market Operator Charges
+ Imperfection Charges
+ Electricity Tax
+ MIC Charges
+ PSO Levy
+ Low Power Factor Surcharge
+
+To understand more about pass-through charges for your business please visit
+www.flogas.ie/business/pass-through-charges/
+
+The 2025/2026 PSO Calculations:*
+The PSO levy for the year the 1 October 2025 to the
+30 September 2026 is set to a monthly charge and has been reduced to €2.01 and €7.77 for d
+customers, respectively. For medium/large commercial customers the monthly charge is set to
+The PSO levy figures noted here exclude VAT.
+*Changes to the PSO for 25/26 will appear on your invoices from 31 October 202
+
+Public Service Obligation﴾PSO﴿ Levy: Decreasedcosts for 2025/2026
+The Public Service Obligation ﴾PSO﴿ levy is set by the Commission for Regulation of Utilities, e
+national
+targets in terms of the generation of electricity from renewables and aligns with the CRU’s vis
+secure, low carbon future.
+The table below details the PSO changes to apply from the 1 October 2025.
+
+ PSO Customer         Monthly          Monthly          Year on Year
+ Category             Levy Amount      Levy Amount      Decrease
+                      ﴾2024/25﴿        ﴾2025/26﴿
+                      €3.23/           €2.01/           €1.22/
+ Domestic
+                      customer         customer         customer
+ Small Commercial     €12.91/          €7.77/           €5.14/
+ ﴾MIC <30 KVA﴿        customer         customer         customer
+ Medium/Large
+ Commercial ﴾MIC>_
+                      €1.57/KVA        €0.96/KVA        €0.61/KVA
+ 30KVA﴿ ﴾€/KVA﴿
+

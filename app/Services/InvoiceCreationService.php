@@ -169,6 +169,9 @@ class InvoiceCreationService
                 // Compute RTD for Udea invoices with parsed line data
                 $this->computeRtdIfApplicable($invoice, $file);
 
+                // Utility bills also feed the Electricity section (docs/features/electricity.md)
+                $this->queueElectricityImport($invoice, $supplier);
+
                 return $invoice;
             });
         } catch (\Exception $e) {
@@ -571,6 +574,29 @@ class InvoiceCreationService
     /**
      * Compute RTD breakdown for Udea invoices with parsed line data
      */
+    /**
+     * Queue the Electricity section's reader for a utility supplier's PDF.
+     * It decides for itself whether the PDF is an electricity bill, and a
+     * failure here must never stop the invoice being created.
+     */
+    private function queueElectricityImport(Invoice $invoice, AccountingSupplier $supplier): void
+    {
+        if ($supplier->supplier_type !== 'utility') {
+            return;
+        }
+
+        try {
+            \App\Jobs\ImportElectricityBill::dispatch($invoice)
+                ->onQueue(config('invoices.parsing.queue_name') ?: 'invoices')
+                ->afterCommit();
+        } catch (\Throwable $e) {
+            Log::warning('Could not queue electricity bill import', [
+                'invoice_id' => $invoice->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function computeRtdIfApplicable(Invoice $invoice, InvoiceUploadFile $file): void
     {
         try {

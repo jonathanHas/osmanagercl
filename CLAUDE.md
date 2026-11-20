@@ -166,6 +166,7 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - Invoice Document Viewing
 - Invoice Payment Management
 - Bank Reconciliation (AI-powered)
+- Electricity (`/management/electricity`: bills read into one provider-neutral shape, arithmetic checks, kWh from meter readings, cost per kWh, per-meter cost split; managers and admins)
 - VAT Returns & Dashboard
 - OSAccounts Integration
 
@@ -262,6 +263,7 @@ php artisan optimize:clear     # Clear caches
 - **Customer Requests**: [Customer Requests](./docs/features/customer-requests.md) - Public board, login-gated writes, line status lifecycle, delivery put-aside flag
 - **Order Comparison**: [Order Comparison & Difference Orders](./docs/features/order-management/order-comparison.md) - Comparing two orders, and creating an order from the difference
 - **Dynamis Pricing**: [Dynamis Invoice Pricing](./docs/features/dynamis-pricing.md) - PDF parser, guide RRP formula (PHP + mirrored in the page's JS), box counts, `FruitVegPriceService` as the one F&V till price write
+- **Electricity**: [Electricity](./docs/features/electricity.md) - Neutral bill shape, `FlogasBillParser` quirks, checks, how monthly kWh and cost are derived, adding a provider parser
 - **Udea Pallet Space**: [Udea Pallet Volumes](./docs/features/udea-pallet-volumes.md) - Basket-only data source, sync page, order-page pallet fill
 - **Features**: [Features Index](./docs/FEATURES_INDEX.md)
 - **Troubleshooting**: [Known Issues](./docs/development/known-issues.md)

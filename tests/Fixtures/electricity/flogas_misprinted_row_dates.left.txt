@@ -1,0 +1,119 @@
+ Electricity
+
+
+
+
+             MOSSFIELD ORGANIC STORE LIMITED
+             MOSSFIELD ORGANIC STORE LIMITED
+             MAIN STREET
+             BIRR
+             R42 TY29 ,
+             IRL
+
+
+
+
+  Billing Period                                           24/10/2025–17/02/2026
+
+  Bill Summary                                                                   Amount
+  Your last Bill                                                                      €0.00
+  Payment Received Thank You                                                          €0.00
+  Balance brought forward                                                            €0.00
+  Net Bill for this period                                                      €4,509.18
+  Total VAT                                                                       €405.83
+  Export Credit                                                                  €-176.69
+  Current Bill                                                                €4,738.32
+
+  Total Due                                                                   €4,738.32
+
+  Your fuel mix is presented on the back of this bill. For further information on your fuel mix,
+  please contact customer service on 041-2149500
+
+
+
+
+Payment Slip
+Building 2, 3rd & 4th Floor,
+The Green,
+Dublin Airport Central,
+                                      Account No:                       400114994
+Dublin Airport,
+Swords,                               MPRN:                             10012131474
+Co. Dublin,
+K67 E2H3
+                                      Transaction Date:                 27/03/2026
+T: 041 214 9500
+E: info@flogas.ie                     Total Due €:                      4,738.32
+www.flogas.ie
+    Description      Meter No         From               To                   Meter Readings          Multiplier    Consumpt.
+                                                                         Previous        Present
+    24hr             Z00000302        24/10/2025         15/12/2025      255162 A        262251 A     1                  7089
+    24hr             Z00027782        24/10/2025         15/12/2025      44148 E         44567 A      1                   419
+    24hr             Z00000302        24/10/2025         15/12/2025      249076 E        255162 A     1                  6086
+    24hr             Z00027782        16/12/2025         17/02/2026      44567 A         45167 A      1                   600
+
+    A – Actual, C – Customer Read, E – Estimate, FE – Flogas Estimate
+
+
+    Bill Information              Units            Rate ﴾€﴿                VAT             Unit           Amount ﴾€﴿
+    24 Hour Units                 14194            0.2549                  9%              €/kWh                     3,618.05
+    Elec Tax                      14194            0.001                   9%              €/kWh                       14.19
+    I-SEM Trading Charge          14194            0.05                    9%              €/kWh                      709.70
+    PSO Levy                      2                7.77                    9%              €/Month                     15.54
+    30/11/2025
+    PSO Levy                      2                5.65                    9%              €/Month                     11.30
+    31/01/2026
+    Standing Charge               117              1.2                     9%              €/Day                      140.40
+
+    Net total                                                                                                        4,509.18
+    VAT 9%                                                                                                             405.83
+    Export credit                        -955.06              0.185000              0%     €/kWh                     -176.69
+    24/10 - 17/02
+
+                                                                                     Current Bill                  4,738.32
+                                                          Previous Outstanding Balance                                 0.00
+                                                                                         Total Due                 4,738.32
+
+
+
+
+Energy Saving Hints and tips
+          These days we use many electrical devices & appliances to get through our day. It would be
+           diﬃcult for any of us to stop using them, but making small changes to our habits can help to
+           reduce energy consumption over time & being a bit smarter in the times we use devices can help
+           to lessen use at peak times.
+          Switch oﬀ unused devices at the wall socket when you are not using them. When devices are
+           sleeping or in standby mode, they still use small amounts of electricity. Timers or smart plugs can
+           be a good way to do this.
+You can save money by renewing your contract or switching suppliers at any time. However, please
+note that an exit fee may apply if you choose to switch before your current contract ends.
+       .
+
+ If you have any queries & would like
+                                                                          Flogas Fuel Mix Disclosure
+additional support, there are a number
+    of impartial bodies who can help
+                                                                       January 2024 to December 2024
+For general advice:                                             Electricity                   % of total
+Citizen Information                                             supplied has      Electricity       Average for All
+www.citizensinformation.ie | T: 0818 07                         been sourced      Supplied by       Island Market
+4000 available Monday to Friday 9am – 8pm                       from the          Flogas            ﴾for
+Commission for Regulation of Utilities                          following fuels                     comparison﴿
+Phone: 1800 404 404,                                            Renewable         100.0             62.4
+email: customercare@cru.ie                                      Natural gas       0.0               34.7
+or visit http://www.cru.ie/                                     Coal              0.0               1.1
+                                                                Oil               0.0               1.3
+For advice on payment or debt issues:
+                                                                Other             0.0               0.5
+Money Advice & Budgeting Service (MABS)
+                                                                Total             100.0             100.0
+www.mabs.ie | T: 0818 07 2000
+                                                                Environmental Impact
+available Monday to Friday 9am – 8pm
+                                                                CO2 Emissions            0g CO2/kWh        163g CO2/kWh
+For help and support on reducing your
+energy bill, grants available, energy                           For information on your fuel mix and on the environmental
+efficiency and emission costs: Sustainable                      impact of your electricity supply, visit www.flogas.ie or, for
+Energy Authority Ireland (SEAI) www.seai.ie |                                 further details call 0412149500.
+T: 01808 2100
+

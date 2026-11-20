@@ -1108,6 +1108,22 @@ Route::middleware('auth')->group(function () {
         Route::delete('/wages/{wageEntry}', [\App\Http\Controllers\Management\WageController::class, 'destroy'])
             ->name('wages.destroy');
 
+        // Electricity: consumption and cost from the bills (docs/features/electricity.md)
+        Route::prefix('electricity')->name('electricity.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Management\ElectricityController::class, 'index'])->name('index');
+            Route::get('/meter-split.csv', [\App\Http\Controllers\Management\ElectricityController::class, 'meterSplitCsv'])->name('meter-split');
+            Route::patch('/meters/{meter}', [\App\Http\Controllers\Management\ElectricityController::class, 'updateMeter'])->name('meters.update');
+            Route::get('/bills', [\App\Http\Controllers\Management\ElectricityBillController::class, 'index'])->name('bills.index');
+            Route::post('/bills', [\App\Http\Controllers\Management\ElectricityBillController::class, 'store'])->name('bills.store');
+            Route::post('/bills/import-from-invoices', [\App\Http\Controllers\Management\ElectricityBillController::class, 'importFromInvoices'])->name('bills.import-from-invoices');
+            Route::get('/bills/{bill}', [\App\Http\Controllers\Management\ElectricityBillController::class, 'show'])->name('bills.show');
+            Route::put('/bills/{bill}', [\App\Http\Controllers\Management\ElectricityBillController::class, 'update'])->name('bills.update');
+            Route::post('/bills/{bill}/confirm', [\App\Http\Controllers\Management\ElectricityBillController::class, 'confirm'])->name('bills.confirm');
+            Route::post('/bills/{bill}/reread', [\App\Http\Controllers\Management\ElectricityBillController::class, 'reread'])->name('bills.reread');
+            Route::delete('/bills/{bill}', [\App\Http\Controllers\Management\ElectricityBillController::class, 'destroy'])->name('bills.destroy');
+            Route::get('/bills/{bill}/pdf', [\App\Http\Controllers\Management\ElectricityBillController::class, 'pdf'])->name('bills.pdf');
+        });
+
         // VAT Dashboard
         Route::prefix('vat-dashboard')->name('vat-dashboard.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Management\VatDashboardController::class, 'index'])->name('index');

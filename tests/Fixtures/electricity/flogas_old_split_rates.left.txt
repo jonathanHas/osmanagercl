@@ -1,0 +1,123 @@
+             JONATHAN HASLAM
+             T/A ORGANIC STORE
+             Main Street
+             Birr
+             Offaly, Ireland
+             R42TY29
+
+
+
+
+                                                                 16/07/24 - 13/08/24
+
+   Bill Summary                                                                Amount
+
+   Your last bill                                                                -51.01
+
+   Payment Received Thank You                                                      0.00
+
+   Balance brought forward                                                       -51.01
+
+   Net Bill for this period                                                     956.35
+
+   Total VAT                                                                     86.06
+
+   Current Bill                                                                1,042.41
+
+
+
+   Total Due                                                                    991.40
+Your fuel mix is presented on the back of this bill. For further information
+on your fuel mix, please contact customer service on 0412149500
+
+
+
+
+                                                                                             50
+Knockbrack House
+Matthews Lane
+Donore Road, Drogheda,
+Co. Louth, Ireland
+A92 T803
+                                                                                          10012
+
+T: 041 214 9500                                                                               0
+E: accenergy@ ogas.ie
+www. ogas.ie
+Description               Meter No         From                  Meter Readings                Multiplier      Consumption
+                                                            Previous     -   Present
+
+24hr                      Z00027782        16/07/24         44230 E              42944 E            1             -1286 kWh
+24hr                      Z00000302        16/07/24        194090 E             198361 E            1              4271 kWh
+
+
+A – Actual, C - Customer Read, E - Estimate, F - Final
+
+
+
+
+Bill Information                                               Units       Rate(€)      VAT                        Amount(€)
+
+
+Unit Rate 24Hr (1st 131 kWh per 24Hr)
+16/07 31/07                                                1647.000       0.28290          R      €/kWh                  465.94
+Unit Rate 24Hr (1st 131 kWh per 24Hr)
+01/08 13/08                                                1338.000       0.23090          R      €/kWh                  308.94
+Unit Rate 24Hr (Bal. of kWh per 24Hr)
+16/07 31/07                                                    0.000      0.28290          R      €/kWh                     0.00
+Unit Rate 24Hr (Bal. of kWh per 24Hr)
+01/08 13/08                                                    0.000      0.23090          R      €/kWh                     0.00
+Standing Charge 16/07 31/07                                   16.000      1.03860          R      €/day                   16.62
+Standing Charge 01/08 13/08                                   13.000      0.97000          R      €/day                   12.61
+PSO Levy for 1 month (Aug 24) 01/08
+13/08                                                          1.000      0.00000          R      €/month                   0.00
+Electricity Tax 16/07 31/07                                    1.647      1.00000          R      €/MWh                     1.65
+Electricity Tax 01/08 13/08                                    1.338      1.00000          R      €/MWh                     1.34
+I-SEM Trading Charge 16/07 31/07                           1646.897       0.05000          R      €/kWh                   82.34
+I-SEM Trading Charge 01/08 13/08                           1338.103       0.05000          R      €/kWh                   66.91
+
+
+Net total
+                                                                                                                         956.35
+
+VAT (R) 9.00% on 956.35                                                                                                   86.06
+
+
+                                                                                          Current Bill                1,042.41
+
+                                                                             Previous Outstanding                        -51.01
+
+
+                                                                                               Total Due                 991.40
+
+
+
+
+  These days we use many electrical devices & appliances to get through our day. It would be di cult for any of
+  us to stop using them, but making small changes to our habits can help to reduce energy consumption over
+  time & being a bit smarter in the times we use devices can help to lessen use at peak times.
+  Switch o unused devices at the wall socket when you are not using them. When devices are sleeping or in
+  standby mode they still use small amounts of electricity. Timers or smart plugs can be a good way to do this.
+
+
+
+
+                                                                                 % of total
+  Electricity supplied has been sourced                     Electricity Supplied by            Average for All Island Market (for
+  from the following fuels                                  Flogas                             comparison)
+
+  Renewable                                                 100.0                               57.6
+  Natural Gas                                               0.0                                 34.2
+  Coal                                                      0.0                                 5.5
+  Oil                                                       0.0                                 1.9
+  Other                                                     0.0                                 0.8
+  Total                                                     100.0                               100.0
+  Environmental Impact
+  CO2 Emissions                                             0 gCO2/kWh                          234 gCO2/kWh
+  For information on your fuel mix and on the environmental impact of your electricity supply visit
+  www. ogas.ie or, for further details call 0412149500.
+
+  An ISEM transmission charge is applied to all commercial electric bills re ecting the additional generation, generation capacity,
+  interconnection and other costs associated with the Single Energy Market. This charge is reviewed monthly and any changes are
+  applied pro-rated to the number of days in the month the bill applies to.
+

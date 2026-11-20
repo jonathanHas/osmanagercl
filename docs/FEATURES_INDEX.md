@@ -830,6 +830,15 @@ Comprehensive VAT return management dashboard with proactive deadline alerts.
 
 📖 [VAT Dashboard Documentation](./features/vat-dashboard.md)
 
+### Electricity (NEW! 2026-11-20)
+- **Location**: `/management/electricity` (Sidebar → Financial → Electricity; managers and admins)
+- **Bills in one shape**: every electricity bill, whoever the supplier, stored with charge lines in fixed categories and meter reading rows with read types; keyed by MPRN
+- **Readers**: `FlogasBillParser` (both Flogas layouts, credit notes, reversed estimates), Claude for layouts no parser knows; every result goes through the same arithmetic checks
+- **Review**: bills that pass every check confirm themselves; the rest are corrected and confirmed beside the PDF
+- **Figures**: monthly kWh from actual meter readings, cost by type of charge, all-in cost per kWh, solar export, each meter's share of the cost (CSV)
+- **Intake**: picked up from bulk-uploaded utility invoices, `electricity:import-from-invoices`, or upload on the page
+- **Docs**: [Electricity](./features/electricity.md)
+
 ### Wages Management (NEW! 2026-02-28)
 Payroll import and P&L integration for employee wage tracking.
 - **XLS Import**: Upload "Gross to Net Total By Week Number" exports from payroll software
