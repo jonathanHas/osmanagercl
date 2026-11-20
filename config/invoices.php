@@ -133,6 +133,28 @@ return [
         'jpeg_quality' => 80,
     ],
 
+    'pdf_compression' => [
+        // Shrink image-heavy PDFs after upload (see App\Services\PdfCompressionService).
+        // Needs Ghostscript (`gs`) and poppler's `pdftotext`; without them files are left as they are.
+        'enabled' => env('INVOICE_PDF_COMPRESSION_ENABLED', true),
+
+        // Only files at least this big are considered (KB)
+        'min_size_kb' => env('INVOICE_PDF_COMPRESSION_MIN_KB', 500),
+
+        // Colour and grey pictures above this resolution are brought down to it
+        'image_dpi' => env('INVOICE_PDF_COMPRESSION_DPI', 200),
+
+        // Keep the original unless the result is at most this fraction of its size
+        'max_size_ratio' => 0.8,
+
+        // A PDF with fewer extractable words than this is treated as a scan and never touched
+        'min_words' => 50,
+
+        'timeout' => 60,
+        'ghostscript' => env('GHOSTSCRIPT_PATH', 'gs'),
+        'pdftotext' => env('PDFTOTEXT_PATH', 'pdftotext'),
+    ],
+
     'pdf_repair' => [
         // Enable automatic PDF repair during upload
         'enabled' => env('INVOICE_PDF_REPAIR_ENABLED', true),

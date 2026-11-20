@@ -90,6 +90,41 @@ memory_limit        = 512M
 
 Restart Apache after changing these (`sudo systemctl restart apache2`).
 
+The two size limits are also set by the app itself, so a fresh machine does not
+fall back to PHP's 2M default: `public/.htaccess` (mod_php, inside
+`<IfModule mod_php.c>`) and `public/.user.ini` (PHP-FPM) both set
+`upload_max_filesize = 32M` and `post_max_size = 120M`. These override php.ini
+for this site. The upload page shows the limit PHP really enforces
+(`effectiveMaxFileSizeMb()`), and a file PHP rejected for size gets a message
+that says so instead of "failed to upload".
+
+### PDF Compression
+
+Some supplier PDFs are far bigger than they need to be (a Flogas electricity bill
+is 4 MB because its last page is a full-page marketing photo). After upload,
+`App\Services\PdfCompressionService` rewrites such a PDF with Ghostscript,
+bringing colour and grey pictures above 200 dpi down to 200 dpi. Text, fonts and
+black-and-white images are not touched. The Flogas bill goes from 4.02 MB to
+0.38 MB and parses identically.
+
+The original is kept, unchanged, unless **all** of these hold:
+
+- the file is at least 500 KB;
+- it has a real text layer (50+ extractable words). A scan, where the picture is
+  the invoice, is never compressed;
+- the page count is the same afterwards;
+- every page yields exactly the same words afterwards (`pdftotext`);
+- the result is at most 80% of the original size.
+
+`file_hash` stays the hash of the file as uploaded; `file_size` becomes the new
+size. Each decision is logged as `PDF compression` with the reason.
+
+Needs `gs` (package `ghostscript`) and `pdftotext` (`poppler-utils`) on the
+server. If either is missing the file is simply left as it is. Settings are under
+`pdf_compression` in `config/invoices.php` (`INVOICE_PDF_COMPRESSION_ENABLED=false`
+turns it off). Ghostscript is run on a copy in the system temp folder because
+Ubuntu 26.04 confines `gs` with AppArmor and it cannot read `/var/www`.
+
 ### Chunked Upload
 
 Because one request cannot safely carry a whole batch, the browser splits a large

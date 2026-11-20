@@ -23,3 +23,12 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Invoice uploads: PHP's defaults (2M per file, 8M per request) reject scanned
+# or image-heavy PDFs before Laravel sees them. Keep these above
+# invoices.bulk_upload.max_file_size_mb (25). Under PHP-FPM the same values
+# come from .user.ini in this folder.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 32M
+    php_value post_max_size 120M
+</IfModule>

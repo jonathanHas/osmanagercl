@@ -40,11 +40,28 @@ class InvoiceBulkUploadController extends Controller
         return view('invoices.bulk-upload', [
             'recentUploads' => $recentUploads,
             'maxFiles' => $maxFiles,
-            'maxFileSize' => config('invoices.bulk_upload.max_file_size_mb'),
+            'maxFileSize' => $this->effectiveMaxFileSizeMb(),
             'allowedExtensions' => config('invoices.bulk_upload.allowed_extensions'),
             'chunkMaxFiles' => $chunkMaxFiles,
             'chunkMaxBytes' => $chunkMaxBytes,
         ]);
+    }
+
+    /**
+     * The largest single file the server will really accept, in MB: the configured
+     * limit, capped by PHP's own upload_max_filesize and post_max_size. PHP drops a
+     * bigger file before Laravel sees it, so the page must not promise more than this.
+     * The limits are raised for this app in public/.htaccess and public/.user.ini.
+     */
+    private function effectiveMaxFileSizeMb(): float
+    {
+        $bytes = min(
+            config('invoices.bulk_upload.max_file_size_mb') * 1024 * 1024,
+            $this->iniBytes('upload_max_filesize'),
+            $this->iniBytes('post_max_size') * 0.8,
+        );
+
+        return floor($bytes / 1024 / 1024 * 10) / 10;
     }
 
     /**
@@ -92,6 +109,7 @@ class InvoiceBulkUploadController extends Controller
         ], [
             'files.max' => "You can upload a maximum of {$maxFiles} files at once.",
             'files.*.max' => "Each file must be less than {$maxSizeMB}MB.",
+            'files.*.uploaded' => 'A file is larger than this server accepts ('.$this->effectiveMaxFileSizeMb().'MB). Check the PHP upload limits.',
         ]);
 
         $incomingCount = count($request->file('files'));
@@ -224,6 +242,19 @@ class InvoiceBulkUploadController extends Controller
                     'exists_after_commit' => $exists,
                     'file_size' => $exists ? filesize($uploadFile->temp_file_path) : 0,
                 ]);
+
+                // Shrink image-heavy PDFs. The hash stays that of the file as uploaded,
+                // so uploading the same original again is still recognised.
+                if ($uploadFile->isPdf() && $exists) {
+                    $compression = app(\App\Services\PdfCompressionService::class)
+                        ->compress($uploadFile->temp_file_path);
+
+                    if ($compression['compressed']) {
+                        $uploadFile->update(['file_size' => $compression['new_size']]);
+                    }
+
+                    \Log::info('PDF compression', ['file_id' => $uploadFile->id] + $compression);
+                }
 
                 // Get page count for PDFs
                 if ($uploadFile->isPdf() && $exists) {
