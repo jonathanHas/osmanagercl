@@ -64,6 +64,7 @@
                         <th class="px-3 py-3 font-medium text-right">Net</th>
                         <th class="px-3 py-3 font-medium text-right">Bill total</th>
                         <th class="px-3 py-3 font-medium">Status</th>
+                        <th class="px-3 py-3 font-medium">Document</th>
                         <th class="px-6 py-3 font-medium">Accounts</th>
                     </tr>
                 </thead>
@@ -94,6 +95,14 @@
                                 @endif
                                 @if($bill->source !== 'parser')<span class="text-xs text-gray-500 dark:text-gray-400">· {{ $bill->source === 'ai' ? 'read by AI' : 'edited' }}</span>@endif
                             </td>
+                            <td class="px-3 py-2 whitespace-nowrap">
+                                @if($bill->pdfPath())
+                                    <a class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener"
+                                       href="{{ route('management.electricity.bills.pdf', $bill) }}" aria-label="Open the PDF of bill {{ $bill->bill_number }} in a new tab">Open PDF</a>
+                                @else
+                                    <span class="text-gray-400">not on disk</span>
+                                @endif
+                            </td>
                             <td class="px-6 py-2 whitespace-nowrap">
                                 @if($bill->invoice)
                                     <a class="text-blue-600 dark:text-blue-400 hover:underline" href="{{ route('invoices.show', $bill->invoice) }}">Invoice</a>
@@ -103,7 +112,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No bills yet. Upload some above, or load them from the accounts invoices.</td></tr>
+                        <tr><td colspan="10" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">No bills yet. Upload some above, or load them from the accounts invoices.</td></tr>
                     @endforelse
                 </tbody>
             </table>

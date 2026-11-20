@@ -370,6 +370,29 @@ class ElectricityTest extends TestCase
         $this->actingAs($manager)->get(route('management.electricity.index'))->assertOk()->assertSee('Electricity used each month');
     }
 
+    public function test_the_bills_list_links_straight_to_the_pdf(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('private');
+        $manager = $this->userWithRole('manager');
+        $bill = $this->importer()->store(
+            $this->billData('B1', '2026-02-03', '2026-01-01', '2026-01-31', 1000, 1310), 'parser', null,
+            ['file_path' => 'electricity/2026/b1.pdf']
+        );
+        $without = $this->importer()->store($this->billData('B2', '2026-03-03', '2026-02-01', '2026-02-28', 1310, 1600), 'parser');
+        \Illuminate\Support\Facades\Storage::disk('private')->put('electricity/2026/b1.pdf', '%PDF-1.4 test');
+
+        $this->actingAs($manager)->get(route('management.electricity.bills.index'))
+            ->assertOk()
+            ->assertSee(route('management.electricity.bills.pdf', $bill))
+            ->assertDontSee(route('management.electricity.bills.pdf', $without))
+            ->assertSee('not on disk');
+
+        $this->actingAs($manager)->get(route('management.electricity.bills.pdf', $bill))
+            ->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->actingAs($manager)->get(route('management.electricity.bills.pdf', $without))->assertNotFound();
+        $this->actingAs($this->userWithRole('employee'))->get(route('management.electricity.bills.pdf', $bill))->assertForbidden();
+    }
+
     public function test_a_manager_can_name_a_meter_and_remove_a_bill(): void
     {
         $manager = $this->userWithRole('manager');

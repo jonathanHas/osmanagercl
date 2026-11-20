@@ -31,6 +31,10 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @if($hasPdf)
+                    <a href="{{ route('management.electricity.bills.pdf', $bill) }}" target="_blank" rel="noopener"
+                       class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Open PDF in new tab</a>
+                @endif
                 @if($aiAvailable && $hasPdf)
                     <form method="POST" action="{{ route('management.electricity.bills.reread', $bill) }}"
                           onsubmit="return confirm('Read this bill again with AI? The figures below are replaced and the bill goes back to review.')">

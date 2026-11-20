@@ -22,7 +22,7 @@ class ElectricityBillController extends Controller
     public function index(Request $request)
     {
         $bills = ElectricityBill::query()
-            ->with(['supplyPoint', 'invoice'])
+            ->with(['supplyPoint', 'invoice.attachments'])
             ->when($request->query('status') === 'needs_review',
                 fn ($q) => $q->where('status', ElectricityBill::STATUS_NEEDS_REVIEW))
             ->orderByDesc('issue_date')->orderByDesc('id')
