@@ -102,6 +102,7 @@ php artisan osaccounts:import-invoices --update-existing --user=1
   - Amount
   - Current payment status
 - **Bulk Payment System**: NEW! Mark multiple invoices as paid directly from outstanding report
+- **Keeps your place after paying** (2026-11-20): Mark as Paid reloads the page, then returns to the supplier that was at the top of the screen with the same suppliers expanded. If that supplier is now fully paid and gone, the next supplier down takes its place (the one above if it was last). State is passed through `sessionStorage` (`outstanding-report:restore`), all in `suppliers/outstanding-report.blade.php`; the admin shell's `<main>` is the scroller, not the window.
   - Individual checkboxes for each invoice
   - "Select all" checkboxes per supplier (header and table)
   - Sticky bulk actions bar that stays visible while scrolling

@@ -130,10 +130,49 @@
                     </div>
 
                     <!-- Supplier Groups -->
+                    {{-- Put the page back where it was after "Mark as Paid" reloads it: same supplier at the
+                         same height, same suppliers expanded. Runs before Alpine so x-init can read it. --}}
+                    <script>
+                        window.outstandingRestore = (function () {
+                            try {
+                                const key = 'outstanding-report:restore';
+                                const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+                                sessionStorage.removeItem(key);
+                                if (saved && saved.url === location.pathname + location.search) return saved;
+                            } catch (e) {}
+                            return null;
+                        })();
+
+                        document.addEventListener('alpine:initialized', function () {
+                            const saved = window.outstandingRestore;
+                            if (!saved || !Array.isArray(saved.order)) return;
+
+                            const card = key => document.querySelector(`[data-supplier-card="${CSS.escape(key)}"]`);
+                            // The supplier that was at the top of the screen; if it has been paid off and is gone,
+                            // the next one down the list that is still here, otherwise the nearest one above.
+                            let target = null, exact = false;
+                            for (let i = saved.anchor; i < saved.order.length && !target; i++) {
+                                target = card(saved.order[i]);
+                                exact = !!target && i === saved.anchor;
+                            }
+                            for (let i = saved.anchor - 1; i >= 0 && !target; i--) target = card(saved.order[i]);
+                            if (!target) return;
+
+                            requestAnimationFrame(function () {
+                                const scroller = target.closest('main');
+                                const top = scroller ? scroller.getBoundingClientRect().top : 0;
+                                const offset = exact ? saved.offset : Math.max(saved.offset, 16);
+                                const delta = target.getBoundingClientRect().top - top - offset;
+                                if (scroller && scroller.scrollHeight > scroller.clientHeight) scroller.scrollTop += delta;
+                                else window.scrollBy(0, delta);
+                            });
+                        });
+                    </script>
                     <div x-data="{ suppliers: {} }" @toggle-all.window="Object.keys(suppliers).forEach(key => suppliers[key] = $event.detail.expand)">
                         @foreach($supplierGroups as $supplierIndex => $supplierGroup)
-                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6" 
-                             x-init="suppliers['{{ $supplierIndex }}'] = false">
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6"
+                             data-supplier-card="{{ $supplierIndex }}"
+                             x-init="suppliers['{{ $supplierIndex }}'] = (window.outstandingRestore?.expanded || []).includes('{{ $supplierIndex }}')">
                             <div class="p-6">
                                 <!-- Supplier Header - Always Visible -->
                                 <div class="flex justify-between items-center">
@@ -164,7 +203,8 @@
                                 </div>
 
                                 <!-- Invoice Details Table - Collapsible -->
-                                <div x-show="suppliers['{{ $supplierIndex }}']" 
+                                <div x-show="suppliers['{{ $supplierIndex }}']"
+                                     data-supplier-details
                                      x-transition:enter="transition ease-out duration-200"
                                      x-transition:enter-start="opacity-0 transform scale-95"
                                      x-transition:enter-end="opacity-100 transform scale-100"
@@ -711,6 +751,33 @@
                 }
             }
             
+            // Remember which supplier is at the top of the screen (and how far down it sits), the order of
+            // the list and which suppliers are open, so the reload can return here. See the script above
+            // the supplier list for the other half.
+            function saveScrollPosition() {
+                try {
+                    const cards = Array.from(document.querySelectorAll('[data-supplier-card]'));
+                    if (!cards.length) return;
+                    const scroller = cards[0].closest('main');
+                    const top = scroller ? scroller.getBoundingClientRect().top : 0;
+                    let anchor = cards.findIndex(card => card.getBoundingClientRect().bottom > top);
+                    if (anchor === -1) anchor = cards.length - 1;
+
+                    sessionStorage.setItem('outstanding-report:restore', JSON.stringify({
+                        url: location.pathname + location.search,
+                        order: cards.map(card => card.dataset.supplierCard),
+                        anchor: anchor,
+                        offset: cards[anchor].getBoundingClientRect().top - top,
+                        expanded: cards
+                            .filter(card => {
+                                const details = card.querySelector('[data-supplier-details]');
+                                return details && details.style.display !== 'none';
+                            })
+                            .map(card => card.dataset.supplierCard),
+                    }));
+                } catch (e) {}
+            }
+
             function submitBulkPayment() {
                 const formData = new FormData(bulkPaymentForm);
                 const invoiceIds = Array.from(selectedInvoices.keys());
@@ -739,7 +806,8 @@
                         updateSelectionDisplay();
                         // Show success message
                         alert(`Success: ${data.message}`);
-                        // Refresh page to show updated payment statuses
+                        // Refresh page to show updated payment statuses, coming back to the same place
+                        saveScrollPosition();
                         window.location.reload();
                     } else {
                         alert(data.error || 'Failed to mark invoices as paid');
