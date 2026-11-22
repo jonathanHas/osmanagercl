@@ -63,7 +63,7 @@ Empty means no mail at all — problems still land in `backup.log`.
 | `BACKUP_PATH` | `/var/backups/osmanager` | Outside the project. Dev: `/home/<you>/backups/osmanager`. |
 | `BACKUP_NOTIFICATION_EMAIL` | empty | Comma-separated. Empty = no mail. |
 | `BACKUP_ARCHIVE_PASSWORD` | empty | Set to AES-256-encrypt the zip (it contains `.env`). Restoring then needs `unzip -P` or 7-Zip; plain zip is simpler to restore. |
-| `BACKUP_MAX_STORAGE_MB` | 30000 | Storage ceiling for both cleanup and the health check. |
+| `BACKUP_MAX_STORAGE_MB` | 30000 | Storage ceiling for cleanup. The health check alerts at this plus 3000 MB, because the night's archive is added after cleanup has trimmed to the ceiling. |
 | `DB_DUMP_BINARY_PATH` | `/usr/bin` | Directory holding `mysqldump`. |
 
 ## Production setup (one-time, needs sudo)

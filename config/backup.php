@@ -167,7 +167,10 @@ return [
             'disks' => ['backups'],
             'health_checks' => [
                 Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumAgeInDays::class => 1,
-                Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumStorageInMegabytes::class => (int) env('BACKUP_MAX_STORAGE_MB', 30000),
+                // Cleanup trims to just under BACKUP_MAX_STORAGE_MB at 01:00 and
+                // the 01:30 archive (about 1 GB) then goes on top, so the check
+                // needs headroom or it reports "unhealthy" every night.
+                Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumStorageInMegabytes::class => (int) env('BACKUP_MAX_STORAGE_MB', 30000) + 3000,
             ],
         ],
     ],
