@@ -146,7 +146,9 @@
             method: 'POST',
             body: formData,
             headers: {
-                'Accept': 'text/event-stream',
+                // JSON first so Laravel answers a rejected form (validation, expired token)
+                // with a JSON message instead of a redirect whose reason is lost here.
+                'Accept': 'application/json, text/event-stream',
                 'X-Requested-With': 'XMLHttpRequest'
             }
         }).then(function(response) {
@@ -156,7 +158,8 @@
                 // Try to extract error message from JSON validation errors
                 if (contentType.includes('application/json')) {
                     return response.json().then(function(json) {
-                        const msg = json.message || 'Validation failed';
+                        const firstError = json.errors ? Object.values(json.errors)[0] : null;
+                        const msg = (firstError && firstError[0]) || json.message || 'Validation failed';
                         throw new Error(msg);
                     });
                 }
