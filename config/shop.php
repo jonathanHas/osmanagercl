@@ -65,6 +65,9 @@ return [
         'help.*',
         'api.products.search',
         'customer-requests.*',
+        // Shop > Fruit & veg > Pricing calls the office pricing endpoints. They
+        // keep their own role:manager,admin gate, and managers have no PIN.
+        'deliveries.dynamis-pricing.*',
         'delivery-legacy.items',
         'delivery-legacy.scan-increment',
         'delivery-legacy.update-quantity',

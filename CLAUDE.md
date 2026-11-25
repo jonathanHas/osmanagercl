@@ -153,7 +153,7 @@ For a complete list of all features with detailed descriptions, see **[Features 
 - Delivery Dockets (`/deliveries`: docket import, new products, cost/price updates) & Receiving (`/delivery-legacy` + Shop *Receive delivery*: scan sessions, the only POS stock write; see `docs/deliveries/README.md`)
 - Unified Supplier Management
 - Udea Pallet Volumes (pallet-space data + running pallet fill on Udea orders)
-- Dynamis Invoice Pricing (invoice PDF → docket + pricing page: guide RRP, per kg / each, applies F&V till prices; managers and admins)
+- Dynamis Invoice Pricing (invoice PDF → docket + pricing page: guide RRP, per kg / each, applies F&V till prices; managers and admins; phone layout at `/shop/fv/pricing`)
 
 **Order Management**
 - Order Generation (sales-driven suggestions, coverage windows, category overrides)
@@ -262,7 +262,7 @@ php artisan optimize:clear     # Clear caches
 - **Staff Procedures**: [Staff Procedures (SOPs) from BookStack](./docs/features/sops-bookstack.md) - Help button per screen, `screen` tag, caching, image proxy, owner setup in BookStack
 - **Customer Requests**: [Customer Requests](./docs/features/customer-requests.md) - Public board, login-gated writes, line status lifecycle, delivery put-aside flag
 - **Order Comparison**: [Order Comparison & Difference Orders](./docs/features/order-management/order-comparison.md) - Comparing two orders, and creating an order from the difference
-- **Dynamis Pricing**: [Dynamis Invoice Pricing](./docs/features/dynamis-pricing.md) - PDF parser, guide RRP formula (PHP + mirrored in the page's JS), box counts, `FruitVegPriceService` as the one F&V till price write
+- **Dynamis Pricing**: [Dynamis Invoice Pricing](./docs/features/dynamis-pricing.md) - PDF parser, guide RRP formula (PHP + mirrored in the office page's JS and the Shop screen's `dynamis-pricing.js`), box counts, `FruitVegPriceService` as the one F&V till price write
 - **Electricity**: [Electricity](./docs/features/electricity.md) - Neutral bill shape, `FlogasBillParser` quirks, checks, how monthly kWh and cost are derived, adding a provider parser
 - **Udea Pallet Space**: [Udea Pallet Volumes](./docs/features/udea-pallet-volumes.md) - Basket-only data source, sync page, order-page pallet fill
 - **Features**: [Features Index](./docs/FEATURES_INDEX.md)

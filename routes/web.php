@@ -133,6 +133,13 @@ Route::middleware('auth')->group(function () {
             Route::get('/fv/harvest', [\App\Http\Controllers\Shop\FruitVegController::class, 'harvest'])->name('fv.harvest');
         });
 
+        // Dynamis invoice pricing on a phone, beside the boxes. The same people as
+        // the office page, and it calls that page's deliveries.dynamis-pricing.* endpoints.
+        Route::middleware('role:manager,admin')->group(function () {
+            Route::get('/fv/pricing', [\App\Http\Controllers\Shop\DynamisPricingController::class, 'index'])->name('fv.pricing');
+            Route::get('/fv/pricing/{delivery}', [\App\Http\Controllers\Shop\DynamisPricingController::class, 'show'])->name('fv.pricing.show');
+        });
+
         // Supplier order review (order_clean cycle 1). Narrower than the office's
         // orders.manage: review, adjust quantities on drafts, export.
         Route::middleware('permission:orders.review')->group(function () {

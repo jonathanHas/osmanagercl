@@ -401,6 +401,43 @@ class DynamisPricingService
     }
 
     /**
+     * The latest invoices that have a pricing page, with how far each has got
+     * (fruit & veg lines only; barcoded lines are not priced here).
+     *
+     * @return array<int, array{delivery: Delivery, invoice_number: ?string, date: ?\Carbon\CarbonInterface, lines: int, priced: int, skipped: int, todo: int}>
+     */
+    public function recentInvoices(int $limit = 12): array
+    {
+        $deliveries = Delivery::where('supplier_id', self::SUPPLIER_ID)
+            ->whereIn('id', DynamisPricingLine::select('delivery_id'))
+            ->orderByDesc('delivery_date')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
+
+        $lines = DynamisPricingLine::whereIn('delivery_id', $deliveries->pluck('id'))
+            ->where('is_barcoded', false)
+            ->get(['delivery_id', 'pricing_mode', 'applied_price'])
+            ->groupBy('delivery_id');
+
+        return $deliveries->map(function (Delivery $delivery) use ($lines) {
+            $own = $lines->get($delivery->id, collect());
+            $skipped = $own->where('pricing_mode', DynamisPricingLine::MODE_SKIP)->count();
+            $priced = $own->filter(fn ($l) => $l->applied_price !== null && $l->pricing_mode !== DynamisPricingLine::MODE_SKIP)->count();
+
+            return [
+                'delivery' => $delivery,
+                'invoice_number' => $delivery->import_data['dynamis']['invoice_number'] ?? null,
+                'date' => $delivery->delivery_date,
+                'lines' => $own->count(),
+                'priced' => $priced,
+                'skipped' => $skipped,
+                'todo' => $own->count() - $priced - $skipped,
+            ];
+        })->all();
+    }
+
+    /**
      * Every pricing line of a docket, ready for the page.
      *
      * @return array{produce: array, barcoded: array}

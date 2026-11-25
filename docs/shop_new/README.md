@@ -39,7 +39,9 @@ Screens today: Home, Stock scan, Find product, Deliveries (list, scan,
 summary; built on the **legacy** `delivery-legacy.*` endpoints, which is the
 flow employees use), Print labels (Shelf labels and Zebra labels tabs; the Zebra card sets the
 country of origin), Customer requests (board, detail, edit; the
-public `/customer-requests` route), Vouchers, F&V waste and harvest, PIN
+public `/customer-requests` route), Vouchers, F&V waste and harvest, F&V
+Dynamis pricing (`/shop/fv/pricing`, managers and admins, built outside the
+plan/implement cycle on 2026-11-25; see `docs/features/dynamis-pricing.md`), PIN
 switch / lock / locked, trust device, Help (BookStack procedures). The coffee
 KDS is deliberately outside the Shop view.
 

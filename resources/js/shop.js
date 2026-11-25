@@ -10,6 +10,7 @@
  */
 import deliveryScan from './shop/delivery-scan';
 import deliverySummary from './shop/delivery-summary';
+import dynamisPricing from './shop/dynamis-pricing';
 import findProduct from './shop/find-product';
 import startIdleLock from './shop/idle-lock';
 import fvHarvest from './shop/fv-harvest';
@@ -50,4 +51,5 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('shopFvHarvest', fvHarvest);
     Alpine.data('shopPinPad', pinPad);
     Alpine.data('shopOrderReview', orderReview);
+    Alpine.data('shopDynamisPricing', dynamisPricing);
 });

@@ -3,7 +3,8 @@
 **Status**: Shipped 2026-11-11
 **Who**: managers and admins only (`role:manager,admin`)
 **Entry point**: Delivery Dockets → New → **Dynamis invoice (pricing)** tab, or the
-**Open pricing page** banner on a Dynamis docket.
+**Open pricing page** banner on a Dynamis docket. On a phone: Shop → Fruit & veg →
+**Pricing** (see [On a phone](#on-a-phone-shop-mode)).
 
 ## What it does
 
@@ -34,7 +35,8 @@ each                       = box price ÷ count in a box
   the figure in use. Some weeks no delivery charge is on the invoice.
 - No rounding: the suggestion is to the cent and the manager types the shelf price.
 - The formula lives in `DynamisPricingService::guidePrice()` / `suggestedPrice()` and is
-  mirrored in the page's Alpine code so it recalculates as a count is typed. Change both.
+  mirrored in the office page's Alpine code and in `resources/js/shop/dynamis-pricing.js`
+  (the Shop screen) so both recalculate as a count is typed. Change all three.
 
 ## Line options
 
@@ -164,6 +166,27 @@ print queue. It then records the applied price on the line and saves the mode an
 the link for next week. Nothing else on the docket changes; costs are still updated from
 the docket page.
 
+## On a phone (Shop mode)
+
+Added 2026-11-25. `/shop/fv/pricing` lists the latest invoices with how many lines are
+still to do; `/shop/fv/pricing/{delivery}` is the pricing page laid out for a phone, to
+use beside the boxes. Managers and admins only (`role:manager,admin`), reached from the
+**Pricing** tab of Shop → Fruit & veg (the tab is shown only to them).
+
+- One row per fruit & veg line (description, till product, status, guide price). Tapping
+  a row opens its editor in flow under it, one at a time: till product (confirm the
+  "Looks like" guess, choose or change it, Show on till, Change to the invoice's
+  country), Per kg / Each with the box count or weight, the price box with **Use guide**
+  and **Keep**, cost and margin, then **Skip** and **Apply**.
+- **To do / Done / All** tabs. A line leaves To do when it is applied or skipped (a
+  toast confirms); find it under Done to apply again or undo a skip.
+- It has no endpoints of its own. It posts to the office page's
+  `deliveries.dynamis-pricing.*` routes, so the rules, the till write and the remembered
+  link are the same on both pages. `Shop\DynamisPricingController` only renders.
+- Left on the office page (linked at the foot of the screen): uploading the invoice,
+  **New product**, transport and markup, **Apply ticked** and the barcoded lines list.
+- The formula is a third copy (see [The formula](#the-formula)).
+
 ## Parser
 
 `DynamisInvoicePdfParserService` runs `pdftotext -layout` (poppler-utils, already required
@@ -181,6 +204,10 @@ imported twice: a second upload opens the existing pricing page.
 - `app/Services/DeliveryDocumentService.php` – files the PDF (extracted from `DeliveryController`)
 - `app/Models/DynamisPricingLine.php`, migration `2026_11_11_000001_create_dynamis_pricing_lines_table`
 - `resources/views/deliveries/dynamis-pricing.blade.php`
+- Shop screen: `app/Http/Controllers/Shop/DynamisPricingController.php`,
+  `resources/views/shop/fv-pricing.blade.php`, `fv-pricing-invoice.blade.php`,
+  `resources/js/shop/dynamis-pricing.js`, `.shop-dyn*` in `resources/css/shop.css`,
+  `DynamisPricingService::recentInvoices()`, `tests/Feature/Shop/ShopDynamisPricingTest.php`
 - Tests: `tests/Feature/DynamisPricingTest.php`, `tests/Unit/DynamisInvoicePdfParserServiceTest.php`,
   `tests/Unit/DynamisPricingFormulaTest.php`, fixture `tests/Fixtures/dynamis_invoice_FC10006631.txt`
 
